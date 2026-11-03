@@ -3,12 +3,11 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useMemo, useRef, useState } from "react";
-import { AdminNav } from "@/components/admin-nav";
 import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
-import { ShopifyMark } from "@/components/marks";
-import { PIcon } from "@/components/polaris-icon";
+import { Orb, ShopifyMark } from "@/components/marks";
 import { PreviewColumn } from "@/components/preview-column";
+import { ProductRail } from "@/components/product-rail";
 import {
   activeState,
   personaFor,
@@ -121,13 +120,33 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   }
 
   return (
-    <div className="relative flex h-dvh min-w-[1280px] bg-[#f1f1f1] text-[#101010]">
-      <AdminNav
-        storeName={state.storeName}
-        preview={state.preview}
-        onOpen={(id) => setState((current) => reducer(current, { type: "rail", id }))}
-        onSearch={() => setState((current) => reducer(current, { type: "toggle-search" }))}
-      />
+    <div className="relative flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white">
+      <div className="p-partial-theme-admin-next-dark flex min-w-0 flex-1 gap-1 bg-[#0c0d0c] text-white">
+        <AgentNav
+          state={state}
+          onSelect={(id) => setState((current) => reducer(current, { type: "select", id }))}
+          onAdd={() => setState((current) => reducer(current, { type: "toggle-add" }))}
+          onSearch={() => setState((current) => reducer(current, { type: "toggle-search" }))}
+          onQuery={(query) => setState((current) => reducer(current, { type: "search", query }))}
+          onExperiments={() => setState((current) => reducer(current, { type: "toggle-experiments" }))}
+        />
+        <div className="my-3 w-px shrink-0 bg-white/10" />
+        <ChatColumn
+          state={state}
+          liveText={liveText}
+          busy={chat.status === "submitted" || chat.status === "streaming"}
+          onChip={(label) => setState((current) => reducer(current, { type: "chip", label }))}
+          onSend={send}
+          onPurpose={(id) => setState((current) => reducer(current, { type: "toggle-purpose", id }))}
+          onStart={() => setState((current) => reducer(current, { type: "chip", label: "Start working" }))}
+          onAddCatalog={(id) => setState((current) => reducer(current, { type: "add-catalog", id }))}
+          onCreate={(name, purpose) => setState((current) => reducer(current, { type: "create-agent", name, purpose }))}
+          onScenario={(scenario) => setState((current) => reducer(current, { type: "scenario", scenario }))}
+          onMotion={(on) => setState((current) => reducer(current, { type: "motion", on }))}
+          onReset={() => setState((current) => reducer(current, { type: "reset" }))}
+          onCloseExperiments={() => setState((current) => reducer(current, { type: "toggle-experiments" }))}
+        />
+      </div>
       <PreviewColumn
         state={state}
         onPreview={(page, wide) => setState((current) => reducer(current, { type: "preview", page, wide }))}
@@ -138,33 +157,10 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         onProduct={(id) => setState((current) => reducer(current, { type: "product", id }))}
         onUpdateProduct={(id, patch) => setState((current) => reducer(current, { type: "update-product", id, patch }))}
         onAddProduct={() => setState((current) => reducer(current, { type: "add-blank-product" }))}
+        onRail={(id) => setState((current) => reducer(current, { type: "rail", id }))}
       />
-      <div className="flex w-[600px] shrink-0 py-3 pr-3">
-        <div className="flex min-w-0 flex-1 overflow-hidden rounded-[20px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_28px_rgba(0,0,0,0.05)]">
-      <AgentNav
-        state={state}
-        onSelect={(id) => setState((current) => reducer(current, { type: "select", id }))}
-        onAdd={() => setState((current) => reducer(current, { type: "toggle-add" }))}
-        onSearch={() => setState((current) => reducer(current, { type: "toggle-search" }))}
-        onQuery={(query) => setState((current) => reducer(current, { type: "search", query }))}
-        onExperiments={() => setState((current) => reducer(current, { type: "toggle-experiments" }))}
-      />
-      <ChatColumn
-        state={state}
-        liveText={liveText}
-        busy={chat.status === "submitted" || chat.status === "streaming"}
-        onChip={(label) => setState((current) => reducer(current, { type: "chip", label }))}
-        onSend={send}
-        onPurpose={(id) => setState((current) => reducer(current, { type: "toggle-purpose", id }))}
-        onStart={() => setState((current) => reducer(current, { type: "chip", label: "Start working" }))}
-        onAddCatalog={(id) => setState((current) => reducer(current, { type: "add-catalog", id }))}
-        onCreate={(name, purpose) => setState((current) => reducer(current, { type: "create-agent", name, purpose }))}
-        onScenario={(scenario) => setState((current) => reducer(current, { type: "scenario", scenario }))}
-        onMotion={(on) => setState((current) => reducer(current, { type: "motion", on }))}
-        onReset={() => setState((current) => reducer(current, { type: "reset" }))}
-        onCloseExperiments={() => setState((current) => reducer(current, { type: "toggle-experiments" }))}
-      />
-        </div>
+      <div className="p-partial-theme-admin-next-dark flex">
+        <ProductRail preview={state.preview} onOpen={(id) => setState((current) => reducer(current, { type: "rail", id }))} />
       </div>
       <span className="sr-only">{agent.name}</span>
       {booting ? <BootScreen storeName={state.storeName} /> : null}
@@ -174,15 +170,15 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
 
 function BootScreen({ storeName }: { storeName: string }) {
   return (
-    <div className="absolute inset-0 z-[200] grid place-items-center bg-[#f6f6f6] text-[#101010]">
+    <div className="absolute inset-0 z-[200] grid place-items-center bg-[#0c0d0c] text-white">
       <div className="w-[280px] text-center">
-        <div className="sk-pulse mx-auto mb-4 grid size-12 place-items-center rounded-full bg-[#672ff4] text-white">
-          <PIcon name="Sidekick" />
+        <div className="mx-auto mb-4 grid place-items-center">
+          <Orb id="chief" size={56} />
         </div>
         <p className="text-[15px] font-medium">Opening {storeName}</p>
-        <p className="mt-1 text-[13px] text-[#606060]">Sidekick is getting the admin ready</p>
-        <div className="mt-4 h-1 overflow-hidden rounded-full bg-[#e6e6e6]">
-          <div className="sk-bar h-full origin-left bg-[#101010]" />
+        <p className="mt-1 text-[13px] text-[#8e8f8b]">Sidekick is getting the admin ready</p>
+        <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10">
+          <div className="sk-bar h-full origin-left bg-white" />
         </div>
       </div>
     </div>
@@ -233,9 +229,9 @@ function Signup({ onSubmit, onActive }: { onSubmit: (storeName: string) => void;
   const [storeName, setStoreName] = useState("My Store");
   const [email, setEmail] = useState("");
   return (
-    <main className="grid min-h-dvh place-items-center bg-[#f1f1f1] px-6 text-[#101010]">
+    <main className="p-partial-theme-admin-next-dark grid min-h-dvh place-items-center bg-[#0c0d0c] px-6 text-white">
       <div className="w-full max-w-[440px]">
-        <ShopifyMark tone="dark" className="mb-6 h-8 w-7" />
+        <ShopifyMark className="mb-6 h-8 w-7" />
         <s-section
           heading="Create your store"
           subheading="You’ll land with Sidekick expanded, ready to set up payments, a theme, and the rest of the store."
