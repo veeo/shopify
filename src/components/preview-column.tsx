@@ -1118,19 +1118,24 @@ function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduc
 }
 
 function Thumb({ product, size = 40 }: { product: Product; size?: number }) {
-  const src = product.tone === "lamp" ? "/assets/lamp.webp" : product.tone === "headphones" ? "/assets/headphones.webp" : null;
+  const radius = size >= 48 ? 12 : 8;
+  if (product.image) {
+    return (
+      <img
+        src={product.image}
+        alt=""
+        width={size}
+        height={size}
+        className="shrink-0 object-cover shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)]"
+        style={{ width: size, height: size, borderRadius: radius }}
+      />
+    );
+  }
   return (
-    <span
-      className={`grid shrink-0 place-items-center overflow-hidden ${toneClass[product.tone]}`}
-      style={{ width: size, height: size, borderRadius: size >= 48 ? 12 : 8 }}
-    >
-      {src ? (
-        <img src={src} alt="" className="size-full object-cover" />
-      ) : (
-        <span className="text-black/25">
-          <PIcon name="Product" size={Math.round(size * 0.5)} />
-        </span>
-      )}
+    <span className={`grid shrink-0 place-items-center ${toneClass[product.tone]}`} style={{ width: size, height: size, borderRadius: radius }}>
+      <span className="text-black/25">
+        <PIcon name="Image" size={Math.round(size * 0.5)} />
+      </span>
     </span>
   );
 }
