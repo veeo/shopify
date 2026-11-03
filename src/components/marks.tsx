@@ -126,14 +126,8 @@ export function ChipButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex h-8 items-center rounded-full px-4 text-[13px] font-medium tracking-[-0.13px] transition duration-150 ease-out hover:brightness-110 ${
-        tone === "primary" ? "bg-[#0c0c0c] text-white" : "bg-[#f3f3f3] text-[#101010]"
-      }`}
-    >
+    <s-button variant={tone === "primary" ? "primary" : "secondary"} onClick={onClick}>
       {label}
-    </button>
+    </s-button>
   );
 }

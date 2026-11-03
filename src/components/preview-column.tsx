@@ -1,8 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { PIcon } from "@/components/polaris-icon";
-import type { PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
+import type { BusinessType, PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
 
 export function PreviewColumn({
   state,
@@ -26,25 +25,20 @@ export function PreviewColumn({
   onAddProduct: () => void;
 }) {
   return (
-    <main className="min-w-0 flex-1 overflow-hidden bg-[#f1f1f1] py-3 pr-0 pl-0">
-      <div className="h-full overflow-hidden rounded-[20px] bg-white text-[#101010] shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
-        <div
-          key={state.preview}
-          className={`${state.motion ? "page-in" : ""} scroll-thin-light h-full overflow-y-auto`}
-        >
-          <div className="mx-auto w-full max-w-[880px]">
-        <Screen
-          state={state}
-          onPreview={onPreview}
-          onChip={onChip}
-          onBusiness={onBusiness}
-          onIdentity={onIdentity}
-          onPaymentsNext={onPaymentsNext}
-          onProduct={onProduct}
-          onUpdateProduct={onUpdateProduct}
-          onAddProduct={onAddProduct}
-        />
-          </div>
+    <main className="min-w-0 flex-1 overflow-hidden bg-[#f1f1f1] py-3">
+      <div className="h-full overflow-hidden rounded-[20px] bg-[#f1f1f1] shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
+        <div key={state.preview} className={`${state.motion ? "page-in" : ""} scroll-thin-light h-full overflow-y-auto`}>
+          <Screen
+            state={state}
+            onPreview={onPreview}
+            onChip={onChip}
+            onBusiness={onBusiness}
+            onIdentity={onIdentity}
+            onPaymentsNext={onPaymentsNext}
+            onProduct={onProduct}
+            onUpdateProduct={onUpdateProduct}
+            onAddProduct={onAddProduct}
+          />
         </div>
       </div>
     </main>
@@ -82,22 +76,48 @@ function Screen(props: {
       return <Products state={state} onProduct={props.onProduct} onAdd={props.onAddProduct} />;
     case "product":
       return (
-        <ProductEdit
-          state={state}
-          onBack={() => props.onPreview("products")}
-          onUpdate={props.onUpdateProduct}
-        />
+        <ProductEdit state={state} onBack={() => props.onPreview("products")} onUpdate={props.onUpdateProduct} />
       );
     case "theme":
-      return <SetupDetail title="Themes" body="PITCH is installed as a draft. Publish it when the photography is ready." action="Publish theme" />;
+      return (
+        <SetupDetail
+          title="Themes"
+          body="PITCH is installed as a draft. Publish it when the photography is ready."
+          action="Publish theme"
+        />
+      );
     case "domain":
-      return <SetupDetail title="Domains" body="Primary domain is still a myshopify.com address. Connect a domain you already own." action="Connect domain" />;
+      return (
+        <SetupDetail
+          title="Domains"
+          body="Primary domain is still a myshopify.com address. Connect a domain you already own."
+          action="Connect domain"
+        />
+      );
     case "shipping":
-      return <SetupDetail title="Shipping" body="Domestic: $6.00 under $50. Free over $50. Calculated rates stay on at checkout." action="Edit rates" />;
+      return (
+        <SetupDetail
+          title="Shipping"
+          body="Domestic: $6.00 under $50. Free over $50. Calculated rates stay on at checkout."
+          action="Edit rates"
+        />
+      );
     case "address":
-      return <SetupDetail title="Locations" body="Add a retail address to offer pickup. Online orders still ship from the default location." action="Add location" />;
+      return (
+        <SetupDetail
+          title="Locations"
+          body="Add a retail address to offer pickup. Online orders still ship from the default location."
+          action="Add location"
+        />
+      );
     case "pos":
-      return <SetupDetail title="Point of Sale" body="Retail kit: reader, dock, and receipt printer. One counter. Ships in 3–5 days." action="Order hardware" />;
+      return (
+        <SetupDetail
+          title="Point of Sale"
+          body="Retail kit: reader, dock, and receipt printer. One counter. Ships in 3–5 days."
+          action="Order hardware"
+        />
+      );
     case "inbox":
       return <ListPage title="Inbox" rows={["Where is order #1078?", "Do you ship the lamp this week?", "Can I exchange the case?"]} />;
     case "notifications":
@@ -123,82 +143,73 @@ function Screen(props: {
   }
 }
 
-function PhoneBar({ title, back, action }: { title: string; back?: () => void; action?: ReactNode }) {
+function Crumb({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <div className="sticky top-0 z-10 flex items-center gap-2 bg-white/90 px-4 py-4 backdrop-blur">
-      {back ? (
-        <button type="button" aria-label="Back" onClick={back} className="grid size-8 place-items-center rounded-full bg-[#f1f1f1]">
-          <PIcon name="ChevronLeft" size={16} />
-        </button>
-      ) : null}
-      <h2 className="text-[25px] font-medium leading-8 tracking-[-0.75px]">{title}</h2>
-      <span className="ml-auto">{action}</span>
-    </div>
+    <s-link
+      slot="breadcrumb-actions"
+      href="#"
+      onClick={(event) => {
+        event.preventDefault();
+        onClick();
+      }}
+    >
+      {label}
+    </s-link>
   );
 }
 
 function HomeSetup({ storeName, onChip }: { storeName: string; onChip: (label: string) => void }) {
   return (
-    <div className="px-6 pb-10 pt-6">
-      <div className="mb-4 flex items-center justify-between text-[12px]">
-        <span className="flex items-center gap-1.5">
-          <span className="size-1.5 rounded-full bg-[#e11d2e]" />
-          Trial end in 1 day
-        </span>
-        <span className="text-[#737572]">
-          Questions? <span className="font-medium text-black underline">(844) 982-1186</span>
-        </span>
-      </div>
-      <h2 className="mb-4 text-[25px] font-medium leading-8 tracking-[-0.75px]">
-        <span className="underline decoration-dotted">{storeName}</span> is coming along
-        <br />
-        Now let’s design your store
-      </h2>
-      <div className="grid grid-cols-2 gap-4">
+    <s-page heading={`${storeName} is coming along`} inlineSize="large">
+      <s-banner slot="supplemental-start" tone="warning" heading="Trial ends in 1 day">
+        Questions? (844) 982-1186
+      </s-banner>
+      <s-paragraph>Now let’s design your store</s-paragraph>
+      <s-grid gridTemplateColumns="repeat(2, minmax(0, 1fr))" gap="base">
         <SetupCard
           art={<img src="/assets/theme-pitch.png" alt="" className="absolute left-10 top-5 h-72 w-56 rounded-md object-cover object-top shadow-xl" />}
           title="Choose your store design"
           body="Pick a theme that fits your brand, then customize from there."
-          cta="Choose theme →"
+          cta="Choose theme"
           onClick={() => onChip("Choose theme →")}
         />
         <SetupCard
           art={<PayArt />}
           title="You're ready to accept payments"
           body="Review settings to accept more payment methods and add a payout account."
-          cta="Review payments →"
+          cta="Review payments"
           onClick={() => onChip("Review payments →")}
         />
         <SetupCard
           art={<DomainArt />}
           title="Get a custom domain"
           body="Give your store a branded URL that's easy to find, trust, and remember."
-          cta="Set up domain →"
+          cta="Set up domain"
           onClick={() => onChip("Set up domain →")}
         />
         <SetupCard
           art={<img src="/assets/shipping-label.png" alt="" className="absolute left-1/2 top-8 w-40 -translate-x-1/2" />}
           title="Review shipping rates"
           body="Look over the defaults set up for you based on your location."
-          cta="Review rates →"
+          cta="Review rates"
           onClick={() => onChip("Review rates →")}
         />
         <SetupCard
           art={<img src="/assets/address-pin.png" alt="" className="absolute left-1/2 top-4 h-24 w-24 -translate-x-1/2 object-contain" />}
           title="Add your retail address"
           body="Add location details and set fulfillment options."
-          cta="Add address →"
+          cta="Add address"
           onClick={() => onChip("Add address →")}
         />
         <SetupCard
           art={<img src="/assets/pos.png" alt="" className="absolute left-1/2 top-2 h-32 -translate-x-1/2 object-contain" />}
           title="Order POS hardware"
           body="Power your store with fast checkouts you can count on."
-          cta="Order hardware →"
+          cta="Order hardware"
           onClick={() => onChip("Order hardware →")}
         />
-      </div>
-    </div>
+      </s-grid>
+    </s-page>
   );
 }
 
@@ -216,22 +227,18 @@ function SetupCard({
   onClick: () => void;
 }) {
   return (
-    <article className="rounded-3xl border border-[#e3e3e3] p-2 shadow-[0_1px_4px_rgba(0,0,0,0.04),0_3px_12px_rgba(0,0,0,0.03)]">
-      <div className="relative h-[132px] overflow-hidden rounded-2xl bg-gradient-to-b from-[#f6f6f6] to-[#ececed]">{art}</div>
-      <div className="space-y-3 p-3">
-        <div>
-          <p className="text-[15px] font-medium leading-[1.4]">{title}</p>
-          <p className="text-[15px] leading-[1.4] text-[#737572]">{body}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onClick}
-          className="h-8 rounded-full border border-[#e3e3e3] bg-white px-4 text-[13px] font-medium shadow-[0_3px_15px_rgba(0,0,0,0.03)]"
-        >
+    <s-box border="base" borderRadius="large" padding="base" background="base">
+      <s-stack gap="base">
+        <div className="relative h-[132px] overflow-hidden rounded-xl bg-gradient-to-b from-[#f6f6f6] to-[#ececed]">{art}</div>
+        <s-stack gap="small-100">
+          <s-heading>{title}</s-heading>
+          <s-paragraph color="subdued">{body}</s-paragraph>
+        </s-stack>
+        <s-button variant="secondary" onClick={onClick}>
           {cta}
-        </button>
-      </div>
-    </article>
+        </s-button>
+      </s-stack>
+    </s-box>
   );
 }
 
@@ -268,84 +275,82 @@ function DomainArt() {
 
 function HomeActive() {
   return (
-    <div className="px-6 pb-10 pt-6">
-      <div className="mb-4 flex items-end justify-between">
-        <h2 className="text-[25px] font-medium tracking-[-0.75px]">Home</h2>
-        <button type="button" className="flex items-center gap-1 text-[12px] text-[#4a4a4a]">
-          <span className="flex -space-x-1.5">
-            <img src="/assets/visitor-a.png" alt="" className="size-5 rounded-full object-cover ring-2 ring-white" />
-            <img src="/assets/visitor-b.png" alt="" className="size-5 rounded-full object-cover ring-2 ring-white" />
-          </span>
-          82 visitors right now <PIcon name="ChevronRight" size={14} />
-        </button>
-      </div>
-      <div className="mb-4 flex gap-2 overflow-hidden">
-        <span className="inline-flex h-8 items-center gap-1 rounded-full bg-black px-3 text-[13px] font-medium text-white">
-          Last 30 days
-        </span>
-        <span className="inline-flex h-8 items-center rounded-full bg-[#f1f1f1] px-3 text-[13px]">All sales channels</span>
-        <span className="inline-flex h-8 items-center rounded-full bg-[#f1f1f1] px-3 text-[13px]">View analytics</span>
-      </div>
-      <SalesChart />
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <Metric up label="24%" name="Total sales" value="$48,392.50" good />
-        <Metric up label="18%" name="Sessions" value="14,280" good />
-        <Metric up={false} label="2%" name="Total orders" value="386" />
-        <Metric up label="0.2%" name="Conversion rate" value="2.7%" good />
-      </div>
-      <div className="mt-6 flex items-center justify-between">
-        <h3 className="text-[20px] font-medium">Recent activity</h3>
-        <button type="button" className="text-[13px] text-[#4a4a4a]">
-          View all
-        </button>
-      </div>
-      <ul className="mt-3 space-y-3 text-[14px]">
-        <Activity title="Danielle Hudson placed order #1078." meta="$369.99 · 3 items · 7 minutes ago" />
-        <Activity title="Your payout is on its way." meta="$2,184.60 · Today at 8:00 AM" />
-        <Activity title="Order #1071 was delivered." meta="Maya Chen · Today at 7:42 AM" />
-      </ul>
-      <h3 className="mb-3 mt-6 text-[20px] font-medium">Business forward</h3>
-      <div className="grid grid-cols-2 gap-4 text-[14px]">
-        <div>
-          <p className="font-medium">Your best seller is picking up speed</p>
-          <p className="mt-1 text-[#4a4a4a]">Flora Sneakers sales are up 32%. You have 126 units left across 8 variants.</p>
-          <p className="mt-2 text-[13px] font-medium">Review inventory →</p>
-        </div>
-        <div>
-          <p className="font-medium">Bring customers back for a second look</p>
-          <p className="mt-1 text-[#4a4a4a]">Turn this month’s new shoppers into repeat customers with a welcome-back email.</p>
-          <p className="mt-2 text-[13px] font-medium">Plan a campaign with Sidekick →</p>
-        </div>
-      </div>
-    </div>
+    <s-page heading="Home" inlineSize="large">
+      <s-stack gap="base">
+        <s-stack direction="inline" gap="small" alignItems="center">
+          <s-avatar src="/assets/visitor-a.png" alt="" size="small" />
+          <s-avatar src="/assets/visitor-b.png" alt="" size="small" />
+          <s-text color="subdued">82 visitors right now</s-text>
+        </s-stack>
+        <s-stack direction="inline" gap="small">
+          <s-clickable-chip color="strong">Last 30 days</s-clickable-chip>
+          <s-clickable-chip>All sales channels</s-clickable-chip>
+          <s-clickable-chip>View analytics</s-clickable-chip>
+        </s-stack>
+        <s-box background="base" border="base" borderRadius="large" padding="base">
+          <SalesChart />
+        </s-box>
+        <s-grid gridTemplateColumns="repeat(2, minmax(0, 1fr))" gap="base">
+          <Metric up label="24%" name="Total sales" value="$48,392.50" good />
+          <Metric up label="18%" name="Sessions" value="14,280" good />
+          <Metric up={false} label="2%" name="Total orders" value="386" />
+          <Metric up label="0.2%" name="Conversion rate" value="2.7%" good />
+        </s-grid>
+        <s-section heading="Recent activity">
+          <s-stack gap="base">
+            <Activity title="Danielle Hudson placed order #1078." meta="$369.99 · 3 items · 7 minutes ago" />
+            <Activity title="Your payout is on its way." meta="$2,184.60 · Today at 8:00 AM" />
+            <Activity title="Order #1071 was delivered." meta="Maya Chen · Today at 7:42 AM" />
+          </s-stack>
+        </s-section>
+        <s-section heading="Business forward">
+          <s-grid gridTemplateColumns="repeat(2, minmax(0, 1fr))" gap="base">
+            <s-stack gap="small-100">
+              <s-heading>Your best seller is picking up speed</s-heading>
+              <s-paragraph color="subdued">
+                Flora Sneakers sales are up 32%. You have 126 units left across 8 variants.
+              </s-paragraph>
+              <s-text type="strong">Review inventory</s-text>
+            </s-stack>
+            <s-stack gap="small-100">
+              <s-heading>Bring customers back for a second look</s-heading>
+              <s-paragraph color="subdued">
+                Turn this month’s new shoppers into repeat customers with a welcome-back email.
+              </s-paragraph>
+              <s-text type="strong">Plan a campaign with Sidekick</s-text>
+            </s-stack>
+          </s-grid>
+        </s-section>
+      </s-stack>
+    </s-page>
   );
 }
 
 function Metric({ name, value, label, good, up }: { name: string; value: string; label: string; good?: boolean; up: boolean }) {
   return (
-    <div className="rounded-[16px] border border-[#e6e6e6] bg-white p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] text-[#606060]">{name}</span>
-        <span className={`rounded-full px-2 py-0.5 text-[12px] font-medium ${good ? "bg-[#b3f782] text-[#306b06]" : "bg-[#f3f3f3] text-[#606060]"}`}>
-          {up ? "↑" : "↓"} {label}
-        </span>
-      </div>
-      <p className="mt-2 text-[22px] font-medium tracking-[-0.4px] tabular-nums">{value}</p>
-    </div>
+    <s-box border="base" borderRadius="large" padding="base" background="base">
+      <s-stack gap="small">
+        <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+          <s-text color="subdued">{name}</s-text>
+          <s-badge tone={good ? "success" : "neutral"} icon={up ? "arrow-up" : "arrow-down"}>
+            {label}
+          </s-badge>
+        </s-stack>
+        <s-heading fontSize="large-200">{value}</s-heading>
+      </s-stack>
+    </s-box>
   );
 }
 
 function Activity({ title, meta }: { title: string; meta: string }) {
   return (
-    <li className="flex gap-3">
-      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#f4f5f3]">
-        <PIcon name="OrderFilled" size={14} />
-      </span>
-      <span>
-        <span className="block font-medium">{title}</span>
-        <span className="text-[13px] text-[#737572]">{meta}</span>
-      </span>
-    </li>
+    <s-stack direction="inline" gap="small" alignItems="center">
+      <s-icon type="order" />
+      <s-stack gap="small-500">
+        <s-text type="strong">{title}</s-text>
+        <s-text color="subdued">{meta}</s-text>
+      </s-stack>
+    </s-stack>
   );
 }
 
@@ -376,80 +381,56 @@ function SalesChart() {
 
 function Payments({ onSetup }: { onSetup: () => void }) {
   return (
-    <div className="px-4 pb-10">
-      <div className="flex items-center gap-2 py-4">
-        <span className="grid size-8 place-items-center rounded-full bg-[#f1f1f1]">
-          <PIcon name="ChevronLeft" size={16} />
-        </span>
-        <span className="grid size-8 place-items-center rounded-full bg-[#f1f1f1]">
-          <PIcon name="HomeFilled" size={16} />
-        </span>
-      </div>
-      <h2 className="mb-4 text-[25px] font-medium tracking-[-0.75px]">Payments</h2>
-      <p className="mb-3 text-[15px] font-medium">Shopify Payments</p>
-      <div className="rounded-3xl border border-[#e3e3e3] p-2 shadow-sm">
-        <div className="rounded-2xl bg-[#f7f7f7] p-4">
-          <p className="text-[15px] font-medium leading-[1.4]">Get up to 7.5% better performance than any other provider on Shopify</p>
-          <ul className="mt-3 space-y-1 text-[13px] leading-[1.4]">
-            {[
-              "Tap into the 400+ million buyers who expect Shop Pay",
-              "Sell in over 130 currencies and get paid in yours",
-              "Access funding, credit, and a free business account for payouts and spending",
-            ].map((line) => (
-              <li key={line} className="flex gap-2">
-                <PIcon name="Check" size={16} />
-                <span>{line}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-[13px] text-[#4a4a4a]">No transaction fees • Card rates starting at 2.5% + $0.30</p>
-        </div>
-        <div className="mt-2 rounded-2xl border border-[#e6e6e6] p-4">
-          <p className="mb-3 text-[15px] font-medium">Available payment methods</p>
-          <div className="flex gap-2">
-            <span className="grid h-6 w-10 place-items-center rounded bg-white shadow">
-              <span className="flex">
-                <span className="size-3 rounded-full bg-[#eb001b]" />
-                <span className="-ml-1 size-3 rounded-full bg-[#f79e1b]" />
-              </span>
-            </span>
-            <span className="grid h-6 w-10 place-items-center rounded bg-[#1934cf] text-[9px] font-extrabold italic text-white">VISA</span>
-            <span className="grid h-6 w-10 place-items-center rounded bg-[#5631f4] text-[10px] font-semibold text-white">shop</span>
-          </div>
-        </div>
-      </div>
-      <div className="mt-4 flex gap-2">
-        <button type="button" onClick={onSetup} className="h-8 flex-1 rounded-full bg-gradient-to-t from-black to-[#3d3d3d] text-[13px] font-medium text-white shadow">
-          Complete setup
-        </button>
-        <button type="button" className="h-8 flex-1 rounded-full bg-[#ebebeb] text-[13px] font-medium">
-          Learn more
-        </button>
-      </div>
-      <Section title="More ways to pay" body="Offer methods processed offsite or through custom checkout integrations" />
-      <Section title="Manual payment methods" body="Accept payments outside your online store, like bank deposits or cash on delivery" />
-      <p className="mb-2 mt-6 text-[15px] font-medium">Shopify configuration</p>
-      <div className="divide-y divide-[#e6e6e6] rounded-3xl border border-[#e3e3e3] px-3">
-        {["Payment capture method", "Payment method customizations", "Gift card expiration", "Apple Wallet passes"].map((row) => (
-          <div key={row} className="flex items-center justify-between py-3 text-[14px]">
-            {row}
-            <span className="text-[#868686]"><PIcon name="ChevronRight" size={16} /></span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Section({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="mt-5">
-      <p className="text-[15px] font-medium">{title}</p>
-      <p className="mt-1 text-[13px] text-[#4a4a4a]">{body}</p>
-      <button type="button" className="mt-3 flex h-8 w-full items-center justify-center gap-1 rounded-full bg-[#ebebeb] text-[13px] font-medium">
-        <PIcon name="Plus" size={14} /> Method
-      </button>
-    </div>
+    <s-page heading="Payments" inlineSize="large">
+      <s-stack gap="base">
+        <s-stack direction="inline" justifyContent="end">
+          <s-button variant="primary" onClick={onSetup}>
+            Complete setup
+          </s-button>
+        </s-stack>
+        <s-section heading="Shopify Payments">
+          <s-stack gap="base">
+            <s-paragraph>Get up to 7.5% better performance than any other provider on Shopify</s-paragraph>
+            <s-unordered-list>
+              <s-list-item>Tap into the 400+ million buyers who expect Shop Pay</s-list-item>
+              <s-list-item>Sell in over 130 currencies and get paid in yours</s-list-item>
+              <s-list-item>Access funding, credit, and a free business account for payouts and spending</s-list-item>
+            </s-unordered-list>
+            <s-text color="subdued">No transaction fees · Card rates starting at 2.5% + $0.30</s-text>
+            <s-stack direction="inline" gap="small" alignItems="center">
+              <s-badge icon="credit-card">Mastercard</s-badge>
+              <s-badge icon="credit-card">Visa</s-badge>
+              <s-badge icon="wallet">Shop Pay</s-badge>
+            </s-stack>
+          </s-stack>
+        </s-section>
+        <s-section heading="More ways to pay" subheading="Offer methods processed offsite or through custom checkout integrations">
+          <s-button icon="plus" variant="secondary">
+            Method
+          </s-button>
+        </s-section>
+        <s-section
+          heading="Manual payment methods"
+          subheading="Accept payments outside your online store, like bank deposits or cash on delivery"
+        >
+          <s-button icon="plus" variant="secondary">
+            Method
+          </s-button>
+        </s-section>
+        <s-section heading="Shopify configuration">
+          <s-stack gap="small">
+            {["Payment capture method", "Payment method customizations", "Gift card expiration", "Apple Wallet passes"].map(
+              (row) => (
+                <s-stack key={row} direction="inline" justifyContent="space-between" alignItems="center">
+                  <s-text>{row}</s-text>
+                  <s-icon type="chevron-right" />
+                </s-stack>
+              ),
+            )}
+          </s-stack>
+        </s-section>
+      </s-stack>
+    </s-page>
   );
 }
 
@@ -468,6 +449,10 @@ const businessCopy = {
   },
 } as const;
 
+function isBusiness(value: string): value is BusinessType {
+  return value === "individual" || value === "business" || value === "nonprofit";
+}
+
 function PaymentsSetup({
   state,
   onBusiness,
@@ -481,70 +466,57 @@ function PaymentsSetup({
   onNext: () => void;
   onBack: () => void;
 }) {
+  const identity = state.paymentsStep === "identity" || state.paymentsStep === "done";
   return (
-    <div className="px-5 pb-8">
-      <div className="flex items-center gap-2 py-4">
-        <button type="button" aria-label="Back" onClick={onBack} className="grid size-8 place-items-center rounded-full bg-[#f1f1f1]">
-          <PIcon name="ChevronLeft" size={16} />
-        </button>
-        <span className="grid size-8 place-items-center rounded-full bg-[#f1f1f1]">
-          <PIcon name="HomeFilled" size={16} />
-        </span>
-      </div>
-      <h2 className="text-[25px] font-medium tracking-[-0.75px]">Set up Shopify Payments</h2>
-      <p className="mt-1 text-[14px] text-[#4a4a4a]">Tell us about your store to start accepting payments</p>
-      {(state.paymentsStep === "identity" || state.paymentsStep === "done") ? (
-        <div className="mt-6 rounded-2xl border border-[#e3e3e3] p-4">
-          <p className="mb-3 text-[15px] font-medium">Your name</p>
-          <label className="mb-3 block text-[13px]">
-            First name
-            <input
-              value={state.identity.first}
-              onChange={(event) => onIdentity({ first: event.target.value })}
-              className="mt-1 h-10 w-full rounded-xl border border-[#e3e3e3] px-3 outline-none"
-            />
-          </label>
-          <label className="block text-[13px]">
-            Last name
-            <input
-              value={state.identity.last}
-              onChange={(event) => onIdentity({ last: event.target.value })}
-              className="mt-1 h-10 w-full rounded-xl border border-[#e3e3e3] px-3 outline-none"
-            />
-          </label>
-        </div>
-      ) : (
-        <div className="mt-6 rounded-2xl border border-[#e3e3e3] p-4">
-          <p className="mb-3 text-[15px] font-medium">I am running my store as:</p>
-          <div className="space-y-2">
-            {(Object.keys(businessCopy) as (keyof typeof businessCopy)[]).map((key) => {
-              const on = state.businessType === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => onBusiness(key)}
-                  className={`flex w-full gap-3 rounded-xl p-3 text-left ${on ? "bg-[#f4f5f3]" : ""}`}
-                >
-                  <span className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border ${on ? "border-black" : "border-[#c8c8c8]"}`}>
-                    {on ? <span className="size-2 rounded-full bg-black" /> : null}
-                  </span>
-                  <span>
-                    <span className="block text-[15px] font-medium">{businessCopy[key].title}</span>
-                    <span className="block text-[13px] leading-[1.4] text-[#4a4a4a]">{businessCopy[key].body}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      <div className="mt-4 flex justify-end">
-        <button type="button" onClick={onNext} className="h-9 rounded-full bg-black px-5 text-[13px] font-medium text-white">
+    <s-page heading="Set up Shopify Payments" inlineSize="base">
+      <Crumb label="Payments" onClick={onBack} />
+      <s-paragraph>Tell us about your store to start accepting payments</s-paragraph>
+      <s-stack direction="inline" justifyContent="end">
+        <s-button variant="primary" onClick={onNext}>
           Next
-        </button>
-      </div>
-    </div>
+        </s-button>
+      </s-stack>
+      {identity ? (
+        <s-section heading="Your name">
+          <s-stack gap="base">
+            <s-text-field
+              label="First name"
+              name="first-name"
+              autocomplete="given-name"
+              value={state.identity.first}
+              onInput={(event) => onIdentity({ first: event.currentTarget.value })}
+            />
+            <s-text-field
+              label="Last name"
+              name="last-name"
+              autocomplete="family-name"
+              value={state.identity.last}
+              onInput={(event) => onIdentity({ last: event.currentTarget.value })}
+            />
+          </s-stack>
+        </s-section>
+      ) : (
+        <s-section heading="I am running my store as">
+          <s-choice-list
+            label="Business type"
+            labelAccessibilityVisibility="exclusive"
+            name="business-type"
+            values={[state.businessType]}
+            onChange={(event) => {
+              const next = event.currentTarget.values[0] ?? "";
+              if (isBusiness(next)) onBusiness(next);
+            }}
+          >
+            {(Object.keys(businessCopy) as BusinessType[]).map((key) => (
+              <s-choice key={key} value={key}>
+                {businessCopy[key].title}
+                <s-text slot="details">{businessCopy[key].body}</s-text>
+              </s-choice>
+            ))}
+          </s-choice-list>
+        </s-section>
+      )}
+    </s-page>
   );
 }
 
@@ -565,61 +537,72 @@ const toneClass: Record<ProductTone, string> = {
 
 function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduct: (id: string) => void; onAdd: () => void }) {
   return (
-    <div className="px-4 pb-8 pt-4">
-      <div className="mb-4 flex items-center gap-2">
-        <PIcon name="ProductFilled" size={16} />
-        <h2 className="text-[22px] font-medium">Products</h2>
-        <button type="button" onClick={onAdd} className="ml-auto h-8 rounded-full bg-black px-3 text-[13px] font-medium text-white">
-          Add product
-        </button>
-        <span className="grid size-8 place-items-center rounded-full bg-[#f1f1f1]">
-          <PIcon name="MenuHorizontal" size={16} />
-        </span>
-      </div>
-      <div className="rounded-2xl bg-[#f6f6f6] p-3 text-[13px]">
-        {[
-          ["Avg. sell-through rate", "18.4%"],
-          ["Products by days of inventory remaining", "18.4%"],
-          ["ABC product analysis", "18.4%"],
-        ].map(([label, value]) => (
-          <div key={label} className="flex justify-between py-1.5">
-            <span>{label}</span>
-            <span className="font-medium">{value}</span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-3 flex h-9 items-center gap-2 rounded-full border border-[#e3e3e3] px-3 text-[13px] text-[#737572]">
-        All <span className="inline-flex rotate-90"><PIcon name="ChevronRight" size={12} /></span> <PIcon name="Search" size={14} /> Search and filter
-      </div>
-      <div className="mt-2 grid grid-cols-[24px_1fr_auto_auto] items-center gap-2 px-1 py-2 text-[12px] text-[#737572]">
-        <span />
-        <span>Product</span>
-        <span>Status</span>
-        <span>Price</span>
-      </div>
-      {state.products.map((product) => (
-        <button
-          key={product.id}
-          type="button"
-          onClick={() => onProduct(product.id)}
-          className="grid w-full grid-cols-[24px_28px_1fr_auto_auto_16px] items-center gap-2 border-t border-[#f0f0f0] py-2 text-left text-[13px]"
-        >
-          <span className="size-4 rounded border border-[#ccc]" />
-          <Thumb product={product} />
-          <span className="truncate">{product.title}</span>
-          <span className="rounded-md bg-[#d7f3ff] px-1.5 py-0.5 text-[11px] font-medium text-[#083344]">{product.status}</span>
-          <span>${product.price}</span>
-          <span className="text-[#868686]"><PIcon name="View" size={14} /></span>
-        </button>
-      ))}
-    </div>
+    <s-page heading="Products" inlineSize="large">
+      <s-stack gap="base">
+        <s-stack direction="inline" justifyContent="end">
+          <s-button variant="primary" icon="plus" onClick={onAdd}>
+            Add product
+          </s-button>
+        </s-stack>
+        <s-section heading="Performance">
+          <s-stack gap="small">
+            {[
+              ["Avg. sell-through rate", "18.4%"],
+              ["Products by days of inventory remaining", "18.4%"],
+              ["ABC product analysis", "18.4%"],
+            ].map(([label, value]) => (
+              <s-stack key={label} direction="inline" justifyContent="space-between" alignItems="center">
+                <s-text>{label}</s-text>
+                <s-text type="strong">{value}</s-text>
+              </s-stack>
+            ))}
+          </s-stack>
+        </s-section>
+        <s-table>
+          <s-search-field slot="filters" label="Search and filter" labelAccessibilityVisibility="exclusive" placeholder="Search and filter" />
+          <s-table-header-row>
+            <s-table-header listSlot="primary">Product</s-table-header>
+            <s-table-header listSlot="inline">Status</s-table-header>
+            <s-table-header listSlot="secondary" format="currency">
+              Price
+            </s-table-header>
+          </s-table-header-row>
+          <s-table-body>
+            {state.products.map((product) => (
+              <s-table-row key={product.id} clickDelegate={`open-${product.id}`}>
+                <s-table-cell>
+                  <s-stack direction="inline" gap="small" alignItems="center">
+                    <Thumb product={product} />
+                    <s-link
+                      id={`open-${product.id}`}
+                      href="#"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onProduct(product.id);
+                      }}
+                    >
+                      {product.title}
+                    </s-link>
+                  </s-stack>
+                </s-table-cell>
+                <s-table-cell>
+                  <s-badge tone={product.status === "Active" ? "success" : "info"}>{product.status}</s-badge>
+                </s-table-cell>
+                <s-table-cell>${product.price}</s-table-cell>
+              </s-table-row>
+            ))}
+          </s-table-body>
+        </s-table>
+      </s-stack>
+    </s-page>
   );
 }
 
 function Thumb({ product }: { product: Product }) {
-  if (product.tone === "headphones") return <img src="/assets/headphones.png" alt="" className="size-7 rounded-md object-cover" />;
-  if (product.tone === "lamp") return <img src="/assets/lamp.png" alt="" className="size-7 rounded-md object-cover" />;
-  return <span className={`size-7 rounded-md ${toneClass[product.tone]}`} />;
+  if (product.tone === "headphones" || product.tone === "lamp") {
+    return <s-thumbnail alt="" size="small" src={product.tone === "lamp" ? "/assets/lamp.png" : "/assets/headphones.png"} />;
+  }
+  return <span className={`inline-block size-8 rounded-md ${toneClass[product.tone]}`} />;
 }
 
 function ProductEdit({
@@ -632,106 +615,81 @@ function ProductEdit({
   onUpdate: (id: string, patch: Partial<Product>) => void;
 }) {
   const product = state.products.find((item) => item.id === state.selectedProductId) ?? state.products[0];
+  if (!product) return <s-page heading="Product" inlineSize="base" />;
   return (
-    <div className="px-4 pb-10">
-      <PhoneBar
-        title=""
-        back={onBack}
-        action={
-          <span className="flex items-center gap-2">
-            <button type="button" className="h-8 rounded-full bg-black px-3 text-[13px] font-medium text-white">
-              Add product
-            </button>
-            <PIcon name="MenuHorizontal" size={16} />
-          </span>
-        }
-      />
-      <div className={`mb-3 grid size-16 place-items-center overflow-hidden rounded-2xl ${toneClass[product.tone]}`}>
-        {(product.tone === "headphones" || product.tone === "lamp") ? (
-          <img src={product.tone === "lamp" ? "/assets/lamp.png" : "/assets/headphones.png"} alt="" className="size-full object-cover" />
-        ) : null}
-      </div>
-      <h2 className="mb-4 text-[25px] font-medium leading-8 tracking-[-0.5px]">{product.title}</h2>
-      <div className="space-y-3 rounded-2xl border border-[#e3e3e3] p-3">
-        <Field label="Title" value={product.title} onChange={(title) => onUpdate(product.id, { title })} />
-        <label className="block text-[13px]">
-          Description
-          <textarea
-            value={product.description}
-            onChange={(event) => onUpdate(product.id, { description: event.target.value })}
-            className="mt-1 h-28 w-full resize-none rounded-xl border border-[#e3e3e3] p-3 text-[14px] outline-none"
-          />
-        </label>
-        <div className="rounded-xl border border-[#e3e3e3] p-3 text-center text-[13px] text-[#737572]">
-          <div className="mb-2 flex justify-center gap-2">
-            <span className="rounded-full bg-[#eee] px-3 py-1">Upload new</span>
-            <span className="px-3 py-1">Select existing</span>
-          </div>
-          Accepts images, videos, or 3D models
-        </div>
-        <Field label="Category" value={product.title} onChange={() => undefined} />
-      </div>
-      <p className="mb-2 mt-5 text-[15px] font-medium">Price</p>
-      <div className="rounded-2xl border border-[#e3e3e3] p-3">
-        <label className="block text-[13px]">
-          <span className="sr-only">Price</span>
-          <input
-            value={product.price}
-            onChange={(event) => onUpdate(product.id, { price: event.target.value })}
-            className="h-10 w-32 rounded-xl border border-[#e3e3e3] px-3 outline-none"
-          />
-        </label>
-        <div className="mt-3 flex gap-2 text-[12px] text-[#737572]">
-          <span className="rounded-full bg-[#f1f1f1] px-2 py-1">Compare-at</span>
-          <span className="rounded-full bg-[#f1f1f1] px-2 py-1">Unit price</span>
-          <span className="rounded-full bg-[#f1f1f1] px-2 py-1">Charge tax · Yes</span>
-        </div>
-      </div>
-      <div className="mt-4 rounded-2xl border border-[#e3e3e3] p-3">
-        <p className="text-[13px] text-[#737572]">Inventory</p>
-        <p className="mt-2 text-[14px]">{product.inventory}</p>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <label className="block text-[13px]">
-      {label}
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 h-10 w-full rounded-xl border border-[#e3e3e3] px-3 text-[14px] outline-none"
-      />
-    </label>
+    <s-page heading={product.title} inlineSize="base">
+      <Crumb label="Products" onClick={onBack} />
+      <s-stack gap="base">
+        <Thumb product={product} />
+        <s-section heading="Product details">
+          <s-stack gap="base">
+            <s-text-field
+              label="Title"
+              name="title"
+              value={product.title}
+              onInput={(event) => onUpdate(product.id, { title: event.currentTarget.value })}
+            />
+            <s-text-area
+              label="Description"
+              name="description"
+              rows={4}
+              value={product.description}
+              onInput={(event) => onUpdate(product.id, { description: event.currentTarget.value })}
+            />
+            <s-text color="subdued">Accepts images, videos, or 3D models</s-text>
+            <s-text-field label="Category" name="category" value={product.title} readOnly />
+          </s-stack>
+        </s-section>
+        <s-section heading="Price">
+          <s-stack gap="small">
+            <s-text-field
+              label="Price"
+              name="price"
+              prefix="$"
+              value={product.price}
+              onInput={(event) => onUpdate(product.id, { price: event.currentTarget.value })}
+            />
+            <s-stack direction="inline" gap="small">
+              <s-badge>Compare-at</s-badge>
+              <s-badge>Unit price</s-badge>
+              <s-badge tone="success">Charge tax · Yes</s-badge>
+            </s-stack>
+          </s-stack>
+        </s-section>
+        <s-section heading="Inventory">
+          <s-paragraph>{product.inventory}</s-paragraph>
+        </s-section>
+      </s-stack>
+    </s-page>
   );
 }
 
 function SetupDetail({ title, body, action }: { title: string; body: string; action: string }) {
   return (
-    <div className="px-4 pb-8 pt-5">
-      <h2 className="text-[25px] font-medium tracking-[-0.75px]">{title}</h2>
-      <p className="mt-3 text-[15px] leading-[1.45] text-[#4a4a4a]">{body}</p>
-      <button type="button" className="mt-4 h-8 rounded-full bg-black px-4 text-[13px] font-medium text-white">
-        {action}
-      </button>
-    </div>
+    <s-page heading={title} inlineSize="base">
+      <s-section accessibilityLabel={title}>
+        <s-stack gap="base">
+          <s-paragraph>{body}</s-paragraph>
+          <s-button variant="primary">{action}</s-button>
+        </s-stack>
+      </s-section>
+    </s-page>
   );
 }
 
 function ListPage({ title, rows }: { title: string; rows: string[] }) {
   return (
-    <div className="px-4 pb-8 pt-5">
-      <h2 className="mb-4 text-[25px] font-medium tracking-[-0.75px]">{title}</h2>
-      <ul className="divide-y divide-[#eee] rounded-2xl border border-[#e3e3e3]">
-        {rows.map((row) => (
-          <li key={row} className="flex items-center justify-between px-3 py-3 text-[14px]">
-            {row}
-            <span className="text-[#868686]"><PIcon name="ChevronRight" size={16} /></span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <s-page heading={title} inlineSize="large">
+      <s-section accessibilityLabel={title}>
+        <s-stack gap="small">
+          {rows.map((row) => (
+            <s-stack key={row} direction="inline" justifyContent="space-between" alignItems="center">
+              <s-text>{row}</s-text>
+              <s-icon type="chevron-right" />
+            </s-stack>
+          ))}
+        </s-stack>
+      </s-section>
+    </s-page>
   );
 }

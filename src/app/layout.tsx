@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import type { ReactNode } from "react";
 import "./globals.css";
 
@@ -16,8 +17,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} antialiased`}>{children}</body>
+    <html lang="en" className="p-partial-theme-admin-next">
+      <body className={`${inter.variable} antialiased`}>
+        <Script src="https://cdn.shopify.com/shopifycloud/polaris-2.js" strategy="beforeInteractive" />
+        {children}
+      </body>
     </html>
   );
 }

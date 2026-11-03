@@ -22,12 +22,14 @@
     "zod": "^4.1.0"
   },
   "devDependencies": {
+    "@shopify/polaris-types": "^2.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
+    "preact": "^10.29.8",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

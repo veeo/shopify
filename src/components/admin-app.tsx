@@ -174,7 +174,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
 
 function BootScreen({ storeName }: { storeName: string }) {
   return (
-    <div className="absolute inset-0 z-40 grid place-items-center bg-[#f6f6f6] text-[#101010]">
+    <div className="absolute inset-0 z-[200] grid place-items-center bg-[#f6f6f6] text-[#101010]">
       <div className="w-[280px] text-center">
         <div className="sk-pulse mx-auto mb-4 grid size-12 place-items-center rounded-full bg-[#672ff4] text-white">
           <PIcon name="Sidekick" />
@@ -233,60 +233,40 @@ function Signup({ onSubmit, onActive }: { onSubmit: (storeName: string) => void;
   const [storeName, setStoreName] = useState("My Store");
   const [email, setEmail] = useState("");
   return (
-    <main className="grid min-h-dvh place-items-center bg-[#f6f6f6] px-6 text-[#101010]">
-      <form
-        className="w-full max-w-[420px] rounded-[20px] bg-white p-8 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.06)]"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit(storeName);
-        }}
-      >
-        <ShopifyMark tone="dark" className="mb-8 h-8 w-7" />
-        <h1 className="text-[26px] font-medium tracking-[-0.4px]">Create your store</h1>
-        <p className="mt-2 text-[14px] leading-[1.45] text-[#606060]">
-          You’ll land with Sidekick expanded, ready to set up payments, a theme, and the rest of the store.
-        </p>
-        <label className="mt-6 block text-[13px] text-[#606060]">
-          Store name
-          <input
-            required
-            value={storeName}
-            onChange={(event) => setStoreName(event.target.value)}
-            className="mt-1 h-10 w-full rounded-xl border border-[#e6e6e6] bg-white px-3 text-[15px] text-[#101010] shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none"
-          />
-        </label>
-        <label className="mt-3 block text-[13px] text-[#606060]">
-          Email
-          <input
-            required
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@store.com"
-            className="mt-1 h-10 w-full rounded-xl border border-[#e6e6e6] bg-white px-3 text-[15px] text-[#101010] shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none placeholder:text-[#868686]"
-          />
-        </label>
-        <label className="mt-3 block text-[13px] text-[#606060]">
-          Password
-          <input
-            required
-            type="password"
-            minLength={4}
-            placeholder="••••••••"
-            className="mt-1 h-10 w-full rounded-xl border border-[#e6e6e6] bg-white px-3 text-[15px] text-[#101010] shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => onSubmit(storeName)}
-          className="mt-6 h-10 w-full rounded-full bg-[#0c0c0c] text-[14px] font-medium text-white"
+    <main className="grid min-h-dvh place-items-center bg-[#f1f1f1] px-6 text-[#101010]">
+      <div className="w-full max-w-[440px]">
+        <ShopifyMark tone="dark" className="mb-6 h-8 w-7" />
+        <s-section
+          heading="Create your store"
+          subheading="You’ll land with Sidekick expanded, ready to set up payments, a theme, and the rest of the store."
         >
-          Create store
-        </button>
-        <button type="button" onClick={onActive} className="mt-4 w-full text-[13px] text-[#606060]">
-          Skip to the live store
-        </button>
-      </form>
+          <s-stack gap="base">
+            <s-text-field
+              label="Store name"
+              name="store-name"
+              required
+              value={storeName}
+              onInput={(event) => setStoreName(event.currentTarget.value)}
+            />
+            <s-email-field
+              label="Email"
+              name="email"
+              required
+              autocomplete="email"
+              placeholder="you@store.com"
+              value={email}
+              onInput={(event) => setEmail(event.currentTarget.value)}
+            />
+            <s-password-field label="Password" name="password" required minLength={4} autocomplete="new-password" />
+            <s-button variant="primary" inlineSize="fill" onClick={() => onSubmit(storeName || "My Store")}>
+              Create store
+            </s-button>
+            <s-button variant="tertiary" inlineSize="fill" onClick={onActive}>
+              Skip to the live store
+            </s-button>
+          </s-stack>
+        </s-section>
+      </div>
     </main>
   );
 }
