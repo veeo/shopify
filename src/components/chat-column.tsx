@@ -75,7 +75,7 @@ export function ChatColumn({
             }}
             active={historyOpen}
           >
-            <PIcon name="Clock" size={20} />
+            <PIcon name="Clock" size={16} />
           </IconButton>
           <IconButton
             label="More"
@@ -85,7 +85,7 @@ export function ChatColumn({
             }}
             active={moreOpen}
           >
-            <PIcon name="MenuHorizontal" size={20} />
+            <PIcon name="MenuHorizontal" size={16} />
           </IconButton>
         </div>
       </header>
@@ -161,7 +161,7 @@ export function ChatColumn({
       </div>
 
       <form
-        className="mt-2 flex items-center gap-2.5 rounded-full border border-[#2e302d] bg-[#252525] p-2 transition-[border-color,box-shadow] duration-150 focus-within:border-[#4a4a4a] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.04)]"
+        className="mt-2 flex items-center gap-2.5 rounded-full border border-[#2e302d] p-2 transition-[border-color,box-shadow] duration-150 focus-within:border-[#4a4a4a] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.04)]"
         onSubmit={(event) => {
           event.preventDefault();
           submit();
@@ -174,27 +174,27 @@ export function ChatColumn({
           placeholder={state.mode === "add" ? "Ask Sidekick…" : agent.placeholder}
           className="min-w-0 flex-1 bg-transparent text-[15px] tracking-[-0.15px] text-white outline-none placeholder:text-[#737572]"
         />
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1.5">
           <button
             type="button"
             aria-label="Attach"
-            className="press grid size-8 place-items-center rounded-full border border-white/10 text-white/80 hover:bg-white/[0.08] hover:text-white"
+            className="press grid size-8 place-items-center rounded-full border border-white/10 bg-[#252525] text-white hover:bg-[#2f2f2f]"
           >
-            <PIcon name="Plus" size={20} />
+            <PIcon name="Plus" size={16} />
           </button>
           <button
             type="button"
             aria-label="Voice mode"
-            className="press grid size-8 place-items-center rounded-full text-white/70 hover:bg-white/[0.08] hover:text-white"
+            className="press grid size-8 place-items-center rounded-full border border-white/10 bg-[#252525] text-white hover:bg-[#2f2f2f]"
           >
-            <PIcon name="Sound" size={20} />
+            <PIcon name="Sound" size={16} />
           </button>
           <button
             type="button"
             aria-label="Dictate"
-            className="press grid size-8 place-items-center rounded-full text-white/70 hover:bg-white/[0.08] hover:text-white"
+            className="press grid size-8 place-items-center rounded-full border border-white/10 bg-[#252525] text-white hover:bg-[#2f2f2f]"
           >
-            <PIcon name="Microphone" size={20} />
+            <PIcon name="Microphone" size={16} />
           </button>
           <button
             type="submit"
@@ -202,7 +202,7 @@ export function ChatColumn({
             disabled={busy || !draft.trim()}
             className="press grid size-8 place-items-center rounded-full bg-white text-black shadow-[0_1px_2px_rgba(0,0,0,0.3)] hover:bg-[#eee] disabled:opacity-40"
           >
-            <PIcon name="ArrowUp" size={20} />
+            <PIcon name="ArrowUp" size={16} />
           </button>
         </span>
       </form>
@@ -276,7 +276,7 @@ function BlockView({
   if (block.type === "text" && block.role === "user") {
     return (
       <div className="rise flex justify-end py-0.5">
-        <p className="max-w-[448px] rounded-[20px] bg-[#252525] px-4 py-2.5 text-[15px] leading-[1.4] tracking-[-0.15px]">
+        <p className="max-w-[448px] rounded-[24px] bg-[#252525] px-4 py-3 text-[15px] leading-[1.4] tracking-[-0.15px]">
           {block.text}
         </p>
       </div>

@@ -38,12 +38,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-button,
-input,
-textarea {
-  font: inherit;
-}
-
 ::selection {
   background: #5631f4;
   color: white;

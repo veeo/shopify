@@ -17,8 +17,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="p-partial-theme-admin-next">
-      <body className={`${inter.variable} antialiased`}>
+    <html lang="en" className={`p-partial-theme-admin-next ${inter.variable}`}>
+      <body className="antialiased">
         <Script src="https://cdn.shopify.com/shopifycloud/polaris-2.js" strategy="beforeInteractive" />
         {children}
       </body>
