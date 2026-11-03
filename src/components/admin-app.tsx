@@ -3,11 +3,12 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useMemo, useRef, useState } from "react";
+import { AdminNav } from "@/components/admin-nav";
 import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
 import { ShopifyMark } from "@/components/marks";
+import { PIcon } from "@/components/polaris-icon";
 import { PreviewColumn } from "@/components/preview-column";
-import { ProductRail } from "@/components/product-rail";
 import {
   activeState,
   personaFor,
@@ -26,6 +27,15 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   const [state, setState] = useState<PrototypeState>(() =>
     initialScenario === "active" ? activeState() : setupState(),
   );
+  const [booting, setBooting] = useState(false);
+  const bootTimer = useRef<number | null>(null);
+
+  function enter(update: (current: PrototypeState) => PrototypeState) {
+    setState(update);
+    if (bootTimer.current) window.clearTimeout(bootTimer.current);
+    setBooting(true);
+    bootTimer.current = window.setTimeout(() => setBooting(false), 980);
+  }
   const turn = useRef<Turn | null>(null);
   const applied = useRef(new Set<string>());
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
@@ -104,14 +114,33 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   if (!state.signedIn) {
     return (
       <Signup
-        onSubmit={(storeName) => setState((current) => reducer(current, { type: "sign-in", storeName }))}
-        onActive={() => setState((current) => ({ ...activeState(current.storeName), motion: current.motion }))}
+        onSubmit={(storeName) => enter((current) => reducer(current, { type: "sign-in", storeName }))}
+        onActive={() => enter((current) => ({ ...activeState(current.storeName), motion: current.motion }))}
       />
     );
   }
 
   return (
-    <div className="flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white">
+    <div className="relative flex h-dvh min-w-[1280px] bg-[#f1f1f1] text-[#101010]">
+      <AdminNav
+        storeName={state.storeName}
+        preview={state.preview}
+        onOpen={(id) => setState((current) => reducer(current, { type: "rail", id }))}
+        onSearch={() => setState((current) => reducer(current, { type: "toggle-search" }))}
+      />
+      <PreviewColumn
+        state={state}
+        onPreview={(page, wide) => setState((current) => reducer(current, { type: "preview", page, wide }))}
+        onChip={(label) => setState((current) => reducer(current, { type: "chip", label }))}
+        onBusiness={(value) => setState((current) => reducer(current, { type: "business-type", value }))}
+        onIdentity={(patch) => setState((current) => reducer(current, { type: "identity", patch }))}
+        onPaymentsNext={() => setState((current) => reducer(current, { type: "payments-next" }))}
+        onProduct={(id) => setState((current) => reducer(current, { type: "product", id }))}
+        onUpdateProduct={(id, patch) => setState((current) => reducer(current, { type: "update-product", id, patch }))}
+        onAddProduct={() => setState((current) => reducer(current, { type: "add-blank-product" }))}
+      />
+      <div className="flex w-[600px] shrink-0 py-3 pr-3">
+        <div className="flex min-w-0 flex-1 overflow-hidden rounded-[20px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_28px_rgba(0,0,0,0.05)]">
       <AgentNav
         state={state}
         onSelect={(id) => setState((current) => reducer(current, { type: "select", id }))}
@@ -120,7 +149,6 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         onQuery={(query) => setState((current) => reducer(current, { type: "search", query }))}
         onExperiments={() => setState((current) => reducer(current, { type: "toggle-experiments" }))}
       />
-      <div className="w-px shrink-0 bg-white/10" />
       <ChatColumn
         state={state}
         liveText={liveText}
@@ -136,19 +164,27 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         onReset={() => setState((current) => reducer(current, { type: "reset" }))}
         onCloseExperiments={() => setState((current) => reducer(current, { type: "toggle-experiments" }))}
       />
-      <PreviewColumn
-        state={state}
-        onPreview={(page, wide) => setState((current) => reducer(current, { type: "preview", page, wide }))}
-        onChip={(label) => setState((current) => reducer(current, { type: "chip", label }))}
-        onBusiness={(value) => setState((current) => reducer(current, { type: "business-type", value }))}
-        onIdentity={(patch) => setState((current) => reducer(current, { type: "identity", patch }))}
-        onPaymentsNext={() => setState((current) => reducer(current, { type: "payments-next" }))}
-        onProduct={(id) => setState((current) => reducer(current, { type: "product", id }))}
-        onUpdateProduct={(id, patch) => setState((current) => reducer(current, { type: "update-product", id, patch }))}
-        onAddProduct={() => setState((current) => reducer(current, { type: "add-blank-product" }))}
-      />
-      <ProductRail preview={state.preview} onOpen={(id) => setState((current) => reducer(current, { type: "rail", id }))} />
+        </div>
+      </div>
       <span className="sr-only">{agent.name}</span>
+      {booting ? <BootScreen storeName={state.storeName} /> : null}
+    </div>
+  );
+}
+
+function BootScreen({ storeName }: { storeName: string }) {
+  return (
+    <div className="absolute inset-0 z-40 grid place-items-center bg-[#f6f6f6] text-[#101010]">
+      <div className="w-[280px] text-center">
+        <div className="sk-pulse mx-auto mb-4 grid size-12 place-items-center rounded-full bg-[#672ff4] text-white">
+          <PIcon name="Sidekick" />
+        </div>
+        <p className="text-[15px] font-medium">Opening {storeName}</p>
+        <p className="mt-1 text-[13px] text-[#606060]">Sidekick is getting the admin ready</p>
+        <div className="mt-4 h-1 overflow-hidden rounded-full bg-[#e6e6e6]">
+          <div className="sk-bar h-full origin-left bg-[#101010]" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -197,29 +233,29 @@ function Signup({ onSubmit, onActive }: { onSubmit: (storeName: string) => void;
   const [storeName, setStoreName] = useState("My Store");
   const [email, setEmail] = useState("");
   return (
-    <main className="grid min-h-dvh place-items-center bg-[#0c0d0c] px-6 text-white">
+    <main className="grid min-h-dvh place-items-center bg-[#f6f6f6] px-6 text-[#101010]">
       <form
-        className="w-full max-w-[420px]"
+        className="w-full max-w-[420px] rounded-[20px] bg-white p-8 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.06)]"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit(storeName);
         }}
       >
-        <ShopifyMark className="mb-8 h-8 w-7" />
-        <h1 className="text-[32px] font-medium tracking-[-0.8px]">Create your store</h1>
-        <p className="mt-2 text-[15px] leading-[1.45] text-[#8e8f8b]">
-          You’ll land with Sidekick, ready to set up payments, a theme, and the rest of the store.
+        <ShopifyMark tone="dark" className="mb-8 h-8 w-7" />
+        <h1 className="text-[26px] font-medium tracking-[-0.4px]">Create your store</h1>
+        <p className="mt-2 text-[14px] leading-[1.45] text-[#606060]">
+          You’ll land with Sidekick expanded, ready to set up payments, a theme, and the rest of the store.
         </p>
-        <label className="mt-6 block text-[13px] text-[#8e8f8b]">
+        <label className="mt-6 block text-[13px] text-[#606060]">
           Store name
           <input
             required
             value={storeName}
             onChange={(event) => setStoreName(event.target.value)}
-            className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-[#171817] px-3 text-[15px] text-white outline-none"
+            className="mt-1 h-10 w-full rounded-xl border border-[#e6e6e6] bg-white px-3 text-[15px] text-[#101010] shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none"
           />
         </label>
-        <label className="mt-3 block text-[13px] text-[#8e8f8b]">
+        <label className="mt-3 block text-[13px] text-[#606060]">
           Email
           <input
             required
@@ -227,27 +263,27 @@ function Signup({ onSubmit, onActive }: { onSubmit: (storeName: string) => void;
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@store.com"
-            className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-[#171817] px-3 text-[15px] text-white outline-none placeholder:text-[#737572]"
+            className="mt-1 h-10 w-full rounded-xl border border-[#e6e6e6] bg-white px-3 text-[15px] text-[#101010] shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none placeholder:text-[#868686]"
           />
         </label>
-        <label className="mt-3 block text-[13px] text-[#8e8f8b]">
+        <label className="mt-3 block text-[13px] text-[#606060]">
           Password
           <input
             required
             type="password"
             minLength={4}
             placeholder="••••••••"
-            className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-[#171817] px-3 text-[15px] text-white outline-none"
+            className="mt-1 h-10 w-full rounded-xl border border-[#e6e6e6] bg-white px-3 text-[15px] text-[#101010] shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none"
           />
         </label>
         <button
           type="button"
           onClick={() => onSubmit(storeName)}
-          className="mt-6 h-11 w-full rounded-full bg-white text-[14px] font-medium text-black"
+          className="mt-6 h-10 w-full rounded-full bg-[#0c0c0c] text-[14px] font-medium text-white"
         >
           Create store
         </button>
-        <button type="button" onClick={onActive} className="mt-4 w-full text-[13px] text-[#8e8f8b]">
+        <button type="button" onClick={onActive} className="mt-4 w-full text-[13px] text-[#606060]">
           Skip to the live store
         </button>
       </form>

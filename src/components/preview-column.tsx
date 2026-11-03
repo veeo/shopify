@@ -1,7 +1,7 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Eye, Home, MoreHorizontal, Plus, Search, Tag } from "lucide-react";
 import type { ReactNode } from "react";
+import { PIcon } from "@/components/polaris-icon";
 import type { PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
 
 export function PreviewColumn({
@@ -25,15 +25,14 @@ export function PreviewColumn({
   onUpdateProduct: (id: string, patch: Partial<Product>) => void;
   onAddProduct: () => void;
 }) {
-  const wide = state.previewWide || state.preview === "payments-setup";
   return (
-    <aside
-      className={`h-full shrink-0 overflow-hidden rounded-3xl bg-white text-[#171817] ${
-        state.motion ? "transition-[width] duration-200 ease-out" : ""
-      }`}
-      style={{ width: wide ? 584 : 393 }}
-    >
-      <div className="scroll-thin-light h-full overflow-y-auto">
+    <main className="min-w-0 flex-1 overflow-hidden bg-[#f1f1f1] py-3 pr-0 pl-0">
+      <div className="h-full overflow-hidden rounded-[20px] bg-white text-[#101010] shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
+        <div
+          key={state.preview}
+          className={`${state.motion ? "page-in" : ""} scroll-thin-light h-full overflow-y-auto`}
+        >
+          <div className="mx-auto w-full max-w-[880px]">
         <Screen
           state={state}
           onPreview={onPreview}
@@ -45,8 +44,10 @@ export function PreviewColumn({
           onUpdateProduct={onUpdateProduct}
           onAddProduct={onAddProduct}
         />
+          </div>
+        </div>
       </div>
-    </aside>
+    </main>
   );
 }
 
@@ -127,7 +128,7 @@ function PhoneBar({ title, back, action }: { title: string; back?: () => void; a
     <div className="sticky top-0 z-10 flex items-center gap-2 bg-white/90 px-4 py-4 backdrop-blur">
       {back ? (
         <button type="button" aria-label="Back" onClick={back} className="grid size-8 place-items-center rounded-full bg-[#f1f1f1]">
-          <ChevronLeft size={16} />
+          <PIcon name="ChevronLeft" size={16} />
         </button>
       ) : null}
       <h2 className="text-[25px] font-medium leading-8 tracking-[-0.75px]">{title}</h2>
@@ -138,7 +139,7 @@ function PhoneBar({ title, back, action }: { title: string; back?: () => void; a
 
 function HomeSetup({ storeName, onChip }: { storeName: string; onChip: (label: string) => void }) {
   return (
-    <div className="px-4 pb-8 pt-4">
+    <div className="px-6 pb-10 pt-6">
       <div className="mb-4 flex items-center justify-between text-[12px]">
         <span className="flex items-center gap-1.5">
           <span className="size-1.5 rounded-full bg-[#e11d2e]" />
@@ -153,7 +154,7 @@ function HomeSetup({ storeName, onChip }: { storeName: string; onChip: (label: s
         <br />
         Now let’s design your store
       </h2>
-      <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <SetupCard
           art={<img src="/assets/theme-pitch.png" alt="" className="absolute left-10 top-5 h-72 w-56 rounded-md object-cover object-top shadow-xl" />}
           title="Choose your store design"
@@ -267,7 +268,7 @@ function DomainArt() {
 
 function HomeActive() {
   return (
-    <div className="px-4 pb-8 pt-5">
+    <div className="px-6 pb-10 pt-6">
       <div className="mb-4 flex items-end justify-between">
         <h2 className="text-[25px] font-medium tracking-[-0.75px]">Home</h2>
         <button type="button" className="flex items-center gap-1 text-[12px] text-[#4a4a4a]">
@@ -275,7 +276,7 @@ function HomeActive() {
             <img src="/assets/visitor-a.png" alt="" className="size-5 rounded-full object-cover ring-2 ring-white" />
             <img src="/assets/visitor-b.png" alt="" className="size-5 rounded-full object-cover ring-2 ring-white" />
           </span>
-          82 visitors right now <ChevronRight size={14} />
+          82 visitors right now <PIcon name="ChevronRight" size={14} />
         </button>
       </div>
       <div className="mb-4 flex gap-2 overflow-hidden">
@@ -286,7 +287,7 @@ function HomeActive() {
         <span className="inline-flex h-8 items-center rounded-full bg-[#f1f1f1] px-3 text-[13px]">View analytics</span>
       </div>
       <SalesChart />
-      <div className="mt-2 divide-y divide-[#eee]">
+      <div className="mt-4 grid grid-cols-2 gap-3">
         <Metric up label="24%" name="Total sales" value="$48,392.50" good />
         <Metric up label="18%" name="Sessions" value="14,280" good />
         <Metric up={false} label="2%" name="Total orders" value="386" />
@@ -322,12 +323,14 @@ function HomeActive() {
 
 function Metric({ name, value, label, good, up }: { name: string; value: string; label: string; good?: boolean; up: boolean }) {
   return (
-    <div className="flex items-center gap-3 py-3">
-      <span className={`rounded-full px-2 py-0.5 text-[12px] font-medium ${good ? "bg-[#d7ffd7] text-[#003800]" : "bg-[#f1f1f1] text-[#4a4a4a]"}`}>
-        {up ? "↑" : "↓"} {label}
-      </span>
-      <span className="text-[14px]">{name}</span>
-      <span className="ml-auto text-[16px] font-medium tabular-nums">{value}</span>
+    <div className="rounded-[16px] border border-[#e6e6e6] bg-white p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13px] text-[#606060]">{name}</span>
+        <span className={`rounded-full px-2 py-0.5 text-[12px] font-medium ${good ? "bg-[#b3f782] text-[#306b06]" : "bg-[#f3f3f3] text-[#606060]"}`}>
+          {up ? "↑" : "↓"} {label}
+        </span>
+      </div>
+      <p className="mt-2 text-[22px] font-medium tracking-[-0.4px] tabular-nums">{value}</p>
     </div>
   );
 }
@@ -336,7 +339,7 @@ function Activity({ title, meta }: { title: string; meta: string }) {
   return (
     <li className="flex gap-3">
       <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#f4f5f3]">
-        <Tag size={14} />
+        <PIcon name="OrderFilled" size={14} />
       </span>
       <span>
         <span className="block font-medium">{title}</span>
@@ -351,13 +354,13 @@ function SalesChart() {
     <svg viewBox="0 0 340 120" className="h-32 w-full" aria-hidden>
       <path
         d="M0 90 C 30 88, 40 70, 60 68 C 90 64, 100 40, 130 48 C 160 56, 180 30, 210 36 C 240 42, 250 18, 280 28 C 310 38, 320 22, 340 30 L 340 120 L 0 120 Z"
-        fill="#5631f4"
+        fill="#672ff4"
         opacity="0.18"
       />
       <path
         d="M0 90 C 30 88, 40 70, 60 68 C 90 64, 100 40, 130 48 C 160 56, 180 30, 210 36 C 240 42, 250 18, 280 28 C 310 38, 320 22, 340 30"
         fill="none"
-        stroke="#5631f4"
+        stroke="#672ff4"
         strokeWidth="2.5"
       />
       <path
@@ -376,10 +379,10 @@ function Payments({ onSetup }: { onSetup: () => void }) {
     <div className="px-4 pb-10">
       <div className="flex items-center gap-2 py-4">
         <span className="grid size-8 place-items-center rounded-full bg-[#f1f1f1]">
-          <ChevronLeft size={16} />
+          <PIcon name="ChevronLeft" size={16} />
         </span>
         <span className="grid size-8 place-items-center rounded-full bg-[#f1f1f1]">
-          <Home size={14} />
+          <PIcon name="HomeFilled" size={16} />
         </span>
       </div>
       <h2 className="mb-4 text-[25px] font-medium tracking-[-0.75px]">Payments</h2>
@@ -394,7 +397,7 @@ function Payments({ onSetup }: { onSetup: () => void }) {
               "Access funding, credit, and a free business account for payouts and spending",
             ].map((line) => (
               <li key={line} className="flex gap-2">
-                <Check size={16} className="mt-0.5 shrink-0" />
+                <PIcon name="Check" size={16} />
                 <span>{line}</span>
               </li>
             ))}
@@ -430,7 +433,7 @@ function Payments({ onSetup }: { onSetup: () => void }) {
         {["Payment capture method", "Payment method customizations", "Gift card expiration", "Apple Wallet passes"].map((row) => (
           <div key={row} className="flex items-center justify-between py-3 text-[14px]">
             {row}
-            <ChevronRight size={16} className="text-[#737572]" />
+            <span className="text-[#868686]"><PIcon name="ChevronRight" size={16} /></span>
           </div>
         ))}
       </div>
@@ -444,7 +447,7 @@ function Section({ title, body }: { title: string; body: string }) {
       <p className="text-[15px] font-medium">{title}</p>
       <p className="mt-1 text-[13px] text-[#4a4a4a]">{body}</p>
       <button type="button" className="mt-3 flex h-8 w-full items-center justify-center gap-1 rounded-full bg-[#ebebeb] text-[13px] font-medium">
-        <Plus size={14} /> Method
+        <PIcon name="Plus" size={14} /> Method
       </button>
     </div>
   );
@@ -482,10 +485,10 @@ function PaymentsSetup({
     <div className="px-5 pb-8">
       <div className="flex items-center gap-2 py-4">
         <button type="button" aria-label="Back" onClick={onBack} className="grid size-8 place-items-center rounded-full bg-[#f1f1f1]">
-          <ChevronLeft size={16} />
+          <PIcon name="ChevronLeft" size={16} />
         </button>
         <span className="grid size-8 place-items-center rounded-full bg-[#f1f1f1]">
-          <Home size={14} />
+          <PIcon name="HomeFilled" size={16} />
         </span>
       </div>
       <h2 className="text-[25px] font-medium tracking-[-0.75px]">Set up Shopify Payments</h2>
@@ -564,13 +567,13 @@ function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduc
   return (
     <div className="px-4 pb-8 pt-4">
       <div className="mb-4 flex items-center gap-2">
-        <Tag size={16} />
+        <PIcon name="ProductFilled" size={16} />
         <h2 className="text-[22px] font-medium">Products</h2>
         <button type="button" onClick={onAdd} className="ml-auto h-8 rounded-full bg-black px-3 text-[13px] font-medium text-white">
           Add product
         </button>
         <span className="grid size-8 place-items-center rounded-full bg-[#f1f1f1]">
-          <MoreHorizontal size={16} />
+          <PIcon name="MenuHorizontal" size={16} />
         </span>
       </div>
       <div className="rounded-2xl bg-[#f6f6f6] p-3 text-[13px]">
@@ -586,7 +589,7 @@ function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduc
         ))}
       </div>
       <div className="mt-3 flex h-9 items-center gap-2 rounded-full border border-[#e3e3e3] px-3 text-[13px] text-[#737572]">
-        All <ChevronRight size={12} className="rotate-90" /> <Search size={14} /> Search and filter
+        All <span className="inline-flex rotate-90"><PIcon name="ChevronRight" size={12} /></span> <PIcon name="Search" size={14} /> Search and filter
       </div>
       <div className="mt-2 grid grid-cols-[24px_1fr_auto_auto] items-center gap-2 px-1 py-2 text-[12px] text-[#737572]">
         <span />
@@ -606,7 +609,7 @@ function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduc
           <span className="truncate">{product.title}</span>
           <span className="rounded-md bg-[#d7f3ff] px-1.5 py-0.5 text-[11px] font-medium text-[#083344]">{product.status}</span>
           <span>${product.price}</span>
-          <Eye size={14} className="text-[#737572]" />
+          <span className="text-[#868686]"><PIcon name="View" size={14} /></span>
         </button>
       ))}
     </div>
@@ -639,7 +642,7 @@ function ProductEdit({
             <button type="button" className="h-8 rounded-full bg-black px-3 text-[13px] font-medium text-white">
               Add product
             </button>
-            <MoreHorizontal size={16} />
+            <PIcon name="MenuHorizontal" size={16} />
           </span>
         }
       />
@@ -725,7 +728,7 @@ function ListPage({ title, rows }: { title: string; rows: string[] }) {
         {rows.map((row) => (
           <li key={row} className="flex items-center justify-between px-3 py-3 text-[14px]">
             {row}
-            <ChevronRight size={16} className="text-[#737572]" />
+            <span className="text-[#868686]"><PIcon name="ChevronRight" size={16} /></span>
           </li>
         ))}
       </ul>

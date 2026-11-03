@@ -1,15 +1,18 @@
 import type { ReactNode } from "react";
+import { PIcon } from "@/components/polaris-icon";
 import type { OrbId } from "@/lib/prototype";
 
-export function ShopifyMark({ className = "h-6 w-[22px]" }: { className?: string }) {
+export function ShopifyMark({ className = "h-6 w-[22px]", tone = "light" }: { className?: string; tone?: "light" | "dark" }) {
+  const bag = tone === "dark" ? "#101010" : "white";
+  const shade = tone === "dark" ? "#5E8E3E" : "#C3C3C3";
   return (
     <svg className={className} viewBox="0 0 22 25" aria-hidden="true">
       <path
-        fill="white"
+        fill={bag}
         d="M15.006 2.914s-.281.08-.743.221c-.08-.261-.201-.562-.362-.884C13.379 1.247 12.595.705 11.671.705c-.06 0-.12 0-.201.02-.02-.04-.06-.06-.08-.1-.402-.442-.924-.643-1.547-.623C8.638.042 7.433.905 6.468 2.452 5.785 3.537 5.263 4.903 5.123 5.968 3.736 6.39 2.772 6.691 2.752 6.711 2.049 6.932 2.029 6.952 1.949 7.615 1.828 8.118 0 22.281 0 22.281L15.187 24.913V2.874c-.08.02-.141.02-.181.04Zm-3.515 1.085c-.804.241-1.688.522-2.551.783.241-.944.723-1.888 1.286-2.511.221-.221.522-.482.863-.643.342.723.422 1.708.402 2.371ZM9.863.805c.281 0 .522.06.723.181-.321.16-.643.422-.944.723-.763.824-1.346 2.11-1.587 3.335-.723.221-1.446.442-2.109.643.422-1.909 2.049-4.822 3.917-4.882ZM7.513 11.854c.08 1.286 3.475 1.567 3.676 4.601.141 2.39-1.265 4.018-3.294 4.138-2.451.161-3.797-1.286-3.797-1.286l.522-2.21s1.346 1.025 2.431.944c.703-.04.964-.623.944-1.025-.1-1.687-2.873-1.587-3.053-4.359-.161-2.31 1.366-4.661 4.741-4.882 1.306-.08 1.969.241 1.969.241l-.763 2.893s-.864-.402-1.888-.321c-1.487.1-1.507 1.044-1.487 1.265Zm4.781-8.096c0-.603-.08-1.467-.362-2.19.924.181 1.366 1.205 1.567 1.828-.362.1-.763.221-1.205.362Z"
       />
       <path
-        fill="#C3C3C3"
+        fill={shade}
         d="M15.691 24.831 22 23.264s-2.712-18.342-2.732-18.462c-.02-.121-.12-.201-.221-.201-.1 0-1.868-.04-1.868-.04s-1.085-1.045-1.487-1.447v21.717Z"
       />
     </svg>
@@ -42,10 +45,10 @@ export function Orb({ id, size = 32 }: { id: OrbId; size?: number }) {
   if (id === "sidekick") {
     return (
       <span
-        className="relative grid shrink-0 place-items-center overflow-hidden rounded-full bg-[#5631f4] shadow-[inset_0_0_2px_rgba(255,255,255,0.35)]"
+        className="relative grid shrink-0 place-items-center overflow-hidden rounded-full bg-[#672ff4] text-white shadow-[inset_0_0_2px_rgba(255,255,255,0.35)]"
         style={{ width: size, height: size }}
       >
-        <SidekickGlyph className="h-[58%] w-[58%]" />
+        <PIcon name="Sidekick" size={Math.round(size * 0.62)} />
       </span>
     );
   }
@@ -104,8 +107,8 @@ export function IconButton({
       aria-label={label}
       aria-pressed={active}
       onClick={onClick}
-      className={`grid size-8 place-items-center rounded-full text-white shadow-[inset_0_0_2px_rgba(255,255,255,0.1)] transition duration-200 ease-out hover:bg-white/10 ${
-        active ? "bg-[#303030]" : "bg-[#252525]"
+      className={`grid size-8 place-items-center rounded-full text-[#101010] transition duration-200 ease-out hover:bg-[#f3f3f3] ${
+        active ? "bg-[#f3f3f3]" : "bg-transparent"
       }`}
     >
       {children}
@@ -126,8 +129,8 @@ export function ChipButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex h-8 items-center rounded-full px-4 text-[13px] font-medium tracking-[-0.13px] shadow-[inset_0_0_2px_rgba(255,255,255,0.1)] transition duration-150 ease-out hover:brightness-110 ${
-        tone === "primary" ? "bg-white text-black" : "bg-[#252525] text-white"
+      className={`inline-flex h-8 items-center rounded-full px-4 text-[13px] font-medium tracking-[-0.13px] transition duration-150 ease-out hover:brightness-110 ${
+        tone === "primary" ? "bg-[#0c0c0c] text-white" : "bg-[#f3f3f3] text-[#101010]"
       }`}
     >
       {label}
