@@ -72,10 +72,14 @@ body {
   background: #373737;
 }
 
-.btn-dark:active,
-.btn-dark[aria-pressed="true"] {
+.btn-dark:active:not(:disabled) {
   background: #414141;
   box-shadow: var(--shadow-button-dark-inset);
+}
+
+.btn-dark[aria-pressed="true"]:not(:active) {
+  background: #3a3a3a;
+  color: #fff;
 }
 
 @keyframes rise {
@@ -244,16 +248,18 @@ body {
 }
 
 /* Sidekick avatars: animated spheres built in CSS. --s is the rendered size in px. */
-.orb {
-  --s: 32px;
-  position: relative;
-  display: block;
-  flex-shrink: 0;
-  width: var(--s);
-  height: var(--s);
-  overflow: hidden;
-  border-radius: 9999px;
-  isolation: isolate;
+@layer components {
+  .orb {
+    --s: 32px;
+    position: relative;
+    display: block;
+    flex-shrink: 0;
+    width: var(--s);
+    height: var(--s);
+    overflow: hidden;
+    border-radius: 9999px;
+    isolation: isolate;
+  }
 }
 
 .orb > i {

@@ -59,7 +59,7 @@ export type Agent = {
 export type Chip = { label: string; tone: "secondary" | "primary" };
 
 export type Block =
-  | { id: string; type: "text"; role: "user" | "assistant"; text: string }
+  | { id: string; type: "text"; role: "user" | "assistant"; text: string; typed?: boolean }
   | { id: string; type: "steps" }
   | { id: string; type: "sellers" }
   | { id: string; type: "chips"; chips: Chip[] }
@@ -543,7 +543,7 @@ export function setupState(storeName = "My Store"): PrototypeState {
     selectedAgentId: "sidekick",
     threads: {
       sidekick: [
-        { id: "hello", type: "text", role: "assistant", text: sidekickHello },
+        { id: "hello", type: "text", role: "assistant", text: sidekickHello, typed: true },
         { id: "hello-chips", type: "chips", chips: setupChips },
       ],
     },

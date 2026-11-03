@@ -336,10 +336,10 @@ function BackPill({ onBack, onHome, icon = "Home" }: { onBack: () => void; onHom
     <div className="flex">
       <span className="inline-flex h-8 items-center overflow-hidden rounded-full border border-[#e3e3e3] bg-white shadow-[0_3px_15px_rgba(0,0,0,0.03)]">
         <button type="button" aria-label="Back" onClick={onBack} className="press grid h-full place-items-center pl-2 pr-0.5 hover:bg-[#f7f7f7]">
-          <PIcon name="ChevronLeft" size={14} />
+          <PIcon name="ChevronLeft" size={16} />
         </button>
         <button type="button" aria-label="Home" onClick={onHome ?? onBack} className="press grid h-full place-items-center pl-1 pr-3 hover:bg-[#f7f7f7]">
-          <PIcon name={icon} size={16} />
+          <PIcon name={icon} size={20} />
         </button>
       </span>
     </div>
@@ -515,13 +515,13 @@ function HomeActive({ nav }: { nav: Nav }) {
               ))}
             </span>
             <span className="text-[#171817] transition-transform group-hover:translate-x-0.5">
-              <PIcon name="ChevronRight" size={14} />
+              <PIcon name="ChevronRight" size={16} />
             </span>
           </button>
         </div>
         <div className="-mr-8 flex gap-2 overflow-x-auto pr-8 [scrollbar-width:none]">
           <Pill tone="ink" onClick={() => setRange(next[range])} className="pl-3 pr-[13px]">
-            <PIcon name="Calendar" size={14} />
+            <PIcon name="Calendar" size={16} />
             {data.label}
           </Pill>
           <Pill tone="soft" className="px-[13px]">
@@ -697,7 +697,7 @@ function Activity({ icon, title, meta, onClick }: { icon: PolarisIconName; title
   return (
     <button type="button" onClick={onClick} className="press press-row -mx-2 flex items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-[#f7f7f6]">
       <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#f4f5f3] text-[#171817]">
-        <PIcon name={icon} size={16} />
+        <PIcon name={icon} size={20} />
       </span>
       <span className="flex min-w-0 flex-col gap-[3px]">
         <span className="truncate text-[13px] font-medium leading-4 tracking-[-0.13px]">{title}</span>
@@ -797,7 +797,7 @@ function Payments({ nav }: { nav: Nav }) {
               {payPoints.map((point) => (
                 <li key={point} className="flex gap-2 text-[13px] leading-[1.4] tracking-[-0.13px] text-black">
                   <span className="mt-0.5 shrink-0">
-                    <PIcon name="Check" size={14} />
+                    <PIcon name="Check" size={16} />
                   </span>
                   {point}
                 </li>
@@ -832,7 +832,7 @@ function Payments({ nav }: { nav: Nav }) {
             {configRows.map((row, index) => (
               <button key={row.label} type="button" className="press press-row group flex items-start gap-3 text-left">
                 <span className="grid size-6 shrink-0 place-items-center rounded-md bg-[#f4f5f3]">
-                  <PIcon name={row.icon} size={16} />
+                  <PIcon name={row.icon} size={20} />
                 </span>
                 <span
                   className={`flex flex-1 items-center justify-between pb-3 pt-0.5 text-[13px] tracking-[-0.13px] ${
@@ -841,7 +841,7 @@ function Payments({ nav }: { nav: Nav }) {
                 >
                   {row.label}
                   <span className="text-[#8a8a8a] transition-transform group-hover:translate-x-0.5">
-                    <PIcon name="ChevronRight" size={14} />
+                    <PIcon name="ChevronRight" size={16} />
                   </span>
                 </span>
               </button>
@@ -861,7 +861,7 @@ function MethodSection({ title, body }: { title: string; body: string }) {
         <p className="text-[13px] tracking-[-0.13px] text-[#4a4a4a]">{body}</p>
       </div>
       <Pill tone="fill" className="w-full gap-2">
-        <PIcon name="Plus" size={16} />
+        <PIcon name="Plus" size={20} />
         Method
       </Pill>
     </section>
@@ -1022,7 +1022,7 @@ function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduc
     <Page>
       <div className="flex h-8 items-center gap-2">
         <span className="flex items-center gap-1.5 text-[15px] font-medium tracking-[-0.15px]">
-          <PIcon name="Product" size={18} />
+          <PIcon name="Product" size={20} />
           Products
         </span>
         <span className="ml-auto flex items-center gap-2">
@@ -1034,14 +1034,14 @@ function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduc
             aria-label="More actions"
             className="press grid size-8 place-items-center rounded-full border border-[#e3e3e3] bg-white hover:bg-[#f7f7f7]"
           >
-            <PIcon name="MenuHorizontal" size={16} />
+            <PIcon name="MenuHorizontal" size={20} />
           </button>
         </span>
       </div>
 
       <div className="flex flex-col rounded-2xl bg-[#f4f5f3] px-4 pb-2.5 pt-4">
         <span className="mb-3 flex h-5 items-center gap-1.5 text-[12px] text-[#171817]">
-          <PIcon name="Calendar" size={14} />
+          <PIcon name="Calendar" size={16} />
           30 days
         </span>
         {[
@@ -1060,11 +1060,11 @@ function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduc
         <div className="flex h-9 items-center rounded-xl border border-[#e3e3e3] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus-within:border-[#171817]">
           <button type="button" className="press flex h-full items-center gap-0.5 pl-3 pr-2.5 text-[13px] font-medium">
             All
-            <PIcon name="ChevronDown" size={14} />
+            <PIcon name="ChevronDown" size={16} />
           </button>
           <span className="h-4 w-px bg-[#e3e3e3]" />
           <span className="pl-2.5 text-[#737572]">
-            <PIcon name="Search" size={16} />
+            <PIcon name="Search" size={20} />
           </span>
           <input
             value={query}
@@ -1106,7 +1106,7 @@ function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduc
               <span className={`justify-self-start rounded-md px-1.5 py-0.5 text-[12px] font-medium leading-4 ${statusClass[product.status]}`}>{product.status}</span>
               <span className="text-[13px] tabular-nums text-[#303030]">${product.price}</span>
               <span className="text-[#4a4a4a]">
-                <PIcon name="View" size={16} />
+                <PIcon name="View" size={20} />
               </span>
             </div>
           ))}
@@ -1183,7 +1183,7 @@ function ProductEdit({
             aria-label="More actions"
             className="press grid size-8 place-items-center rounded-full border border-[#e3e3e3] bg-white hover:bg-[#f7f7f7]"
           >
-            <PIcon name="MenuHorizontal" size={16} />
+            <PIcon name="MenuHorizontal" size={20} />
           </button>
         </span>
       </div>
@@ -1241,7 +1241,7 @@ function ProductEdit({
               <span className="rounded bg-[#e3e3e3] px-1 text-[11px] font-medium leading-4">{taxed ? "Yes" : "No"}</span>
             </Chip>
             <span className="text-[#4a4a4a]">
-              <PIcon name="ChevronDown" size={16} />
+              <PIcon name="ChevronDown" size={20} />
             </span>
           </div>
         </Card>
@@ -1332,7 +1332,7 @@ function ListPage({ title, rows, onHome }: { title: string; rows: ListRow[]; onH
           {rows.map((row, index) => (
             <button key={row.label} type="button" onClick={row.go} className="press press-row group flex items-start gap-3 text-left">
               <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#f4f5f3]">
-                <PIcon name={row.icon} size={16} />
+                <PIcon name={row.icon} size={20} />
               </span>
               <span
                 className={`flex min-w-0 flex-1 items-center gap-2 pb-3 ${index < rows.length - 1 ? "border-b-[0.5px] border-[#e6e6e6]" : ""}`}
@@ -1343,7 +1343,7 @@ function ListPage({ title, rows, onHome }: { title: string; rows: ListRow[]; onH
                 </span>
                 {row.badge ? <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${badgeClass[row.badge]}`}>{row.badge}</span> : null}
                 <span className="text-[#8a8a8a] transition-transform group-hover:translate-x-0.5">
-                  <PIcon name="ChevronRight" size={14} />
+                  <PIcon name="ChevronRight" size={16} />
                 </span>
               </span>
             </button>

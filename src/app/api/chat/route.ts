@@ -6,6 +6,7 @@ import {
   stepCountIs,
   streamText,
   tool,
+  type LanguageModel,
   type UIMessage,
 } from "ai";
 import { z } from "zod";
@@ -69,27 +70,41 @@ function textOf(message: UIMessage | undefined) {
 function scriptedResponse(agentId: string, text: string, storeName: string) {
   const turn = scriptedTurn(agentId, text, storeName);
   const stream = createUIMessageStream({
-    execute({ writer }) {
-      writer.write({
-        type: "data-effects",
-        data: { effects: turn.effects },
-        transient: true,
-      });
+    async execute({ writer }) {
+      writer.write({ type: "data-effects", data: { effects: turn.effects } });
       const id = "scripted";
       writer.write({ type: "text-start", id });
-      const words = turn.text.split(/(\s+)/);
-      for (const word of words) writer.write({ type: "text-delta", id, delta: word });
+      for (const word of turn.text.split(/(\s+)/)) {
+        writer.write({ type: "text-delta", id, delta: word });
+        if (word.trim()) await new Promise((resolve) => setTimeout(resolve, 28));
+      }
       writer.write({ type: "text-end", id });
     },
   });
   return createUIMessageStreamResponse({ stream });
 }
 
+function chatModel(): LanguageModel | null {
+  if (process.env.ANTHROPIC_API_KEY) return anthropic(process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5");
+  if (process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN) {
+    return process.env.AI_GATEWAY_MODEL || "anthropic/claude-sonnet-5.5";
+  }
+  return null;
+}
+
 export async function POST(request: Request) {
   let body: {
     messages?: UIMessage[];
     transcript?: { role: "user" | "assistant"; content: string }[];
-    prototype?: { agentId?: string; storeName?: string; preview?: string; scenario?: string };
+    prototype?: {
+      agentId?: string;
+      agentName?: string;
+      persona?: string;
+      storeName?: string;
+      preview?: string;
+      scenario?: string;
+      products?: string[];
+    };
   };
   try {
     body = await request.json();
@@ -104,7 +119,9 @@ export async function POST(request: Request) {
   const asked = textOf(lastUser);
   if (!asked) return Response.json({ error: "Send a message." }, { status: 400 });
 
-  if (!process.env.ANTHROPIC_API_KEY) return scriptedResponse(agentId, asked, storeName);
+  const model = chatModel();
+  if (!model) return scriptedResponse(agentId, asked, storeName);
+  const persona = body.prototype?.persona?.trim().slice(0, 4000) || personaFor(agentId);
 
   const prior: UIMessage[] = (body.transcript ?? []).slice(-12).map((message, index) => ({
     id: `prior-${index}`,
@@ -115,19 +132,29 @@ export async function POST(request: Request) {
 
   try {
     const result = streamText({
-      model: anthropic(process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5"),
+      model,
       system: [
-        personaFor(agentId),
+        persona,
+        body.prototype?.agentName ? `Your name in this chat is ${body.prototype.agentName}.` : "",
         "You are inside a Shopify admin prototype. Use tools to change the preview, payments form, catalog, and sidekick list. Do not claim you changed something unless you called the tool.",
-        "Write two to six short sentences. No markdown headings.",
+        "Write two to six short sentences in plain text. No markdown, bullets, or headings.",
         `Store: ${storeName}. Scenario: ${body.prototype?.scenario ?? "setup"}. Preview: ${body.prototype?.preview ?? "home-setup"}.`,
-      ].join("\n"),
+        body.prototype?.products?.length ? `Catalog: ${body.prototype.products.slice(0, 30).join(", ")}.` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
       messages: await convertToModelMessages(messages),
       tools,
       stopWhen: stepCountIs(4),
     });
-    return result.toUIMessageStreamResponse();
-  } catch {
+    return result.toUIMessageStreamResponse({
+      onError: (error) => {
+        console.error("chat stream failed", error);
+        return "The model is unavailable right now.";
+      },
+    });
+  } catch (error) {
+    console.error("chat request failed", error);
     return scriptedResponse(agentId, asked, storeName);
   }
 }

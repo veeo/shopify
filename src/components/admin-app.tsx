@@ -12,6 +12,7 @@ import {
   activeState,
   personaFor,
   prototypeSnapshot,
+  purposes,
   reducer,
   scriptedTurn,
   selectedAgent,
@@ -65,13 +66,16 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
       .map((part) => ("text" in part ? part.text : ""))
       .join("")
       .trim();
-    const effects = effectsFrom(message, applied.current);
+    const scripted = scriptedEffects(message);
+    const effects = scripted ?? effectsFrom(message, applied.current);
     setState((current) => {
-      const spoken = text || scriptedTurn(pending.agentId, pending.text, current.storeName).text;
-      const withText = reducer(current, { type: "commit", agentId: pending.agentId, text: spoken });
-      const nextEffects =
-        effects.length > 0 ? effects : scriptedTurn(pending.agentId, pending.text, current.storeName).effects;
-      return reducer(withText, { type: "effects", effects: nextEffects });
+      if (!text) {
+        const script = scriptedTurn(pending.agentId, pending.text, current.storeName);
+        const withScript = reducer(current, { type: "commit", agentId: pending.agentId, text: script.text });
+        return reducer(withScript, { type: "effects", effects: script.effects });
+      }
+      const withText = reducer(current, { type: "commit", agentId: pending.agentId, text });
+      return reducer(withText, { type: "effects", effects });
     });
   }
 
@@ -103,7 +107,9 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           prototype: {
             ...prototypeSnapshot(current),
             agentId,
-            persona: personaFor(agentId),
+            agentName: current.agents.find((item) => item.id === agentId)?.name ?? "Sidekick",
+            persona: agentPersona(current, agentId),
+            products: current.products.map((product) => `${product.title} ($${product.price})`),
           },
         },
       },
@@ -183,6 +189,22 @@ function BootScreen({ storeName }: { storeName: string }) {
       </div>
     </div>
   );
+}
+
+function agentPersona(state: PrototypeState, agentId: string) {
+  const base = state.agents.find((item) => item.id === agentId)?.persona || personaFor(agentId);
+  if (agentId !== "chief" || state.purposes.length === 0) return base;
+  const chosen = purposes.filter((item) => state.purposes.includes(item.id)).map((item) => item.title);
+  return `${base} The merchant asked you to focus on: ${chosen.join(", ")}.`;
+}
+
+function scriptedEffects(message: UIMessage): Effect[] | null {
+  for (const part of message.parts) {
+    if (part.type !== "data-effects" || !("data" in part)) continue;
+    const data = part.data as { effects?: Effect[] };
+    return Array.isArray(data.effects) ? data.effects : [];
+  }
+  return null;
 }
 
 function effectsFrom(message: UIMessage, seen: Set<string>) {

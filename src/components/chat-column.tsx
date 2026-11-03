@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChipButton, IconButton, Orb } from "@/components/marks";
 import { PIcon } from "@/components/polaris-icon";
 import {
@@ -49,6 +49,11 @@ export function ChatColumn({
   const [draft, setDraft] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [typedDone, setTypedDone] = useState(() => new Set(typedOnce));
+  const markTyped = useCallback((id: string) => {
+    typedOnce.add(id);
+    setTypedDone(new Set(typedOnce));
+  }, []);
   const thread = state.threads[agent.id] ?? [];
   const history = thread.filter((block) => block.type === "text" && block.role === "user");
 
@@ -75,7 +80,7 @@ export function ChatColumn({
             }}
             active={historyOpen}
           >
-            <PIcon name="Clock" size={16} />
+            <PIcon name="Clock" size={20} />
           </IconButton>
           <IconButton
             label="More"
@@ -85,7 +90,7 @@ export function ChatColumn({
             }}
             active={moreOpen}
           >
-            <PIcon name="MenuHorizontal" size={16} />
+            <PIcon name="MenuHorizontal" size={20} />
           </IconButton>
         </div>
       </header>
@@ -137,9 +142,13 @@ export function ChatColumn({
           <Purpose state={state} onPurpose={onPurpose} onStart={onStart} onChip={onChip} />
         ) : (
           <div className="flex max-w-[640px] flex-col gap-2">
-            {thread.map((block) => (
-              <BlockView key={block.id} block={block} state={state} onChip={onChip} onCreate={onCreate} />
-            ))}
+            {visibleBlocks(thread, typedDone).map((block) =>
+              block.type === "text" && block.typed && !typedDone.has(block.id) ? (
+                <TypeOut key={block.id} text={block.text} instant={!state.motion} onDone={() => markTyped(block.id)} />
+              ) : (
+                <BlockView key={block.id} block={block} state={state} onChip={onChip} onCreate={onCreate} />
+              ),
+            )}
             {busy && !liveText ? (
               <div className="rise flex items-center py-3 text-[#8e8f8b]" aria-live="polite">
                 <span className="sr-only">{agent.name} is working</span>
@@ -180,21 +189,21 @@ export function ChatColumn({
             aria-label="Attach"
             className="press grid size-8 place-items-center rounded-full border border-white/10 bg-[#252525] text-white hover:bg-[#2f2f2f]"
           >
-            <PIcon name="Plus" size={16} />
+            <PIcon name="Plus" size={20} />
           </button>
           <button
             type="button"
             aria-label="Voice mode"
             className="press grid size-8 place-items-center rounded-full border border-white/10 bg-[#252525] text-white hover:bg-[#2f2f2f]"
           >
-            <PIcon name="Sound" size={16} />
+            <PIcon name="Sound" size={20} />
           </button>
           <button
             type="button"
             aria-label="Dictate"
             className="press grid size-8 place-items-center rounded-full border border-white/10 bg-[#252525] text-white hover:bg-[#2f2f2f]"
           >
-            <PIcon name="Microphone" size={16} />
+            <PIcon name="Microphone" size={20} />
           </button>
           <button
             type="submit"
@@ -202,7 +211,7 @@ export function ChatColumn({
             disabled={busy || !draft.trim()}
             className="press grid size-8 place-items-center rounded-full bg-white text-black shadow-[0_1px_2px_rgba(0,0,0,0.3)] hover:bg-[#eee] disabled:opacity-40"
           >
-            <PIcon name="ArrowUp" size={16} />
+            <PIcon name="ArrowUp" size={20} />
           </button>
         </span>
       </form>
@@ -463,5 +472,39 @@ function Purpose({
         <ChipButton label="Start working" tone="primary" onClick={onStart} />
       </div>
     </div>
+  );
+}
+
+const typedOnce = new Set<string>();
+
+function visibleBlocks(thread: Block[], done: Set<string>) {
+  const pending = thread.findIndex((block) => block.type === "text" && block.typed && !done.has(block.id));
+  return pending === -1 ? thread : thread.slice(0, pending + 1);
+}
+
+function TypeOut({ text, instant, onDone }: { text: string; instant: boolean; onDone: () => void }) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const reduce = instant || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let shown = 0;
+    let timer = 0;
+    const tick = () => {
+      shown = reduce ? text.length : Math.min(text.length, shown + 2);
+      setCount(shown);
+      if (shown >= text.length) {
+        onDone();
+        return;
+      }
+      const pause = /[.!?]\s*$/.test(text.slice(0, shown)) ? 220 : 16;
+      timer = window.setTimeout(tick, pause);
+    };
+    timer = window.setTimeout(tick, reduce ? 0 : 1100);
+    return () => window.clearTimeout(timer);
+  }, [text, instant, onDone]);
+  return (
+    <p className="max-w-[560px] whitespace-pre-wrap py-2 text-[15px] leading-[1.4] tracking-[-0.15px]" aria-label={text}>
+      <span aria-hidden>{text.slice(0, count)}</span>
+      <span className="caret ml-0.5 inline-block h-4 w-px translate-y-0.5 bg-white" aria-hidden />
+    </p>
   );
 }

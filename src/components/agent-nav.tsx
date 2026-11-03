@@ -38,10 +38,10 @@ export function AgentNav({
         </span>
         <span className="ml-auto flex gap-1.5">
           <IconButton label="Add a sidekick" onClick={onAdd} active={state.mode === "add"}>
-            <PIcon name="Plus" size={16} />
+            <PIcon name="Plus" size={20} />
           </IconButton>
-          <IconButton label="Search sidekicks" onClick={onSearch} active={state.searchOpen}>
-            <PIcon name="Search" size={16} />
+          <IconButton label={state.searchOpen ? "Close search" : "Search sidekicks"} onClick={onSearch} active={state.searchOpen}>
+            <PIcon name={state.searchOpen ? "X" : "Search"} size={20} />
           </IconButton>
         </span>
       </div>
@@ -114,10 +114,10 @@ export function AgentNav({
         <img src="/assets/user.png" alt="" className="size-8 rounded-full object-cover" />
         <span className="ml-auto flex gap-1.5">
           <IconButton label="Apps" onClick={onExperiments}>
-            <PIcon name="Apps" size={16} />
+            <PIcon name="Apps" size={20} />
           </IconButton>
           <IconButton label="Experiments" onClick={onExperiments} active={state.experimentsOpen}>
-            <PIcon name="Settings" size={16} />
+            <PIcon name="Settings" size={20} />
           </IconButton>
         </span>
       </div>
