@@ -1118,7 +1118,7 @@ function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduc
 }
 
 function Thumb({ product, size = 40 }: { product: Product; size?: number }) {
-  const src = product.tone === "lamp" ? "/assets/lamp.png" : product.tone === "headphones" ? "/assets/headphones.png" : null;
+  const src = product.tone === "lamp" ? "/assets/lamp.webp" : product.tone === "headphones" ? "/assets/headphones.webp" : null;
   return (
     <span
       className={`grid shrink-0 place-items-center overflow-hidden ${toneClass[product.tone]}`}

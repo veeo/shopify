@@ -201,13 +201,13 @@ export const sellers = [
     title: "Cloud Headphones",
     meta: "$64,800 · 342 orders",
     advice: "Test a carrying-case bundle. Carry the offer through email and agentic ads.",
-    image: "/assets/headphones.png",
+    image: "/assets/headphones.webp",
   },
   {
     title: "Studio Desk Lamp",
     meta: "$38,400 · 216 orders",
     advice: "Make delivery and warranty clear. Match the message across paid channels.",
-    image: "/assets/lamp.png",
+    image: "/assets/lamp.webp",
   },
 ] as const;
 
