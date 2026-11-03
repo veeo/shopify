@@ -18,6 +18,13 @@
   --color-sub: #4a4a4a;
 }
 
+:root {
+  --ease-emphasized: cubic-bezier(0.2, 0.8, 0, 1);
+  --shadow-button-dark: 0 0 0 0.5px #0000003d, 0 1px 2px -0.5px #0000001f, 0 2px 3px -1.5px #0000001f,
+    0 4px 4px -2px #0000001f, inset 0 1px 0 #ffffff0a, inset 0 0 0 1px #ffffff12, inset 0 4px 4px -2px #ffffff0a;
+  --shadow-button-dark-inset: 0 0 0 1px #0000005c, 0 0 0 2px #ffffff08, 0 2px 0 #ffffff0a, inset 0 1px 0 #00000033;
+}
+
 html,
 body {
   height: 100%;
@@ -28,17 +35,47 @@ body {
 body {
   font-family: var(--font-sans);
   text-rendering: optimizeLegibility;
-}
-
-button,
-input,
-textarea {
-  font: inherit;
+  -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
   background: #5631f4;
   color: white;
+}
+
+/* Shopify admin-next press: scale(.97) on the emphasized ease, released slower than pressed. */
+.press {
+  transition:
+    transform 400ms var(--ease-emphasized),
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.press:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 150ms, 100ms, 100ms, 100ms;
+}
+
+.press-row:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.btn-dark {
+  background: #2f2f2f;
+  box-shadow: var(--shadow-button-dark);
+  color: #eee;
+}
+
+.btn-dark:hover {
+  background: #373737;
+}
+
+.btn-dark:active,
+.btn-dark[aria-pressed="true"] {
+  background: #414141;
+  box-shadow: var(--shadow-button-dark-inset);
 }
 
 @keyframes rise {
@@ -53,7 +90,82 @@ textarea {
 }
 
 .rise {
-  animation: rise 180ms ease-out;
+  animation: rise 220ms var(--ease-emphasized);
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-in {
+  animation: page-in 320ms var(--ease-emphasized);
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pop-in {
+  animation: pop-in 200ms var(--ease-emphasized);
+  transform-origin: top right;
+}
+
+@keyframes sk-bar {
+  from {
+    transform: scaleX(0.08);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.sk-bar {
+  animation: sk-bar 900ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes sk-dot {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  40% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+.sk-dots i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: sk-dot 1s infinite;
+}
+
+.sk-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.sk-dots i:nth-child(3) {
+  animation-delay: 0.3s;
 }
 
 @keyframes blink {
@@ -74,4 +186,295 @@ textarea {
 .scroll-thin-light {
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+/* Sales chart draw-in */
+@keyframes chart-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes chart-fill {
+  from {
+    opacity: 0;
+    transform: scaleY(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes chart-dot {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.chart-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: chart-draw 1400ms var(--ease-emphasized) 150ms forwards;
+}
+
+.chart-line-compare {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: chart-draw 1400ms var(--ease-emphasized) 350ms forwards;
+}
+
+.chart-fill {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: chart-fill 900ms var(--ease-emphasized) 500ms forwards;
+}
+
+.chart-dot {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chart-dot 400ms var(--ease-emphasized) 1300ms forwards;
+}
+
+/* Sidekick avatars: animated spheres built in CSS. --s is the rendered size in px. */
+.orb {
+  --s: 32px;
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  width: var(--s);
+  height: var(--s);
+  overflow: hidden;
+  border-radius: 9999px;
+  isolation: isolate;
+}
+
+.orb > i {
+  position: absolute;
+  display: block;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.orb .gloss {
+  inset: 0;
+  z-index: 5;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.95) 0 7%, rgba(255, 255, 255, 0.35) 16%, transparent 34%),
+    radial-gradient(circle at 70% 82%, rgba(255, 255, 255, 0.35), transparent 40%);
+  box-shadow:
+    inset 0 0 0 calc(var(--s) * 0.02) rgba(255, 255, 255, 0.55),
+    inset calc(var(--s) * -0.06) calc(var(--s) * -0.08) calc(var(--s) * 0.16) rgba(60, 50, 140, 0.22);
+}
+
+/* Chief of Staff: frosted glass sphere with a violet/blue ribbon folding through it */
+.orb-chief {
+  background: radial-gradient(circle at 38% 32%, #ffffff 0%, #f1f0ff 38%, #dcdcf6 72%, #c4c4ea 100%);
+}
+
+.orb-chief .ribbon {
+  left: -30%;
+  top: 34%;
+  width: 160%;
+  height: 34%;
+  background: linear-gradient(90deg, #c26bff 0%, #6b4dff 35%, #2f6bff 65%, #8a5bff 100%);
+  filter: blur(calc(var(--s) * 0.07));
+  animation: chief-wave 5.2s ease-in-out infinite;
+}
+
+.orb-chief .ribbon-2 {
+  left: -20%;
+  top: 46%;
+  width: 140%;
+  height: 18%;
+  background: linear-gradient(90deg, transparent, #ff8ad8 30%, #8f7bff 70%, transparent);
+  opacity: 0.8;
+  filter: blur(calc(var(--s) * 0.06));
+  animation: chief-wave 5.2s ease-in-out -2.6s infinite reverse;
+}
+
+@keyframes chief-wave {
+  0%,
+  100% {
+    transform: rotate(-24deg) translateY(10%) scaleY(0.9);
+  }
+  50% {
+    transform: rotate(18deg) translateY(-14%) scaleY(1.25);
+  }
+}
+
+/* Ideas: glass sphere full of drifting bubbles */
+.orb-ideas {
+  background: radial-gradient(circle at 40% 35%, #ffffff 0%, #f3e9ff 45%, #d9c8ff 80%, #c3a8ff 100%);
+}
+
+.orb-ideas .bubble {
+  filter: blur(calc(var(--s) * 0.015));
+  box-shadow: inset calc(var(--s) * -0.03) calc(var(--s) * -0.04) calc(var(--s) * 0.06) rgba(0, 0, 0, 0.18);
+}
+
+.orb-ideas .b1 {
+  width: 42%;
+  height: 42%;
+  left: 30%;
+  top: 30%;
+  background: radial-gradient(circle at 35% 30%, #ff8ccf, #e0218a);
+  animation: bubble-a 6s ease-in-out infinite;
+}
+
+.orb-ideas .b2 {
+  width: 34%;
+  height: 34%;
+  left: 12%;
+  top: 22%;
+  background: radial-gradient(circle at 35% 30%, #8f8cff, #4a2ff0);
+  animation: bubble-b 7s ease-in-out infinite;
+}
+
+.orb-ideas .b3 {
+  width: 30%;
+  height: 30%;
+  left: 56%;
+  top: 50%;
+  background: radial-gradient(circle at 35% 30%, #7aa0ff, #2b4dff);
+  animation: bubble-c 5.4s ease-in-out infinite;
+}
+
+.orb-ideas .b4 {
+  width: 26%;
+  height: 26%;
+  left: 24%;
+  top: 60%;
+  background: radial-gradient(circle at 35% 30%, #d38bff, #8d2bf0);
+  animation: bubble-b 6.4s ease-in-out -3s infinite reverse;
+}
+
+.orb-ideas .b5 {
+  width: 22%;
+  height: 22%;
+  left: 58%;
+  top: 14%;
+  background: radial-gradient(circle at 35% 30%, #ffb3e6, #ff4fb2);
+  animation: bubble-a 5s ease-in-out -2s infinite reverse;
+}
+
+@keyframes bubble-a {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(-18%, 14%) scale(1.08);
+  }
+  66% {
+    transform: translate(14%, -12%) scale(0.94);
+  }
+}
+
+@keyframes bubble-b {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(40%, 30%);
+  }
+}
+
+@keyframes bubble-c {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -30%) scale(1.15);
+  }
+}
+
+/* Trends: pearl with an iridescent sheen sliding over it */
+.orb-trends {
+  background: radial-gradient(circle at 36% 30%, #ffffff 0%, #eeedf6 40%, #c9cde3 78%, #9fa8cc 100%);
+}
+
+.orb-trends .sheen {
+  inset: -30%;
+  background: conic-gradient(from 0deg, #ffd3f0, #d4e2ff, #cffff2, #fff1c9, #ffd3f0);
+  opacity: 0.6;
+  mix-blend-mode: multiply;
+  filter: blur(calc(var(--s) * 0.12));
+  animation: spin 7s linear infinite;
+}
+
+.orb-trends .glint {
+  width: 60%;
+  height: 60%;
+  left: 8%;
+  top: 6%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95), transparent 65%);
+  animation: glint 4.5s ease-in-out infinite;
+}
+
+@keyframes glint {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(28%, 22%);
+  }
+}
+
+/* Store + Agentic: soft pastel gradient spheres swirling at different speeds */
+.orb-store {
+  background: #dff3ea;
+}
+
+.orb-agentic {
+  background: #f6dcf3;
+}
+
+.orb-store .swirl,
+.orb-agentic .swirl {
+  inset: -25%;
+  filter: blur(calc(var(--s) * 0.14));
+}
+
+.orb-store .swirl {
+  background: conic-gradient(from 40deg, #b6f2cf, #ffd0bf, #ffc3dc, #c7d3ff, #7fb2ff, #b6f2cf);
+  animation: spin 8s linear infinite;
+}
+
+.orb-agentic .swirl {
+  background: conic-gradient(from 200deg, #ffe28a, #ff9bd6, #c88bff, #8aa2ff, #ffb0a0, #ffe28a);
+  animation: spin 6s linear infinite reverse;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.orb-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb *,
+  .chart-line,
+  .chart-line-compare,
+  .chart-fill,
+  .chart-dot {
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+  }
 }

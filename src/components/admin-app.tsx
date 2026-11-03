@@ -5,7 +5,7 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { useMemo, useRef, useState } from "react";
 import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
-import { ShopifyMark } from "@/components/marks";
+import { Orb, ShopifyMark } from "@/components/marks";
 import { PreviewColumn } from "@/components/preview-column";
 import { ProductRail } from "@/components/product-rail";
 import {
@@ -26,6 +26,15 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   const [state, setState] = useState<PrototypeState>(() =>
     initialScenario === "active" ? activeState() : setupState(),
   );
+  const [booting, setBooting] = useState(false);
+  const bootTimer = useRef<number | null>(null);
+
+  function enter(update: (current: PrototypeState) => PrototypeState) {
+    setState(update);
+    if (bootTimer.current) window.clearTimeout(bootTimer.current);
+    setBooting(true);
+    bootTimer.current = window.setTimeout(() => setBooting(false), 980);
+  }
   const turn = useRef<Turn | null>(null);
   const applied = useRef(new Set<string>());
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
@@ -104,38 +113,40 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   if (!state.signedIn) {
     return (
       <Signup
-        onSubmit={(storeName) => setState((current) => reducer(current, { type: "sign-in", storeName }))}
-        onActive={() => setState((current) => ({ ...activeState(current.storeName), motion: current.motion }))}
+        onSubmit={(storeName) => enter((current) => reducer(current, { type: "sign-in", storeName }))}
+        onActive={() => enter((current) => ({ ...activeState(current.storeName), motion: current.motion }))}
       />
     );
   }
 
   return (
-    <div className="flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white">
-      <AgentNav
-        state={state}
-        onSelect={(id) => setState((current) => reducer(current, { type: "select", id }))}
-        onAdd={() => setState((current) => reducer(current, { type: "toggle-add" }))}
-        onSearch={() => setState((current) => reducer(current, { type: "toggle-search" }))}
-        onQuery={(query) => setState((current) => reducer(current, { type: "search", query }))}
-        onExperiments={() => setState((current) => reducer(current, { type: "toggle-experiments" }))}
-      />
-      <div className="w-px shrink-0 bg-white/10" />
-      <ChatColumn
-        state={state}
-        liveText={liveText}
-        busy={chat.status === "submitted" || chat.status === "streaming"}
-        onChip={(label) => setState((current) => reducer(current, { type: "chip", label }))}
-        onSend={send}
-        onPurpose={(id) => setState((current) => reducer(current, { type: "toggle-purpose", id }))}
-        onStart={() => setState((current) => reducer(current, { type: "chip", label: "Start working" }))}
-        onAddCatalog={(id) => setState((current) => reducer(current, { type: "add-catalog", id }))}
-        onCreate={(name, purpose) => setState((current) => reducer(current, { type: "create-agent", name, purpose }))}
-        onScenario={(scenario) => setState((current) => reducer(current, { type: "scenario", scenario }))}
-        onMotion={(on) => setState((current) => reducer(current, { type: "motion", on }))}
-        onReset={() => setState((current) => reducer(current, { type: "reset" }))}
-        onCloseExperiments={() => setState((current) => reducer(current, { type: "toggle-experiments" }))}
-      />
+    <div className="relative flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white">
+      <div className="p-partial-theme-admin-next-dark flex min-w-0 flex-1 gap-1 bg-[#0c0d0c] text-white">
+        <AgentNav
+          state={state}
+          onSelect={(id) => setState((current) => reducer(current, { type: "select", id }))}
+          onAdd={() => setState((current) => reducer(current, { type: "toggle-add" }))}
+          onSearch={() => setState((current) => reducer(current, { type: "toggle-search" }))}
+          onQuery={(query) => setState((current) => reducer(current, { type: "search", query }))}
+          onExperiments={() => setState((current) => reducer(current, { type: "toggle-experiments" }))}
+        />
+        <div className="my-3 w-px shrink-0 bg-white/10" />
+        <ChatColumn
+          state={state}
+          liveText={liveText}
+          busy={chat.status === "submitted" || chat.status === "streaming"}
+          onChip={(label) => setState((current) => reducer(current, { type: "chip", label }))}
+          onSend={send}
+          onPurpose={(id) => setState((current) => reducer(current, { type: "toggle-purpose", id }))}
+          onStart={() => setState((current) => reducer(current, { type: "chip", label: "Start working" }))}
+          onAddCatalog={(id) => setState((current) => reducer(current, { type: "add-catalog", id }))}
+          onCreate={(name, purpose) => setState((current) => reducer(current, { type: "create-agent", name, purpose }))}
+          onScenario={(scenario) => setState((current) => reducer(current, { type: "scenario", scenario }))}
+          onMotion={(on) => setState((current) => reducer(current, { type: "motion", on }))}
+          onReset={() => setState((current) => reducer(current, { type: "reset" }))}
+          onCloseExperiments={() => setState((current) => reducer(current, { type: "toggle-experiments" }))}
+        />
+      </div>
       <PreviewColumn
         state={state}
         onPreview={(page, wide) => setState((current) => reducer(current, { type: "preview", page, wide }))}
@@ -146,9 +157,30 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         onProduct={(id) => setState((current) => reducer(current, { type: "product", id }))}
         onUpdateProduct={(id, patch) => setState((current) => reducer(current, { type: "update-product", id, patch }))}
         onAddProduct={() => setState((current) => reducer(current, { type: "add-blank-product" }))}
+        onRail={(id) => setState((current) => reducer(current, { type: "rail", id }))}
       />
-      <ProductRail preview={state.preview} onOpen={(id) => setState((current) => reducer(current, { type: "rail", id }))} />
+      <div className="p-partial-theme-admin-next-dark flex">
+        <ProductRail preview={state.preview} onOpen={(id) => setState((current) => reducer(current, { type: "rail", id }))} />
+      </div>
       <span className="sr-only">{agent.name}</span>
+      {booting ? <BootScreen storeName={state.storeName} /> : null}
+    </div>
+  );
+}
+
+function BootScreen({ storeName }: { storeName: string }) {
+  return (
+    <div className="absolute inset-0 z-[200] grid place-items-center bg-[#0c0d0c] text-white">
+      <div className="w-[280px] text-center">
+        <div className="mx-auto mb-4 grid place-items-center">
+          <Orb id="chief" size={56} />
+        </div>
+        <p className="text-[15px] font-medium">Opening {storeName}</p>
+        <p className="mt-1 text-[13px] text-[#8e8f8b]">Sidekick is getting the admin ready</p>
+        <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10">
+          <div className="sk-bar h-full origin-left bg-white" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -197,60 +229,40 @@ function Signup({ onSubmit, onActive }: { onSubmit: (storeName: string) => void;
   const [storeName, setStoreName] = useState("My Store");
   const [email, setEmail] = useState("");
   return (
-    <main className="grid min-h-dvh place-items-center bg-[#0c0d0c] px-6 text-white">
-      <form
-        className="w-full max-w-[420px]"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit(storeName);
-        }}
-      >
-        <ShopifyMark className="mb-8 h-8 w-7" />
-        <h1 className="text-[32px] font-medium tracking-[-0.8px]">Create your store</h1>
-        <p className="mt-2 text-[15px] leading-[1.45] text-[#8e8f8b]">
-          You’ll land with Sidekick, ready to set up payments, a theme, and the rest of the store.
-        </p>
-        <label className="mt-6 block text-[13px] text-[#8e8f8b]">
-          Store name
-          <input
-            required
-            value={storeName}
-            onChange={(event) => setStoreName(event.target.value)}
-            className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-[#171817] px-3 text-[15px] text-white outline-none"
-          />
-        </label>
-        <label className="mt-3 block text-[13px] text-[#8e8f8b]">
-          Email
-          <input
-            required
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@store.com"
-            className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-[#171817] px-3 text-[15px] text-white outline-none placeholder:text-[#737572]"
-          />
-        </label>
-        <label className="mt-3 block text-[13px] text-[#8e8f8b]">
-          Password
-          <input
-            required
-            type="password"
-            minLength={4}
-            placeholder="••••••••"
-            className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-[#171817] px-3 text-[15px] text-white outline-none"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => onSubmit(storeName)}
-          className="mt-6 h-11 w-full rounded-full bg-white text-[14px] font-medium text-black"
+    <main className="p-partial-theme-admin-next-dark grid min-h-dvh place-items-center bg-[#0c0d0c] px-6 text-white">
+      <div className="w-full max-w-[440px]">
+        <ShopifyMark className="mb-6 h-8 w-7" />
+        <s-section
+          heading="Create your store"
+          subheading="You’ll land with Sidekick expanded, ready to set up payments, a theme, and the rest of the store."
         >
-          Create store
-        </button>
-        <button type="button" onClick={onActive} className="mt-4 w-full text-[13px] text-[#8e8f8b]">
-          Skip to the live store
-        </button>
-      </form>
+          <s-stack gap="base">
+            <s-text-field
+              label="Store name"
+              name="store-name"
+              required
+              value={storeName}
+              onInput={(event) => setStoreName(event.currentTarget.value)}
+            />
+            <s-email-field
+              label="Email"
+              name="email"
+              required
+              autocomplete="email"
+              placeholder="you@store.com"
+              value={email}
+              onInput={(event) => setEmail(event.currentTarget.value)}
+            />
+            <s-password-field label="Password" name="password" required minLength={4} autocomplete="new-password" />
+            <s-button variant="primary" inlineSize="fill" onClick={() => onSubmit(storeName || "My Store")}>
+              Create store
+            </s-button>
+            <s-button variant="tertiary" inlineSize="fill" onClick={onActive}>
+              Skip to the live store
+            </s-button>
+          </s-stack>
+        </s-section>
+      </div>
     </main>
   );
 }
