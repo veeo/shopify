@@ -1,28 +1,6 @@
-export const previewPages = [
-  "home-setup",
-  "home-active",
-  "payments",
-  "payments-setup",
-  "products",
-  "product",
-  "inbox",
-  "notifications",
-  "customers",
-  "marketing",
-  "analytics",
-  "finance",
-  "content",
-  "online-store",
-  "email",
-  "settings",
-  "theme",
-  "domain",
-  "shipping",
-  "address",
-  "pos",
-] as const;
+import { navFor, previewPages, type PreviewId } from "@/lib/admin-nav";
 
-export type PreviewId = (typeof previewPages)[number];
+export { previewPages, type PreviewId };
 
 export const businessTypes = ["individual", "business", "nonprofit"] as const;
 export type BusinessType = (typeof businessTypes)[number];
@@ -349,7 +327,7 @@ const sidekick = agent({
   group: "favorites",
   preview: "Lets get started",
   topic: "Get started",
-  placeholder: "Ask Sidekick…",
+  placeholder: "Work with Sidekick",
   orb: "sidekick",
   installed: true,
 });
@@ -811,10 +789,10 @@ export function runChip(state: PrototypeState, label: string) {
       id: id(state),
       type: "text",
       role: "assistant",
-      text: "PITCH is a strong start for a product-led store. It keeps the type large and the product photography full-bleed. I opened it in the preview so you can react before publishing.",
+      text: "Your store is on Horizon, Shopify’s free default theme. It’s a clean start, and Tinker and Dwell are worth a look if you want something more editorial. I opened Online Store so you can compare them before you customize.",
     });
-    patchAgent(state, "sidekick", { topic: "Choose a theme", preview: "PITCH is ready to preview." });
-    state.preview = "theme";
+    patchAgent(state, "sidekick", { topic: "Choose a theme", preview: "Horizon is live. Compare themes." });
+    state.preview = "online-store";
     state.previewWide = false;
     return;
   }
@@ -836,9 +814,9 @@ export function runChip(state: PrototypeState, label: string) {
       id: id(state),
       type: "text",
       role: "assistant",
-      text: "I set domestic shipping from your location: $6 under $50, free over $50, and calculated rates at checkout. Tell me if you want flat, free, or local pickup instead.",
+      text: "Shipping is set up for your United States market with two options, Standard and Express, based on your location. Shipping rates now live in Markets, so I opened Shipping and delivery where you can review them.",
     });
-    patchAgent(state, "sidekick", { topic: "Shipping", preview: "Free over $50, $6 under." });
+    patchAgent(state, "sidekick", { topic: "Shipping", preview: "Standard and Express for the US." });
     state.preview = "shipping";
     return;
   }
@@ -860,7 +838,7 @@ export function runChip(state: PrototypeState, label: string) {
       id: id(state),
       type: "text",
       role: "assistant",
-      text: "POS hardware is the reader, dock, and receipt printer. The retail kit in the preview covers a single counter. Say the word and I’ll add it as a draft order.",
+      text: "POS hardware is the reader, dock, and receipt printer. I opened Point of Sale. Shop POS hardware is under Recommended for you, and you can sign in to the POS app with the QR code.",
     });
     patchAgent(state, "sidekick", { topic: "POS", preview: "Retail kit is ready to order." });
     state.preview = "pos";
@@ -1014,8 +992,8 @@ export function scriptedTurn(agentId: string, text: string, storeName: string): 
     return { text: "Chief of staff is in the nav. Choose a few purposes, then start working.", effects };
   }
   if (/theme/.test(q)) {
-    effects.push({ type: "navigate", page: "theme" });
-    return { text: "PITCH is on the preview. It’s a good fit if the product photography can carry the page.", effects };
+    effects.push({ type: "navigate", page: "online-store" });
+    return { text: "Horizon is your current theme. I opened Online Store so you can preview it or compare Tinker and Dwell.", effects };
   }
   if (/domain/.test(q)) {
     effects.push({ type: "navigate", page: "domain" });
@@ -1023,7 +1001,7 @@ export function scriptedTurn(agentId: string, text: string, storeName: string): 
   }
   if (/shipping|rates/.test(q)) {
     effects.push({ type: "navigate", page: "shipping" });
-    return { text: "Domestic rates are $6 under $50 and free after that. I opened them in the preview.", effects };
+    return { text: "Your United States market ships with Standard and Express. I opened Shipping and delivery in the preview.", effects };
   }
   if (/address|retail|pickup/.test(q)) {
     effects.push({ type: "navigate", page: "address" });
@@ -1031,15 +1009,15 @@ export function scriptedTurn(agentId: string, text: string, storeName: string): 
   }
   if (/pos|hardware|reader/.test(q)) {
     effects.push({ type: "navigate", page: "pos" });
-    return { text: "The retail kit is a reader, dock, and printer. I opened it so you can order when the counter is ready.", effects };
+    return { text: "POS hardware is a reader, dock, and printer. I opened Point of Sale; Shop POS hardware is under Recommended for you.", effects };
   }
   if (/home|dashboard/.test(q)) {
     effects.push({ type: "navigate", page: "home-active" });
     return { text: "Here’s the live Home dashboard.", effects };
   }
-  if (/inbox/.test(q)) {
-    effects.push({ type: "navigate", page: "inbox" });
-    return { text: "Inbox is open. Two customers are waiting on shipping.", effects };
+  if (/\border/.test(q)) {
+    effects.push({ type: "navigate", page: "orders" });
+    return { text: "Orders are open in the preview.", effects };
   }
   if (/product/.test(q)) {
     effects.push({ type: "navigate", page: "products" });
@@ -1308,55 +1286,12 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
 }
 
 function railPage(id: string, state: PrototypeState): PreviewId {
-  switch (id) {
-    case "home":
-      return state.scenario === "active" || state.chiefPhase === "working" ? "home-active" : "home-setup";
-    case "inbox":
-      return "inbox";
-    case "notifications":
-      return "notifications";
-    case "products":
-      return "products";
-    case "customers":
-      return "customers";
-    case "marketing":
-      return "marketing";
-    case "analytics":
-      return "analytics";
-    case "finance":
-      return "finance";
-    case "content":
-      return "content";
-    case "online-store":
-      return "online-store";
-    case "email":
-      return "email";
-    case "settings":
-      return "settings";
-    default:
-      return state.preview;
-  }
+  if (id === "home") return state.scenario === "active" || state.chiefPhase === "working" ? "home-active" : "home-setup";
+  return (previewPages as readonly string[]).includes(id) ? (id as PreviewId) : state.preview;
 }
 
 export function railForPreview(page: PreviewId): string {
-  switch (page) {
-    case "home-setup":
-    case "home-active":
-    case "theme":
-    case "domain":
-    case "shipping":
-    case "address":
-    case "pos":
-      return "home";
-    case "payments":
-    case "payments-setup":
-      return "finance";
-    case "products":
-    case "product":
-      return "products";
-    default:
-      return page;
-  }
+  return navFor(page).id;
 }
 
 export function personaFor(id: string) {
