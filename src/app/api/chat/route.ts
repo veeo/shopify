@@ -84,9 +84,9 @@ function scriptedResponse(agentId: string, text: string, storeName: string) {
   return createUIMessageStreamResponse({ stream });
 }
 
-function chatModel(): LanguageModel | null {
+function chatModel(request: Request): LanguageModel | null {
   if (process.env.ANTHROPIC_API_KEY) return anthropic(process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5");
-  if (process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN) {
+  if (process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN || request.headers.has("x-vercel-oidc-token")) {
     return process.env.AI_GATEWAY_MODEL || "anthropic/claude-sonnet-5.5";
   }
   return null;
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
   const asked = textOf(lastUser);
   if (!asked) return Response.json({ error: "Send a message." }, { status: 400 });
 
-  const model = chatModel();
+  const model = chatModel(request);
   if (!model) return scriptedResponse(agentId, asked, storeName);
   const persona = body.prototype?.persona?.trim().slice(0, 4000) || personaFor(agentId);
 
