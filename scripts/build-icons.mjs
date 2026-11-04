@@ -34,7 +34,7 @@ function sources(dir) {
 
 const wanted = new Set();
 for (const text of sources(path.join(root, "src"))) {
-  for (const [, name] of text.matchAll(/"([A-Z][A-Za-z0-9]+)"/g)) {
+  for (const [, name] of text.matchAll(/"([A-Z][A-Za-z0-9]*)"/g)) {
     const id = kebab(name);
     if (line[id] || filled[id]) wanted.add(name);
   }
