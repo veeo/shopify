@@ -1,7 +1,7 @@
 import index from "@/lib/help-index.json";
 
 const HELP_ORIGIN = "https://help.shopify.com";
-const ARTICLE_LIMIT = 12_000;
+const ARTICLE_LIMIT = 30_000;
 
 type Entry = { path: string; title: string; summary: string; terms: Map<string, number> };
 
