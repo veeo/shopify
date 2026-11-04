@@ -146,6 +146,10 @@ export async function POST(request: Request) {
       messages: await convertToModelMessages(messages),
       tools,
       stopWhen: stepCountIs(4),
+      // Gateway free tier blocks the newest Sonnet; fall back to Claude models it serves.
+      providerOptions: {
+        gateway: { models: ["anthropic/claude-sonnet-4.5", "anthropic/claude-haiku-5.5", "anthropic/claude-haiku-4.5"] },
+      },
     });
     return result.toUIMessageStreamResponse({
       onError: (error) => {
