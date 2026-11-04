@@ -3,22 +3,22 @@
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { railForPreview, type PreviewId } from "@/lib/prototype";
 
-type RailItem = { id: string; label: string; icon: PolarisIconName; filled: PolarisIconName } | { id: string; divider: true };
+type RailItem = { id: string; label: string; icon: PolarisIconName } | { id: string; divider: true };
 
 const items: RailItem[] = [
-  { id: "home", label: "Home", icon: "Home", filled: "HomeFilled" },
-  { id: "inbox", label: "Inbox", icon: "Chat", filled: "Chat" },
-  { id: "notifications", label: "Notifications", icon: "Notification", filled: "NotificationFilled" },
-  { id: "products", label: "Products", icon: "Product", filled: "ProductFilled" },
-  { id: "customers", label: "Customers", icon: "Person", filled: "PersonFilled" },
-  { id: "marketing", label: "Marketing", icon: "Target", filled: "TargetFilled" },
-  { id: "analytics", label: "Analytics", icon: "ChartVertical", filled: "ChartVerticalFilled" },
-  { id: "finance", label: "Finance", icon: "Finance", filled: "FinanceFilled" },
-  { id: "content", label: "Content", icon: "Content", filled: "ContentFilled" },
+  { id: "home", label: "Home", icon: "Home" },
+  { id: "inbox", label: "Inbox", icon: "Chat" },
+  { id: "notifications", label: "Notifications", icon: "Notification" },
+  { id: "products", label: "Products", icon: "Product" },
+  { id: "customers", label: "Customers", icon: "Person" },
+  { id: "marketing", label: "Marketing", icon: "Gauge" },
+  { id: "analytics", label: "Analytics", icon: "ChartVertical" },
+  { id: "finance", label: "Finance", icon: "Bank" },
+  { id: "content", label: "Content", icon: "Content" },
   { id: "divider-1", divider: true },
-  { id: "online-store", label: "Online Store", icon: "StoreOnline", filled: "StoreOnline" },
+  { id: "online-store", label: "Online Store", icon: "Store" },
   { id: "divider-2", divider: true },
-  { id: "email", label: "Email", icon: "Email", filled: "Email" },
+  { id: "email", label: "Email", icon: "Email" },
 ];
 
 export function ProductRail({ preview, onOpen }: { preview: PreviewId; onOpen: (id: string) => void }) {
@@ -33,7 +33,7 @@ export function ProductRail({ preview, onOpen }: { preview: PreviewId; onOpen: (
             <RailButton
               key={item.id}
               label={item.label}
-              icon={item.id === active ? item.filled : item.icon}
+              icon={item.icon}
               on={item.id === active}
               onClick={() => onOpen(item.id)}
             />
@@ -42,7 +42,7 @@ export function ProductRail({ preview, onOpen }: { preview: PreviewId; onOpen: (
       </div>
       <RailButton
         label="Settings"
-        icon={active === "settings" ? "SettingsFilled" : "Settings"}
+        icon="Settings"
         on={active === "settings"}
         onClick={() => onOpen("settings")}
       />

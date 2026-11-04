@@ -85,13 +85,13 @@ export function Orb({ id, size = 32 }: { id: OrbId; size?: number }) {
     case "customers":
       return (
         <span className="orb grid place-items-center bg-[#2f2f2f] text-[#eee]" style={style}>
-          <PIcon name="PersonFilled" size={Math.round(size * 0.55)} />
+          <PIcon name="Person" size={Math.round(size * 0.7)} />
         </span>
       );
     case "orders":
       return (
         <span className="orb grid place-items-center bg-[#2f2f2f] text-[#eee]" style={style}>
-          <PIcon name="OrderFilled" size={Math.round(size * 0.55)} />
+          <PIcon name="Order" size={Math.round(size * 0.7)} />
         </span>
       );
     default:
