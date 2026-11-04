@@ -1,6 +1,7 @@
 "use client";
 
 import { IconButton, Orb, ShopifyMark } from "@/components/marks";
+import { Tip } from "@/components/chat-column";
 import { PIcon } from "@/components/polaris-icon";
 import { visibleAgents, type AgentGroup, type PrototypeState } from "@/lib/prototype";
 
@@ -14,6 +15,8 @@ const groups: { id: AgentGroup; label: string | null }[] = [
 
 export function AgentNav({
   state,
+  navOpen,
+  onToggleNav,
   onSelect,
   onAdd,
   onSearch,
@@ -21,6 +24,8 @@ export function AgentNav({
   onExperiments,
 }: {
   state: PrototypeState;
+  navOpen: boolean;
+  onToggleNav: () => void;
   onSelect: (id: string) => void;
   onAdd: () => void;
   onSearch: () => void;
@@ -33,9 +38,23 @@ export function AgentNav({
   return (
     <aside className="flex h-full w-[248px] shrink-0 flex-col gap-4 px-3 pb-3 pt-7">
       <div className="flex items-center gap-1 pb-4 pl-2">
-        <span className="grid size-8 place-items-center">
-          <ShopifyMark />
-        </span>
+        <Tip label={navOpen ? "Collapse navigation" : "Expand navigation"} keys={["Ctrl", "B"]} side="right">
+          <button
+            type="button"
+            aria-label={navOpen ? "Collapse navigation" : "Expand navigation"}
+            aria-expanded={navOpen}
+            aria-keyshortcuts="Control+B Meta+B"
+            onClick={onToggleNav}
+            className="group/logo press relative grid size-8 place-items-center rounded-lg transition-colors hover:bg-white/[0.08]"
+          >
+            <span className="transition-opacity duration-150 group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0">
+              <ShopifyMark />
+            </span>
+            <span className="absolute inset-0 grid place-items-center text-white opacity-0 transition-opacity duration-150 group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100">
+              <PIcon name="LayoutSidebarRight" size={20} />
+            </span>
+          </button>
+        </Tip>
         <span className="ml-auto flex gap-1.5">
           <IconButton label="Add a sidekick" onClick={onAdd} active={state.mode === "add"}>
             <PIcon name="Plus" size={20} />
