@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { AdminPage, type PageNav } from "@/components/admin-pages";
+import { Badge, Body, Btn, Card as AdminCard, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
+import { Composer } from "@/components/chat-column";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import type { BusinessType, PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
 
-type Nav = {
+type Nav = PageNav & {
   onPreview: (page: PreviewId, wide?: boolean) => void;
   onRail: (id: string) => void;
   onChip: (label: string) => void;
@@ -14,6 +17,10 @@ export function PreviewColumn({
   state,
   onPreview,
   onChip,
+  onAsk,
+  onRecents,
+  onCard,
+  onDismissCard,
   onBusiness,
   onIdentity,
   onPaymentsNext,
@@ -25,6 +32,10 @@ export function PreviewColumn({
   state: PrototypeState;
   onPreview: (page: PreviewId, wide?: boolean) => void;
   onChip: (label: string) => void;
+  onAsk: (text: string) => void;
+  onRecents: () => void;
+  onCard: (id: string) => void;
+  onDismissCard: (id: string) => void;
   onBusiness: (value: PrototypeState["businessType"]) => void;
   onIdentity: (patch: Partial<PrototypeState["identity"]>) => void;
   onPaymentsNext: () => void;
@@ -34,11 +45,11 @@ export function PreviewColumn({
   onRail: (id: string) => void;
 }) {
   const wide = state.previewWide || state.preview === "payments-setup";
-  const nav: Nav = { onPreview, onRail, onChip };
+  const nav: Nav = { onPreview, onRail, onChip, go: (page) => onPreview(page), rail: onRail, chip: onChip, ask: onAsk };
   const grey = state.preview === "product";
   return (
     <aside
-      className={`p-partial-theme-admin-next-light h-full shrink-0 overflow-hidden rounded-3xl text-[#171817] ${grey ? "bg-[#f7f7f7]" : "bg-white"} ${
+      className={`p-partial-theme-admin-next-light h-full shrink-0 overflow-hidden rounded-xl text-[#303030] ${grey ? "bg-[#f7f7f7]" : "bg-white"} ${
         state.motion ? "transition-[width] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
       }`}
       style={{ width: wide ? 584 : 393 }}
@@ -47,6 +58,9 @@ export function PreviewColumn({
         <Screen
           state={state}
           nav={nav}
+          onRecents={onRecents}
+          onCard={onCard}
+          onDismissCard={onDismissCard}
           onBusiness={onBusiness}
           onIdentity={onIdentity}
           onPaymentsNext={onPaymentsNext}
@@ -62,6 +76,9 @@ export function PreviewColumn({
 function Screen(props: {
   state: PrototypeState;
   nav: Nav;
+  onRecents: () => void;
+  onCard: (id: string) => void;
+  onDismissCard: (id: string) => void;
   onBusiness: (value: PrototypeState["businessType"]) => void;
   onIdentity: (patch: Partial<PrototypeState["identity"]>) => void;
   onPaymentsNext: () => void;
@@ -70,8 +87,9 @@ function Screen(props: {
   onAddProduct: () => void;
 }) {
   const { state, nav } = props;
-  const home = () => nav.onRail("home");
   switch (state.preview) {
+    case "home-setup":
+      return <HomeSetup state={state} nav={nav} onRecents={props.onRecents} onCard={props.onCard} onDismiss={props.onDismissCard} />;
     case "home-active":
       return <HomeActive nav={nav} />;
     case "payments":
@@ -84,205 +102,19 @@ function Screen(props: {
           onIdentity={props.onIdentity}
           onNext={props.onPaymentsNext}
           onBack={() => nav.onPreview("payments")}
-          onHome={home}
+          onHome={() => nav.onRail("home")}
         />
       );
     case "products":
-      return <Products state={state} onProduct={props.onProduct} onAdd={props.onAddProduct} />;
+      return <Products state={state} onProduct={props.onProduct} onAdd={props.onAddProduct} nav={nav} />;
     case "product":
-      return (
-        <ProductEdit
-          state={state}
-          onBack={() => nav.onPreview("products")}
-          onUpdate={props.onUpdateProduct}
-          onAdd={props.onAddProduct}
-        />
-      );
-    case "theme":
-      return (
-        <SetupDetail
-          title="Themes"
-          onHome={home}
-          art={<img src="/assets/theme-pitch.png" alt="" className="absolute left-1/2 top-5 w-[228px] -translate-x-1/2 rounded-t-md shadow-xl" />}
-          body="PITCH is installed as a draft. Publish it when the photography is ready."
-          action="Publish theme"
-          secondary="Customize"
-        />
-      );
-    case "domain":
-      return (
-        <SetupDetail
-          title="Domains"
-          onHome={home}
-          art={<DomainArt />}
-          body="Primary domain is still mystore.myshopify.com. Connect a domain you already own, or buy a new one."
-          action="Connect existing"
-          secondary="Buy new domain"
-        >
-          <s-text-field label="Domain" placeholder="example.com" name="domain" />
-        </SetupDetail>
-      );
-    case "shipping":
-      return (
-        <SetupDetail
-          title="Shipping"
-          onHome={home}
-          art={<img src="/assets/shipping-label.png" alt="" className="absolute left-1/2 top-8 w-40 -translate-x-1/2" />}
-          body="Rates set from your location. Calculated rates stay on at checkout."
-          action="Edit rates"
-        >
-          <div className="flex flex-col">
-            <KeyValue label="Domestic · under $50" value="$6.00" />
-            <KeyValue label="Domestic · $50 and up" value="Free" />
-            <KeyValue label="International" value="Calculated" last />
-          </div>
-        </SetupDetail>
-      );
-    case "address":
-      return (
-        <SetupDetail
-          title="Locations"
-          onHome={home}
-          art={<img src="/assets/address-pin.png" alt="" className="absolute left-1/2 top-4 size-24 -translate-x-1/2 object-contain" />}
-          body="Add a retail address to offer pickup. Online orders still ship from the default location."
-          action="Save location"
-        >
-          <div className="flex flex-col gap-3">
-            <s-text-field label="Location name" placeholder="Main street shop" name="location" />
-            <s-text-field label="Address" placeholder="Street and number" name="address" autocomplete="address-line1" />
-            <s-checkbox label="Offer local pickup" checked />
-          </div>
-        </SetupDetail>
-      );
-    case "pos":
-      return (
-        <SetupDetail
-          title="Point of Sale"
-          onHome={home}
-          art={<img src="/assets/pos.png" alt="" className="absolute left-1/2 top-2 h-32 -translate-x-1/2 object-contain" />}
-          body="Retail kit: reader, dock, and receipt printer. One counter. Ships in 3–5 days."
-          action="Order hardware"
-        />
-      );
-    case "inbox":
-      return (
-        <ListPage
-          title="Inbox"
-          onHome={home}
-          rows={[
-            { icon: "Chat", label: "Where is order #1078?", meta: "Danielle Hudson · 4m" },
-            { icon: "Chat", label: "Do you ship the lamp this week?", meta: "Maya Chen · 1h" },
-            { icon: "Chat", label: "Can I exchange the case?", meta: "Jordan Ellis · Yesterday" },
-          ]}
-        />
-      );
-    case "notifications":
-      return (
-        <ListPage
-          title="Notifications"
-          onHome={home}
-          rows={[
-            { icon: "Clock", label: "Trial ends in 1 day", meta: "Pick a plan to keep selling", badge: "Action" },
-            { icon: "Money", label: "Payout of $2,184.60 is on the way", meta: "Today at 8:00 AM", go: () => nav.onRail("finance") },
-            { icon: "Delivery", label: "2 orders need tracking", meta: "Fulfillment", go: () => nav.onRail("customers") },
-          ]}
-        />
-      );
-    case "customers":
-      return (
-        <ListPage
-          title="Customers"
-          onHome={home}
-          rows={[
-            { icon: "Person", label: "Danielle Hudson", meta: "3 orders · $612.40" },
-            { icon: "Person", label: "Maya Chen", meta: "1 order · $89.00" },
-            { icon: "Person", label: "Jordan Ellis", meta: "5 orders · $1,204.95" },
-          ]}
-        />
-      );
-    case "marketing":
-      return (
-        <ListPage
-          title="Marketing"
-          onHome={home}
-          rows={[
-            { icon: "Email", label: "Welcome back", meta: "Email · Draft", badge: "Draft" },
-            { icon: "Discount", label: "Headphones bundle", meta: "Discount · Paused" },
-            { icon: "Target", label: "Gift sets", meta: "Campaign · This week", badge: "Live" },
-          ]}
-        />
-      );
-    case "analytics":
-      return <Analytics onHome={home} />;
-    case "finance":
-      return (
-        <ListPage
-          title="Finance"
-          onHome={home}
-          rows={[
-            { icon: "Money", label: "Payout $2,184.60", meta: "Arrives today" },
-            { icon: "Wallet", label: "Balance $18,420.12", meta: "Shopify Balance" },
-            { icon: "Payment", label: "Shopify Payments", meta: "Finish setup", badge: "Action", go: () => nav.onPreview("payments") },
-          ]}
-        />
-      );
-    case "content":
-      return (
-        <ListPage
-          title="Content"
-          onHome={home}
-          rows={[
-            { icon: "Metaobject", label: "Homepage hero", meta: "Metaobject" },
-            { icon: "Page", label: "Lamp delivery note", meta: "Page" },
-            { icon: "Page", label: "About the studio", meta: "Page" },
-          ]}
-        />
-      );
-    case "online-store":
-      return (
-        <ListPage
-          title="Online Store"
-          onHome={home}
-          rows={[
-            { icon: "Theme", label: "Themes", meta: "PITCH · Draft", go: () => nav.onPreview("theme") },
-            { icon: "Page", label: "Pages", meta: "4 pages" },
-            { icon: "Menu", label: "Navigation", meta: "Main menu" },
-            { icon: "Domain", label: "Domains", meta: "mystore.myshopify.com", go: () => nav.onPreview("domain") },
-          ]}
-        />
-      );
-    case "email":
-      return (
-        <ListPage
-          title="Email"
-          onHome={home}
-          rows={[
-            { icon: "Email", label: "Welcome", meta: "Tightened by Slackbot", badge: "Live" },
-            { icon: "Email", label: "Abandoned checkout", meta: "Automation · On" },
-            { icon: "Email", label: "Back in stock", meta: "Automation · Off" },
-          ]}
-        />
-      );
-    case "settings":
-      return (
-        <ListPage
-          title="Settings"
-          onHome={home}
-          rows={[
-            { icon: "Store", label: "Store details", meta: "My Store" },
-            { icon: "Plan", label: "Plan", meta: "Trial · 1 day left", badge: "Action" },
-            { icon: "Payment", label: "Payments", meta: "Shopify Payments", go: () => nav.onPreview("payments") },
-            { icon: "Delivery", label: "Shipping and delivery", meta: "2 rates", go: () => nav.onPreview("shipping") },
-            { icon: "Location", label: "Locations", meta: "1 location", go: () => nav.onPreview("address") },
-          ]}
-        />
-      );
+      return <ProductEdit state={state} onBack={() => nav.onPreview("products")} onUpdate={props.onUpdateProduct} />;
     default:
-      return <HomeSetup storeName={state.storeName} onChip={nav.onChip} />;
+      return <AdminPage page={state.preview} state={state} nav={nav} />;
   }
 }
 
-/* Shared pieces, sized from the Figma mobile frames */
+/* Shared pieces for the Figma-designed screens (active home, payments setup) */
 
 function Page({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
   return <div className={`flex flex-col gap-6 pb-[86px] pt-7 ${wide ? "px-8" : "px-6"}`}>{children}</div>;
@@ -290,10 +122,6 @@ function Page({ children, wide = false }: { children: ReactNode; wide?: boolean 
 
 function H1({ children }: { children: ReactNode }) {
   return <h2 className="text-[25px] font-medium leading-8 tracking-[-0.75px] text-[#171817]">{children}</h2>;
-}
-
-function H2({ children }: { children: ReactNode }) {
-  return <h3 className="text-[15px] font-medium leading-[1.4] tracking-[-0.15px] text-[#171817]">{children}</h3>;
 }
 
 type PillTone = "outline" | "fill" | "dark" | "soft" | "ink";
@@ -360,104 +188,268 @@ function Divider() {
   return <div className="h-px w-full bg-[#eaece8]" />;
 }
 
-/* Home · setup guides */
+/* Home · setup guides, from the current admin home */
 
-function HomeSetup({ storeName, onChip }: { storeName: string; onChip: (label: string) => void }) {
+const setupCards: { id: string; art: ReactNode; title: string; body: string; cta: string; badge?: string }[] = [
+  {
+    id: "theme",
+    art: <img src="/assets/theme-pitch.png" alt="" className="absolute left-1/2 top-[19px] w-[228px] -translate-x-1/2 rounded-t-[3px] shadow-[0_8px_24px_rgba(0,0,0,0.12)]" />,
+    title: "Choose your store design",
+    body: "Pick a theme that fits your brand, then customize from there.",
+    cta: "Choose theme",
+  },
+  {
+    id: "payments",
+    art: <PayArt />,
+    title: "You're ready to accept payments",
+    body: "Review settings to accept more payment methods and add a payout account.",
+    cta: "Review payments",
+  },
+  {
+    id: "domain",
+    art: <DomainArt />,
+    badge: "Get $20 back",
+    title: "Get a custom domain",
+    body: "Give your store a branded URL that's easy to find, trust, and remember.",
+    cta: "Set up domain",
+  },
+  {
+    id: "shipping",
+    art: <img src="/assets/shipping-label.png" alt="" className="absolute left-1/2 top-8 w-40 -translate-x-1/2" />,
+    title: "Review shipping rates",
+    body: "Look over the defaults set up for you based on your location.",
+    cta: "Review rates",
+  },
+  {
+    id: "address",
+    art: <img src="/assets/address-pin.png" alt="" className="absolute left-1/2 top-4 size-24 -translate-x-1/2 object-contain" />,
+    title: "Add your retail address",
+    body: "Add location details and set fulfillment options.",
+    cta: "Add address",
+  },
+  {
+    id: "pos",
+    art: <img src="/assets/pos.png" alt="" className="absolute left-1/2 top-2 h-32 -translate-x-1/2 object-contain" />,
+    title: "Order POS hardware",
+    body: "Power your store with fast checkouts you can count on.",
+    cta: "Order hardware",
+  },
+];
+
+const homePlaceholders = ["Help me choose a theme", "Customize my current theme", "Which theme should I use?", "What themes are popular?"];
+
+/** Cards that have already played their collapse, so returning to Home doesn't replay it. */
+const collapsedCards = new Set<string>();
+
+function HomeSetup({
+  state,
+  nav,
+  onRecents,
+  onCard,
+  onDismiss,
+}: {
+  state: PrototypeState;
+  nav: Nav;
+  onRecents: () => void;
+  onCard: (id: string) => void;
+  onDismiss: (id: string) => void;
+}) {
+  const hidden = new Set([...state.cardsDone, ...state.cardsDismissed]);
+  const sidekick = state.agents.find((item) => item.id === "sidekick");
   return (
-    <Page>
-      <div className="flex h-8 items-center justify-between text-[12px] leading-4">
-        <span className="flex items-center gap-1.5 font-medium text-black">
-          <span className="grid size-[18px] place-items-center">
-            <span className="grid size-4 place-items-center rounded-full bg-[#ffdbd7]">
-              <span className="size-2 rounded-full bg-[#eb1700]" />
-            </span>
-          </span>
-          Trial end in 1 day
-        </span>
-        <span className="text-[#737572]">
+    <div className="flex flex-col gap-6 px-4 pb-10 pt-3">
+      <div className="flex h-7 items-center justify-between text-[12px]">
+        <ReadyToSell onLaunch={() => nav.go("online-store-preferences")} />
+        <span className="text-[#616161]">
           Questions?{" "}
-          <a href="tel:8449821186" className="ml-1 font-medium text-black underline underline-offset-2 hover:decoration-2">
+          <a href="tel:8449821186" className="font-semibold text-[#303030] underline underline-offset-2 hover:decoration-2">
             (844) 982-1186
           </a>
         </span>
       </div>
-      <h2 className="text-[25px] font-medium leading-8 tracking-[-0.75px] text-black">
-        <span className="underline decoration-dotted decoration-1 underline-offset-[5px]">{storeName}</span> is coming along
+      <h2 className="pt-4 text-center text-[21px] font-medium leading-[1.25] tracking-[-0.5px] text-[#303030]">
+        <button
+          type="button"
+          onClick={() => nav.go("settings-general")}
+          className="underline decoration-dotted decoration-1 underline-offset-[5px] hover:decoration-solid"
+        >
+          {state.storeName}
+        </button>{" "}
+        {state.cardsDone.length > 0 ? "is on a roll" : "is looking good"}
         <br />
         Now let’s design your store
       </h2>
-      <div className="flex flex-col gap-4">
-        <SetupCard
-          art={<img src="/assets/theme-pitch.png" alt="" className="absolute left-1/2 top-[19px] w-[228px] -translate-x-1/2 rounded-t-[3px] shadow-[0_8px_24px_rgba(0,0,0,0.12)]" />}
-          title="Choose your store design"
-          body="Pick a theme that fits your brand, then customize from there."
-          cta="Choose theme"
-          onClick={() => onChip("Choose theme →")}
+      {sidekick ? (
+        <Composer
+          state={state}
+          agent={sidekick}
+          suggestions={homePlaceholders}
+          rotating={homePlaceholders}
+          busy={false}
+          locked={false}
+          light
+          onSend={nav.ask}
+          onStop={() => undefined}
+          onRecents={onRecents}
         />
-        <SetupCard
-          art={<PayArt />}
-          title="You're ready to accept payments"
-          body="Review settings to accept more payment methods and add a payout account."
-          cta="Review payments"
-          onClick={() => onChip("Review payments →")}
-        />
-        <SetupCard
-          art={<DomainArt />}
-          title="Get a custom domain"
-          body="Give your store a branded URL that's easy to find, trust, and remember."
-          cta="Set up domain"
-          onClick={() => onChip("Set up domain →")}
-        />
-        <SetupCard
-          art={<img src="/assets/shipping-label.png" alt="" className="absolute left-1/2 top-8 w-40 -translate-x-1/2" />}
-          title="Review shipping rates"
-          body="Look over the defaults set up for you based on your location."
-          cta="Review rates"
-          onClick={() => onChip("Review rates →")}
-        />
-        <SetupCard
-          art={<img src="/assets/address-pin.png" alt="" className="absolute left-1/2 top-4 size-24 -translate-x-1/2 object-contain" />}
-          title="Add your retail address"
-          body="Add location details and set fulfillment options."
-          cta="Add address"
-          onClick={() => onChip("Add address →")}
-        />
-        <SetupCard
-          art={<img src="/assets/pos.png" alt="" className="absolute left-1/2 top-2 h-32 -translate-x-1/2 object-contain" />}
-          title="Order POS hardware"
-          body="Power your store with fast checkouts you can count on."
-          cta="Order hardware"
-          onClick={() => onChip("Order hardware →")}
-        />
-      </div>
-    </Page>
+      ) : null}
+      <ul aria-label="Home feed" className="flex flex-col">
+        {setupCards.map((card) => (
+          <CardSlot key={card.id} id={card.id} hidden={hidden.has(card.id)}>
+            <SetupCard {...card} onOpen={() => onCard(card.id)} onDismiss={() => onDismiss(card.id)} />
+          </CardSlot>
+        ))}
+      </ul>
+      {setupCards.every((card) => hidden.has(card.id)) ? (
+        <p className="rise text-center text-[12px] text-[#616161]">You’re all caught up. Sidekick will suggest what to do next.</p>
+      ) : null}
+    </div>
   );
 }
 
-function SetupCard({ art, title, body, cta, onClick }: { art: ReactNode; title: string; body: string; cta: string; onClick: () => void }) {
+function CardSlot({ id, hidden, children }: { id: string; hidden: boolean; children: ReactNode }) {
+  const [hiddenAtMount] = useState(hidden);
+  const [phase, setPhase] = useState<"shown" | "fading" | "gone">(() => (hidden && collapsedCards.has(id) ? "gone" : "shown"));
+  useEffect(() => {
+    if (!hidden) {
+      collapsedCards.delete(id);
+      return;
+    }
+    if (collapsedCards.has(id)) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // A card completed elsewhere stays on screen for a beat when Home opens, so the reflow reads as cause and effect.
+    const delay = reduce ? 0 : hiddenAtMount ? 450 : 0;
+    const fade = window.setTimeout(() => setPhase("fading"), delay);
+    const gone = window.setTimeout(() => {
+      collapsedCards.add(id);
+      setPhase("gone");
+    }, delay + (reduce ? 0 : 220));
+    return () => {
+      window.clearTimeout(fade);
+      window.clearTimeout(gone);
+    };
+  }, [hidden, id, hiddenAtMount]);
+  const state = !hidden ? "shown" : phase;
   return (
-    <Card className="p-2">
+    <li
+      aria-hidden={hidden || undefined}
+      inert={hidden || undefined}
+      className={`grid transition-[grid-template-rows,opacity,scale] ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
+        state === "gone" ? "grid-rows-[0fr] opacity-0 duration-300" : state === "fading" ? "grid-rows-[1fr] scale-[0.97] opacity-0 duration-200" : "grid-rows-[1fr] opacity-100 duration-200"
+      }`}
+    >
+      <div className={`min-h-0 ${hidden ? "overflow-hidden" : ""}`}>
+        <div className="pb-3">{children}</div>
+      </div>
+    </li>
+  );
+}
+
+function SetupCard({
+  art,
+  title,
+  body,
+  cta,
+  badge,
+  onOpen,
+  onDismiss,
+}: {
+  art: ReactNode;
+  title: string;
+  body: string;
+  cta: string;
+  badge?: string;
+  onOpen: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={title}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      className="group/card relative flex cursor-pointer flex-col rounded-2xl bg-white p-1.5 shadow-[0_0_0_1px_#ebebeb,0_1px_0_rgba(0,0,0,0.03)] outline-none transition-[transform,box-shadow] duration-200 ease-out will-change-transform hover:scale-[1.025] hover:shadow-[0_0_0_1px_#dcdcdc,0_10px_28px_rgba(0,0,0,0.1)] focus-visible:shadow-[0_0_0_2px_#005bd3] active:scale-[1.01] active:shadow-[0_0_0_1px_#d4d4d4,0_6px_18px_rgba(0,0,0,0.1)] motion-reduce:transform-none"
+    >
+      <div className="relative h-[132px] overflow-hidden rounded-xl bg-gradient-to-b from-[#f6f6f6] to-[#ececed]">
+        <div className="absolute inset-0 origin-center opacity-90 saturate-[0.85] transition-[transform,filter,opacity] duration-300 ease-out group-hover/card:scale-[1.06] group-hover/card:opacity-100 group-hover/card:saturate-100 group-active/card:scale-[1.04] group-active/card:opacity-100 group-active/card:saturate-100 motion-reduce:transform-none">
+          {art}
+        </div>
+        {badge ? <span className="absolute left-2 top-2 rounded-full bg-[#616161] px-2 py-0.5 text-[11px] font-medium text-white">{badge}</span> : null}
+        <button
+          type="button"
+          aria-label="Dismiss card"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDismiss();
+          }}
+          className="absolute right-2 top-2 grid size-5 place-items-center rounded-full bg-white/95 text-[#4a4a4a] opacity-0 shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-opacity duration-200 hover:bg-white hover:text-[#303030] focus-visible:opacity-100 group-hover/card:opacity-100 group-active/card:opacity-100 [@media(hover:none)]:opacity-100"
+        >
+          <PIcon name="X" size={14} />
+        </button>
+      </div>
+      <div className="flex flex-col items-start gap-3 px-2.5 pb-2.5 pt-3 transition-transform duration-200 ease-out group-hover/card:-translate-y-px">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-[13px] font-semibold text-[#303030]">{title}</h3>
+          <p className="text-[12px] leading-[1.45] text-[#616161]">{body}</p>
+        </div>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen();
+          }}
+          className="press inline-flex h-7 items-center rounded-full bg-white px-2.5 text-[12px] font-semibold text-[#303030] shadow-[0_0_0_1px_#e3e3e3,0_1px_0_#e3e3e3] hover:bg-[#fafafa]"
+        >
+          {cta}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function ReadyToSell({ onLaunch, dark = false }: { onLaunch: () => void; dark?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <button
         type="button"
-        onClick={onClick}
-        aria-label={cta}
-        className="relative h-[132px] overflow-hidden rounded-2xl bg-gradient-to-b from-[#f6f6f6] to-[#ececed] transition-[filter] hover:brightness-[0.98]"
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className={`flex items-center gap-1.5 rounded-full py-1 pl-1.5 pr-2.5 text-[12px] font-medium ${dark ? "text-white" : "text-[#303030] hover:bg-[#f1f1f1]"}`}
       >
-        {art}
+        <span className="grid size-3.5 place-items-center rounded-full bg-[#cdfed4]">
+          <span className="size-2 rounded-full bg-[#29b14b]" />
+        </span>
+        Ready to sell
       </button>
-      <div className="flex flex-col items-start gap-3 p-3">
-        <div className="flex flex-col gap-1.5 text-[15px] leading-[1.4] tracking-[-0.15px]">
-          <p className="font-medium text-black">{title}</p>
-          <p className="text-[#737572]">{body}</p>
-        </div>
-        <Pill onClick={onClick}>
-          {cta}
-          <span className="-mr-1.5">
-            <PIcon name="ArrowRight" size={20} />
-          </span>
-        </Pill>
-      </div>
-    </Card>
+      {open ? <ReadyCard onLaunch={onLaunch} className="left-0 top-8" /> : null}
+    </span>
+  );
+}
+
+export function ReadyCard({ onLaunch, className }: { onLaunch: () => void; className: string }) {
+  return (
+    <span
+      className={`pop-in absolute z-50 flex w-[240px] flex-col items-start gap-1.5 rounded-2xl bg-white p-3 text-left text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.16)] ${className}`}
+    >
+      <span className="flex items-center gap-1.5 rounded-full bg-[#f1f1f1] py-0.5 pl-1 pr-2 text-[11px] font-medium">
+        <span className="size-2 rounded-full bg-[#29b14b]" /> Ready to sell
+      </span>
+      <span className="text-[13px] font-semibold">You can sell, but your store isn’t public</span>
+      <span className="text-[12px] leading-[1.4] text-[#616161]">When you’re ready to reach customers, launch your online store.</span>
+      <span className="pt-1">
+        <Btn tone="primary" onClick={onLaunch}>
+          Launch store
+        </Btn>
+      </span>
+    </span>
   );
 }
 
@@ -555,14 +547,14 @@ function HomeActive({ nav }: { nav: Nav }) {
       <section className="flex flex-col gap-3.5">
         <div className="flex items-center justify-between">
           <h3 className="text-[20px] font-medium leading-8 tracking-[-0.4px]">Recent activity</h3>
-          <button type="button" onClick={() => nav.onRail("notifications")} className="press text-[12px] text-[#737572] hover:text-[#171817]">
+          <button type="button" onClick={() => nav.onRail("orders")} className="press text-[12px] text-[#737572] hover:text-[#171817]">
             View all
           </button>
         </div>
         <div className="flex flex-col">
-          <Activity icon="Order" title="Danielle Hudson placed order #1078." meta="$369.99 · 3 items · 7 minutes ago" onClick={() => nav.onRail("customers")} />
+          <Activity icon="Order" title="Danielle Hudson placed order #1078." meta="$369.99 · 3 items · 7 minutes ago" onClick={() => nav.onRail("orders")} />
           <Activity icon="Money" title="Your payout is on its way." meta="$2,184.60 · Today at 8:00 AM" onClick={() => nav.onRail("finance")} />
-          <Activity icon="Delivery" title="Order #1071 was delivered." meta="Maya Chen · Today at 7:42 AM" onClick={() => nav.onRail("customers")} />
+          <Activity icon="Delivery" title="Order #1071 was delivered." meta="Maya Chen · Today at 7:42 AM" onClick={() => nav.onRail("orders")} />
         </div>
       </section>
 
@@ -581,7 +573,7 @@ function HomeActive({ nav }: { nav: Nav }) {
             title="Bring customers back for a second look"
             body="Turn this month’s new shoppers into repeat customers with a welcome-back email."
             cta="Plan a campaign with Sidekick"
-            onClick={() => nav.onRail("marketing")}
+            onClick={() => nav.onRail("growth")}
           />
         </div>
       </section>
@@ -748,154 +740,6 @@ function SalesChart({ scale }: { scale: number }) {
   );
 }
 
-function Analytics({ onHome }: { onHome: () => void }) {
-  return (
-    <Page>
-      <BackPill onBack={onHome} />
-      <H1>Analytics</H1>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[12px] text-[#737572]">Sessions · Last 30 days</span>
-        <span className="flex items-center gap-2">
-          <CountUp value={14280} className="text-[25px] font-medium leading-8 tracking-[-0.75px]" />
-          <Delta up>18%</Delta>
-        </span>
-      </div>
-      <SalesChart scale={0.9} />
-      <div className="flex flex-col">
-        <KeyValue label="Conversion rate" value="2.7%" />
-        <KeyValue label="Average order value" value="$125.37" />
-        <KeyValue label="Top product" value="Cloud Headphones" last />
-      </div>
-    </Page>
-  );
-}
-
-function KeyValue({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
-  return (
-    <div className={`flex items-center justify-between py-3 text-[13px] tracking-[-0.13px] ${last ? "" : "border-b border-[#eaece8]"}`}>
-      <span>{label}</span>
-      <span className="font-medium">{value}</span>
-    </div>
-  );
-}
-
-/* Payments */
-
-const payPoints = [
-  "Tap into the 400+ million buyers who expect Shop Pay",
-  "Sell in over 130 currencies and get paid in yours",
-  "Access funding, credit, and a free business account for payouts and spending",
-];
-
-const configRows: { icon: PolarisIconName; label: string }[] = [
-  { icon: "Payment", label: "Payment capture method" },
-  { icon: "Settings", label: "Payment method customizations" },
-  { icon: "GiftCard", label: "Gift card expiration" },
-  { icon: "Wallet", label: "Apple Wallet passes" },
-];
-
-function Payments({ nav }: { nav: Nav }) {
-  return (
-    <Page>
-      <BackPill onBack={() => nav.onRail("settings")} onHome={() => nav.onRail("home")} />
-      <H1>Payments</H1>
-      <section className="flex flex-col gap-4">
-        <H2>Shopify Payments</H2>
-        <Card>
-          <div className="flex flex-col gap-3 rounded-2xl bg-[#f7f7f7] p-4">
-            <p className="text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">Get up to 7.5% better performance than any other provider on Shopify</p>
-            <ul className="flex flex-col gap-0.5">
-              {payPoints.map((point) => (
-                <li key={point} className="flex gap-2 text-[13px] leading-[1.4] tracking-[-0.13px] text-black">
-                  <span className="mt-0.5 shrink-0">
-                    <PIcon name="Check" size={20} />
-                  </span>
-                  {point}
-                </li>
-              ))}
-            </ul>
-            <p className="text-[13px] leading-[1.4] tracking-[-0.13px] text-[#4a4a4a]">No transaction fees • Card rates starting at 2.5% + $0.30</p>
-          </div>
-          <div className="flex flex-col gap-3 rounded-2xl border-[0.5px] border-[#e6e6e6] bg-white p-4">
-            <p className="text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">Available payment methods</p>
-            <div className="flex gap-2">
-              <CardMark kind="mc" />
-              <CardMark kind="visa" />
-              <CardMark kind="shop" />
-            </div>
-          </div>
-        </Card>
-        <div className="flex gap-2">
-          <Pill tone="dark" className="flex-1" onClick={() => nav.onChip("Complete setup")}>
-            Complete setup
-          </Pill>
-          <Pill tone="fill" className="flex-1" onClick={() => nav.onChip("Learn more")}>
-            Learn more
-          </Pill>
-        </div>
-      </section>
-      <MethodSection title="More ways to pay" body="Offer methods processed offsite or through custom checkout integrations" />
-      <MethodSection title="Manual payment methods" body="Accept payments outside your online store, like bank deposits or cash on delivery" />
-      <section className="flex flex-col gap-4">
-        <H2>Shopify configuration</H2>
-        <Card>
-          <div className="flex flex-col gap-2.5 px-3 pt-3">
-            {configRows.map((row, index) => (
-              <button key={row.label} type="button" className="press press-row group flex items-start gap-3 text-left">
-                <span className="grid size-6 shrink-0 place-items-center rounded-md bg-[#f4f5f3]">
-                  <PIcon name={row.icon} size={20} />
-                </span>
-                <span
-                  className={`flex flex-1 items-center justify-between pb-3 pt-0.5 text-[13px] tracking-[-0.13px] ${
-                    index < configRows.length - 1 ? "border-b-[0.5px] border-[#e6e6e6]" : ""
-                  }`}
-                >
-                  {row.label}
-                  <span className="text-[#8a8a8a] transition-transform group-hover:translate-x-0.5">
-                    <PIcon name="ChevronRight" size={20} />
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </Card>
-      </section>
-    </Page>
-  );
-}
-
-function MethodSection({ title, body }: { title: string; body: string }) {
-  return (
-    <section className="flex flex-col gap-4 py-3">
-      <div className="flex flex-col gap-1.5 leading-[1.4]">
-        <H2>{title}</H2>
-        <p className="text-[13px] tracking-[-0.13px] text-[#4a4a4a]">{body}</p>
-      </div>
-      <Pill tone="fill" className="w-full gap-2">
-        <PIcon name="Plus" size={20} />
-        Method
-      </Pill>
-    </section>
-  );
-}
-
-function CardMark({ kind }: { kind: "mc" | "visa" | "shop" }) {
-  if (kind === "mc") {
-    return (
-      <span className="grid h-6 w-10 place-items-center rounded-[4px] bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
-        <span className="flex">
-          <span className="size-3 rounded-full bg-[#eb001b]" />
-          <span className="-ml-1 size-3 rounded-full bg-[#f79e1b] mix-blend-multiply" />
-        </span>
-      </span>
-    );
-  }
-  if (kind === "visa") {
-    return <span className="grid h-6 w-10 place-items-center rounded-[4px] bg-[#1934cf] text-[10px] font-extrabold italic text-white">VISA</span>;
-  }
-  return <span className="grid h-6 w-10 place-items-center rounded-[4px] bg-[#5a31f4] text-[11px] font-bold tracking-[-0.3px] text-white">shop</span>;
-}
-
 /* Payments setup (panel widens to 584) */
 
 const businessCopy = {
@@ -1001,6 +845,91 @@ function PaymentsSetup({
   );
 }
 
+/* Settings › Payments */
+
+const payPoints = [
+  "Tap into the 400+ million buyers who expect Shop Pay",
+  "Sell in over 130 currencies and get paid in yours",
+  "Access funding, credit, and a free business account for payouts and spending",
+];
+
+const configRows: { icon: PolarisIconName; label: string }[] = [
+  { icon: "Payment", label: "Payment capture method" },
+  { icon: "Settings", label: "Payment method customizations" },
+  { icon: "GiftCard", label: "Gift card expiration" },
+  { icon: "Wallet", label: "Apple Wallet passes" },
+];
+
+function Payments({ nav }: { nav: Nav }) {
+  return (
+    <>
+      <TopBar back="Settings" onBack={() => nav.go("settings")} title="Settings" />
+      <Body>
+        <h2 className="px-1 pt-2 text-[20px] font-bold leading-7 tracking-[-0.3px]">Payments</h2>
+        <Section
+          title="Shopify Payments"
+          aside={
+            <span className="flex gap-1.5">
+              <Btn tone="gray" onClick={() => nav.onChip("Learn more")}>
+                Learn more
+              </Btn>
+              <Btn tone="primary" onClick={() => nav.onChip("Complete setup")}>
+                Complete setup
+              </Btn>
+            </span>
+          }
+        >
+          <AdminCard className="flex flex-col gap-2.5">
+            <Muted>No transaction fees · Card rates starting at 2.9% + $0.30</Muted>
+            <div className="flex flex-col gap-1.5 rounded-lg bg-[#f7f7f7] p-3">
+              <p className="text-[12px] font-semibold">Get up to 7.5% better performance than any other provider on Shopify</p>
+              {payPoints.map((point) => (
+                <p key={point} className="flex gap-1.5 text-[12px] leading-[1.4]">
+                  <span className="mt-px shrink-0">
+                    <PIcon name="Check" size={14} />
+                  </span>
+                  {point}
+                </p>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 rounded-lg p-2.5 text-[12px] shadow-[0_0_0_1px_#ebebeb]">
+              <PIcon name="Payment" size={18} />
+              <span className="flex-1">Available payment methods</span>
+              <img src="/assets/admin/pay-methods.png" alt="Shop Pay, Visa, Mastercard, American Express, Discover, Diners Club" className="h-4 w-auto" />
+              <span className="text-[11px] text-[#616161]">+10</span>
+            </div>
+          </AdminCard>
+          <button type="button" className="self-start px-1 text-[12px] text-[#303030] underline">
+            See all other providers
+          </button>
+        </Section>
+        <MethodSection title="More ways to pay" body="Offer methods processed offsite or through custom checkout integrations" />
+        <MethodSection title="Manual payment methods" body="Accept payments outside your online store, like bank deposits or cash on delivery" />
+        <Section title="Payment configuration">
+          <AdminCard flush>
+            {configRows.map((row, index) => (
+              <Row key={row.label} first={index === 0} icon={row.icon} title={row.label} />
+            ))}
+          </AdminCard>
+        </Section>
+      </Body>
+    </>
+  );
+}
+
+function MethodSection({ title, body }: { title: string; body: string }) {
+  return (
+    <Section title={title}>
+      <Muted className="-mt-2 px-1">{body}</Muted>
+      <AdminCard className="flex justify-center">
+        <Btn tone="gray" icon="Plus">
+          Method
+        </Btn>
+      </AdminCard>
+    </Section>
+  );
+}
+
 /* Products */
 
 const toneClass: Record<ProductTone, string> = {
@@ -1018,118 +947,72 @@ const toneClass: Record<ProductTone, string> = {
   aqua: "bg-[#ccf3f6]",
 };
 
-const statusClass: Record<Product["status"], string> = {
-  Draft: "bg-[#58e3ff] text-[#002e3a]",
-  Active: "bg-[rgb(215,255,215)] text-[rgb(0,56,0)]",
-};
-
-function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduct: (id: string) => void; onAdd: () => void }) {
+function Products({ state, onProduct, onAdd, nav }: { state: PrototypeState; onProduct: (id: string) => void; onAdd: () => void; nav: Nav }) {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
   const shown = state.products.filter((product) => product.title.toLowerCase().includes(query.trim().toLowerCase()));
-  const all = shown.length > 0 && shown.every((product) => selected.includes(product.id));
-  const toggle = (id: string) => setSelected((list) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]));
   return (
-    <Page>
-      <div className="flex h-8 items-center gap-2">
-        <span className="flex items-center gap-1.5 text-[15px] font-medium tracking-[-0.15px]">
-          <PIcon name="Product" size={20} />
-          Products
-        </span>
-        <span className="ml-auto flex items-center gap-2">
-          <Pill tone="dark" onClick={onAdd}>
-            Add product
-          </Pill>
-          <button
-            type="button"
-            aria-label="More actions"
-            className="press grid size-8 place-items-center rounded-full border border-[#e3e3e3] bg-white hover:bg-[#f7f7f7]"
-          >
-            <PIcon name="MenuHorizontal" size={20} />
-          </button>
-        </span>
-      </div>
-
-      <div className="flex flex-col rounded-2xl bg-[#f4f5f3] px-4 pb-2.5 pt-4">
-        <span className="mb-3 flex h-5 items-center gap-1.5 text-[12px] text-[#171817]">
-          <PIcon name="Calendar" size={20} />
-          30 days
-        </span>
-        {[
-          ["Avg. sell-through rate", "18.4%"],
-          ["Products by days of inventory remaining", "18.4%"],
-          ["ABC product analysis", "18.4%"],
-        ].map(([label, value]) => (
-          <div key={label} className="flex h-9 items-center justify-between gap-3">
-            <span className="text-[12px] tracking-[-0.12px]">{label}</span>
-            <span className="text-[15px] font-medium tracking-[-0.3px]">{value}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <div className="flex h-9 items-center rounded-xl border border-[#e3e3e3] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus-within:border-[#171817]">
-          <button type="button" className="press flex h-full items-center gap-0.5 pl-3 pr-2.5 text-[13px] font-medium">
-            All
-            <PIcon name="ChevronDown" size={20} />
-          </button>
-          <span className="h-4 w-px bg-[#e3e3e3]" />
-          <span className="pl-2.5 text-[#737572]">
-            <PIcon name="Search" size={20} />
-          </span>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search and filter"
-            aria-label="Search products"
-            className="h-full min-w-0 flex-1 bg-transparent pl-1.5 pr-3 text-[13px] outline-none placeholder:text-[#8a8a8a]"
-          />
-        </div>
-
-        <div>
-          <div className="grid h-8 grid-cols-[16px_32px_minmax(0,1fr)_64px_56px_16px] items-center gap-x-2 rounded-[10px] bg-[#f7f7f7] pl-2 text-[12px] text-[#4a4a4a]">
-            <s-checkbox
-              accessibilityLabel="Select all products"
-              checked={all}
-              onChange={() => setSelected(all ? [] : shown.map((product) => product.id))}
-            />
-            <span className="col-span-2">Product</span>
-            <span>Status</span>
-            <span>Price</span>
-          </div>
-          {shown.map((product) => (
-            <div
-              key={product.id}
-              onClick={() => onProduct(product.id)}
-              className="press-row grid h-[52px] cursor-pointer grid-cols-[16px_32px_minmax(0,1fr)_64px_56px_16px] items-center gap-x-2 border-b border-[#ebebeb] pl-2 transition-colors hover:bg-[#fafafa] active:scale-[0.99]"
-            >
-              <span onClick={(event) => event.stopPropagation()} className="flex">
-                <s-checkbox
-                  accessibilityLabel={`Select ${product.title}`}
-                  checked={selected.includes(product.id)}
-                  onChange={() => toggle(product.id)}
-                />
+    <>
+      <TopBar
+        icon="Product"
+        title="Products"
+        actions={[{ label: "Add product", tone: "primary", onClick: onAdd }]}
+        more={[{ label: "View as" }, { label: "Import" }, { label: "Export" }, { label: "Collections", onClick: () => nav.go("collections") }, { label: "Inventory", onClick: () => nav.go("inventory") }]}
+      />
+      <Body>
+        <AdminCard flush>
+          <div className="flex items-stretch gap-3 overflow-x-auto px-3 py-2.5 [scrollbar-width:none]">
+            <span className="flex shrink-0 items-center gap-1 self-center text-[12px] font-medium">
+              <PIcon name="Calendar" size={16} />
+              30 days
+            </span>
+            {[
+              ["Average sell-through rate", state.scenario === "active" ? "18.4%" : "—"],
+              ["Products by days of inventory remaining", state.scenario === "active" ? "42 days" : "No data"],
+              ["ABC product analysis", state.scenario === "active" ? "A: 4 · B: 6 · C: 18" : "No data"],
+            ].map(([label, value]) => (
+              <span key={label} className="flex w-40 shrink-0 flex-col gap-0.5 border-l border-[#ebebeb] pl-3 text-[12px]">
+                <span className="truncate font-semibold underline decoration-[#b5b5b5] decoration-dotted underline-offset-[3px]">{label}</span>
+                <span className="text-[#616161]">{value}</span>
               </span>
-              <Thumb product={product} size={32} />
-              <button type="button" className="truncate text-left text-[13px] tracking-[-0.13px] text-[#303030]">
-                {product.title}
-              </button>
-              <span className={`justify-self-start rounded-md px-1.5 py-0.5 text-[12px] font-medium leading-4 ${statusClass[product.status]}`}>{product.status}</span>
-              <span className="text-[13px] tabular-nums text-[#303030]">${product.price}</span>
-              <span className="text-[#4a4a4a]">
-                <PIcon name="View" size={20} />
-              </span>
-            </div>
-          ))}
-          {shown.length === 0 ? <div className="py-8 text-center text-[13px] text-[#737572]">No products match “{query}”</div> : null}
-        </div>
-      </div>
-    </Page>
+            ))}
+          </div>
+        </AdminCard>
+        <Table
+          select
+          toolbar={<TableSearch placeholder="Search and filter" value={query} onChange={setQuery} />}
+          onRow={(index) => onProduct(shown[index].id)}
+          columns={[
+            { label: "", width: 28 },
+            { label: "Product", width: 170 },
+            { label: "Status", width: 64 },
+            { label: "Inventory", width: 128 },
+            { label: "Category", width: 96 },
+            { label: "Channels", width: 64, align: "end" },
+            { label: "Product type", width: 92 },
+            { label: "Vendor", width: 80 },
+          ]}
+          rows={shown.map((product) => [
+            <Thumb key="t" product={product} size={28} />,
+            <span key="p" className="font-semibold">
+              {product.title || "Untitled product"}
+            </span>,
+            <Badge key="s" tone={product.status === "Active" ? "success" : "info"}>
+              {product.status}
+            </Badge>,
+            product.inventory === "0 in stock" ? "Inventory not tracked" : product.inventory,
+            "Uncategorized",
+            "3",
+            "",
+            state.storeName,
+          ])}
+        />
+        {shown.length === 0 ? <p className="py-6 text-center text-[12px] text-[#616161]">No products match “{query}”</p> : null}
+      </Body>
+    </>
   );
 }
 
 function Thumb({ product, size = 40 }: { product: Product; size?: number }) {
-  const radius = size >= 48 ? 12 : 8;
   if (product.image) {
     return (
       <img
@@ -1137,230 +1020,182 @@ function Thumb({ product, size = 40 }: { product: Product; size?: number }) {
         alt=""
         width={size}
         height={size}
-        className="shrink-0 object-cover shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)]"
-        style={{ width: size, height: size, borderRadius: radius }}
+        className="shrink-0 rounded-md border border-[#ebebeb] object-cover"
+        style={{ width: size, height: size }}
       />
     );
   }
   return (
-    <span className={`grid shrink-0 place-items-center ${toneClass[product.tone]}`} style={{ width: size, height: size, borderRadius: radius }}>
-      <span className="text-black/25">
-        <PIcon name="Image" size={20} />
+    <span className={`grid shrink-0 place-items-center rounded-md border border-[#ebebeb] ${toneClass[product.tone]}`} style={{ width: size, height: size }}>
+      <span className="text-black/30">
+        <PIcon name="Image" size={16} />
       </span>
     </span>
   );
 }
 
-/* Product page edit */
-
-function Field({ label, children, help }: { label: string; children: ReactNode; help?: string }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="px-3 text-[13px] tracking-[-0.13px] text-[#303030]">{label}</span>
-      {children}
-      {help ? <span className="px-3 text-[12px] leading-[1.4] text-[#737373]">{help}</span> : null}
-    </div>
-  );
-}
+/* Add product / edit product, stacked for the narrow panel */
 
 const inputClass =
-  "w-full rounded-xl border border-[#e3e3e3] bg-white px-3 text-[13px] leading-[1.55] tracking-[-0.13px] text-[#171817] outline-none transition-colors hover:border-[#cfcfcf] focus:border-[#171817]";
+  "w-full rounded-lg border border-[#8a8a8a]/40 bg-white px-2.5 text-[12px] leading-[1.5] text-[#303030] outline-none transition-colors hover:border-[#8a8a8a] focus:border-[#303030] focus:shadow-[0_0_0_1px_#303030] placeholder:text-[#8a8a8a]";
+
+const toolbarIcons: PolarisIconName[] = ["TextBold", "TextItalic", "TextUnderline", "TextColor", "TextAlignLeft", "Link", "Image", "PlayCircle", "TextIndent", "Code"];
+
+function Label({ children }: { children: ReactNode }) {
+  return <span className="text-[12px] font-medium text-[#303030]">{children}</span>;
+}
 
 function ProductEdit({
   state,
   onBack,
   onUpdate,
-  onAdd,
 }: {
   state: PrototypeState;
   onBack: () => void;
   onUpdate: (id: string, patch: Partial<Product>) => void;
-  onAdd: () => void;
 }) {
   const [taxed, setTaxed] = useState(true);
   const [tracked, setTracked] = useState(true);
   const product = state.products.find((item) => item.id === state.selectedProductId) ?? state.products[0];
   if (!product) return null;
+  const fresh = !product.title && !product.description;
   return (
-    <Page>
-      <div className="flex h-8 items-center justify-between">
-        <BackPill onBack={onBack} icon="Product" />
-        <span className="flex items-center gap-2">
-          <Pill tone="dark" onClick={onAdd}>
-            Add product
-          </Pill>
-          <button
-            type="button"
-            aria-label="More actions"
-            className="press grid size-8 place-items-center rounded-full border border-[#e3e3e3] bg-white hover:bg-[#f7f7f7]"
-          >
-            <PIcon name="MenuHorizontal" size={20} />
-          </button>
-        </span>
-      </div>
-      <div className="flex flex-col gap-3">
-        <Thumb product={product} size={48} />
-        <H1>{product.title || "Untitled product"}</H1>
-      </div>
-      <Card className="gap-5 p-4">
-        <Field label="Title">
-          <input value={product.title} onChange={(event) => onUpdate(product.id, { title: event.target.value })} className={`${inputClass} h-9`} />
-        </Field>
-        <Field label="Description">
-          <textarea
-            rows={4}
-            value={product.description}
-            onChange={(event) => onUpdate(product.id, { description: event.target.value })}
-            className={`${inputClass} resize-none py-2.5`}
-          />
-        </Field>
-        <Field label="Media">
-          <div className="flex flex-col items-center gap-2 rounded-2xl border border-[#e3e3e3] px-4 py-6">
-            <span className="flex items-center gap-2">
-              <Pill tone="fill" className="px-3">
-                Upload new
-              </Pill>
-              <Pill tone="soft" className="bg-transparent px-3">
-                Select existing
-              </Pill>
-            </span>
-            <span className="text-[12px] text-[#8a8a8a]">Accepts images, videos, or 3D models</span>
-          </div>
-        </Field>
-        <Field label="Category" help="Determines tax rates and adds metafields to improve search, filters, and cross-channel sales">
-          <input readOnly value={product.title} className={`${inputClass} h-9`} />
-        </Field>
-      </Card>
-      <section className="flex flex-col gap-4">
-        <H2>Price</H2>
-        <Card className="gap-3 p-4">
-          <label className="flex h-9 w-fit items-center rounded-xl border border-[#e3e3e3] bg-white px-3 text-[13px] focus-within:border-[#171817]">
-            $
-            <input
-              value={product.price}
-              inputMode="decimal"
-              aria-label="Price"
-              onChange={(event) => onUpdate(product.id, { price: event.target.value })}
-              className="w-[46px] bg-transparent outline-none"
-            />
+    <>
+      <TopBar back="Products" onBack={onBack} title="Products" actions={[{ label: fresh ? "Save" : "Save", tone: "primary", onClick: onBack }]} />
+      <Body>
+        <h2 className="px-1 pt-1 text-[20px] font-bold leading-7 tracking-[-0.3px]">{fresh ? "Add product" : product.title || "Untitled product"}</h2>
+        <AdminCard className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1">
+            <Label>Title</Label>
+            <input value={product.title} placeholder="Short sleeve t-shirt" onChange={(event) => onUpdate(product.id, { title: event.target.value })} className={`${inputClass} h-8`} />
           </label>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Chip>Compare-at</Chip>
-            <Chip>Unit price</Chip>
-            <Chip onClick={() => setTaxed((value) => !value)}>
-              Charge tax
-              <span className="rounded bg-[#e3e3e3] px-1 text-[11px] font-medium leading-4">{taxed ? "Yes" : "No"}</span>
-            </Chip>
-            <span className="text-[#4a4a4a]">
-              <PIcon name="ChevronDown" size={20} />
+          <div className="flex flex-col gap-1">
+            <Label>Description</Label>
+            <div className="overflow-hidden rounded-lg border border-[#8a8a8a]/40 focus-within:border-[#303030]">
+              <div className="flex items-center gap-0.5 overflow-x-auto border-b border-[#ebebeb] bg-[#f7f7f7] px-1.5 py-1 text-[#4a4a4a] [scrollbar-width:none]">
+                <span className="flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px]">
+                  Paragraph <PIcon name="ChevronDown" size={14} />
+                </span>
+                {toolbarIcons.map((icon) => (
+                  <span key={icon} className="grid size-6 shrink-0 place-items-center rounded hover:bg-[#ebebeb]">
+                    <PIcon name={icon} size={16} />
+                  </span>
+                ))}
+              </div>
+              <textarea
+                rows={4}
+                value={product.description}
+                aria-label="Description"
+                onChange={(event) => onUpdate(product.id, { description: event.target.value })}
+                className="w-full resize-none px-2.5 py-2 text-[12px] leading-[1.5] outline-none"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label>Media</Label>
+            <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-[#8a8a8a] px-4 py-5">
+              {product.image ? <img src={product.image} alt="" className="mb-1 size-14 rounded-md object-cover" /> : null}
+              <span className="flex items-center gap-2">
+                <Btn tone="gray">Upload new</Btn>
+                <Btn tone="plain">Select existing</Btn>
+              </span>
+              <span className="text-[11px] text-[#616161]">Accepts images, videos, or 3D models</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <s-select label="Category" placeholder="Choose a product category" details="Determines tax rates and adds metafields to improve search, filters, and cross-channel sales">
+              <s-option value="none">Uncategorized</s-option>
+            </s-select>
+          </div>
+        </AdminCard>
+        <Section title="Price">
+          <AdminCard flush>
+            <div className="p-3">
+              <label className="flex h-8 w-40 items-center gap-1 rounded-lg border border-[#8a8a8a]/40 px-2.5 text-[12px] focus-within:border-[#303030]">
+                <span className="text-[#616161]">$</span>
+                <input
+                  value={product.price}
+                  inputMode="decimal"
+                  aria-label="Price"
+                  onChange={(event) => onUpdate(product.id, { price: event.target.value })}
+                  className="min-w-0 flex-1 bg-transparent outline-none"
+                />
+              </label>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-[#ebebeb] px-3 py-2">
+              {["Compare-at", "Unit price"].map((label) => (
+                <span key={label} className="rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
+                  {label}
+                </span>
+              ))}
+              <button type="button" onClick={() => setTaxed((value) => !value)} className="flex items-center gap-1 rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
+                Charge tax <span className="rounded bg-[#e3e3e3] px-1 font-medium text-[#303030]">{taxed ? "Yes" : "No"}</span>
+              </button>
+              <span className="rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">Cost per item</span>
+            </div>
+          </AdminCard>
+        </Section>
+        <AdminCard flush>
+          <div className="flex items-center justify-between px-3 py-2.5">
+            <span className="text-[13px] font-semibold">Inventory</span>
+            <span className="flex items-center gap-2 text-[12px] text-[#616161]">
+              Inventory tracked
+              <Toggle on={tracked} onChange={setTracked} label="Inventory tracked" />
             </span>
           </div>
-        </Card>
-      </section>
-      <Card className="gap-4 p-4">
-        <Field label="Inventory">
-          <input readOnly value={product.inventory} className={`${inputClass} h-9`} />
-        </Field>
-        <div className="px-3">
-          <s-checkbox label="Track quantity" checked={tracked} onChange={() => setTracked((value) => !value)} />
-        </div>
-      </Card>
-    </Page>
-  );
-}
-
-function Chip({ children, onClick }: { children: ReactNode; onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="press inline-flex h-7 items-center gap-1.5 rounded-lg bg-[#f1f1f1] px-2 text-[13px] tracking-[-0.13px] text-[#303030] hover:bg-[#e9e9e9]"
-    >
-      {children}
-    </button>
-  );
-}
-
-/* Setup detail and list pages reached from cards, chips, and the rail */
-
-function SetupDetail({
-  title,
-  body,
-  action,
-  secondary,
-  art,
-  onHome,
-  children,
-}: {
-  title: string;
-  body: string;
-  action: string;
-  secondary?: string;
-  art?: ReactNode;
-  onHome: () => void;
-  children?: ReactNode;
-}) {
-  return (
-    <Page>
-      <BackPill onBack={onHome} />
-      <H1>{title}</H1>
-      <Card className="p-2">
-        {art ? <div className="relative h-[132px] overflow-hidden rounded-2xl bg-gradient-to-b from-[#f6f6f6] to-[#ececed]">{art}</div> : null}
-        <div className="flex flex-col gap-4 p-3">
-          <p className="text-[15px] leading-[1.4] tracking-[-0.15px] text-[#4a4a4a]">{body}</p>
-          {children}
-        </div>
-      </Card>
-      <div className="flex gap-2">
-        <Pill tone="dark" className="flex-1">
-          {action}
-        </Pill>
-        {secondary ? (
-          <Pill tone="fill" className="flex-1">
-            {secondary}
-          </Pill>
-        ) : null}
-      </div>
-    </Page>
-  );
-}
-
-type ListRow = { icon: PolarisIconName; label: string; meta: string; badge?: "Action" | "Draft" | "Live"; go?: () => void };
-
-const badgeClass = {
-  Action: "bg-[#ffe7c2] text-[#4f3500]",
-  Draft: "bg-[#58e3ff] text-[#002e3a]",
-  Live: "bg-[rgb(215,255,215)] text-[rgb(0,56,0)]",
-} as const;
-
-function ListPage({ title, rows, onHome }: { title: string; rows: ListRow[]; onHome: () => void }) {
-  return (
-    <Page>
-      <BackPill onBack={onHome} />
-      <H1>{title}</H1>
-      <Card>
-        <div className="flex flex-col gap-2.5 px-3 pt-3">
-          {rows.map((row, index) => (
-            <button key={row.label} type="button" onClick={row.go} className="press press-row group flex items-start gap-3 text-left">
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#f4f5f3]">
-                <PIcon name={row.icon} size={20} />
+          {tracked ? (
+            <div className="mx-3 mb-3 overflow-hidden rounded-lg text-[12px] shadow-[0_0_0_1px_#e3e3e3]">
+              <div className="flex justify-between bg-[#f7f7f7] px-2.5 py-1.5 font-medium text-[#616161]">
+                <span>Location</span>
+                <span>Quantity</span>
+              </div>
+              <div className="flex items-center justify-between px-2.5 py-2">
+                <span>Shop location</span>
+                <input aria-label="Quantity" defaultValue={Number.parseInt(product.inventory, 10) || 0} className={`${inputClass} h-7 w-20 text-right`} />
+              </div>
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-1.5 border-t border-[#ebebeb] px-3 py-2">
+            {["SKU", "Barcodes"].map((label) => (
+              <span key={label} className="rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
+                {label}
               </span>
-              <span
-                className={`flex min-w-0 flex-1 items-center gap-2 pb-3 ${index < rows.length - 1 ? "border-b-[0.5px] border-[#e6e6e6]" : ""}`}
-              >
-                <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                  <span className="truncate text-[13px] font-medium leading-4 tracking-[-0.13px]">{row.label}</span>
-                  <span className="truncate text-[12px] leading-4 text-[#737572]">{row.meta}</span>
-                </span>
-                {row.badge ? <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${badgeClass[row.badge]}`}>{row.badge}</span> : null}
-                <span className="text-[#8a8a8a] transition-transform group-hover:translate-x-0.5">
-                  <PIcon name="ChevronRight" size={20} />
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </Card>
-    </Page>
+            ))}
+            <span className="flex items-center gap-1 rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
+              Sell when out of stock <span className="rounded bg-[#e3e3e3] px-1 font-medium text-[#303030]">Off</span>
+            </span>
+          </div>
+        </AdminCard>
+        <AdminCard className="flex flex-col gap-3">
+          <s-select label="Status" value={product.status} onChange={(event) => onUpdate(product.id, { status: event.currentTarget.value as Product["status"] })}>
+            <s-option value="Active">Active</s-option>
+            <s-option value="Draft">Draft</s-option>
+          </s-select>
+          <span className="flex items-center justify-between text-[12px]">
+            <span className="font-medium">Publishing</span>
+            <PIcon name="Adjust" size={16} />
+          </span>
+          <span className="flex items-center gap-1.5 text-[12px]">
+            <PIcon name="Channels" size={16} /> All channels
+          </span>
+        </AdminCard>
+        <AdminCard className="flex flex-col gap-3">
+          <span className="flex items-center gap-1 text-[12px] font-semibold">
+            Product organization <PIcon name="Info" size={14} />
+          </span>
+          <s-select label="Type">
+            <s-option value="">None</s-option>
+          </s-select>
+          <s-select label="Vendor">
+            <s-option value="">None</s-option>
+          </s-select>
+          <s-text-field label="Collections" placeholder="Add collections" />
+          <s-text-field label="Tags" placeholder="Add tags" />
+          <s-select label="Theme template">
+            <s-option value="default">Default product</s-option>
+          </s-select>
+        </AdminCard>
+      </Body>
+    </>
   );
 }

@@ -2,12 +2,13 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
 import { Orb, ShopifyMark } from "@/components/marks";
 import { PreviewColumn } from "@/components/preview-column";
-import { ProductRail } from "@/components/product-rail";
+import { AdminRail } from "@/components/admin-rail";
+import { SearchPalette } from "@/components/search-palette";
 import {
   activeState,
   personaFor,
@@ -17,11 +18,14 @@ import {
   scriptedTurn,
   selectedAgent,
   setupState,
+  type Action,
   type Effect,
+  type Segment,
   type PrototypeState,
 } from "@/lib/prototype";
+import { segmentsOf, sourcesOf } from "@/lib/turn";
 
-type Turn = { agentId: string; text: string; done: boolean };
+type Turn = { agentId: string; text: string; done: boolean; first: boolean };
 
 export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "setup" | "active" }) {
   const [state, setState] = useState<PrototypeState>(() =>
@@ -29,6 +33,9 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   );
   const [booting, setBooting] = useState(false);
   const [offline, setOffline] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const [palette, setPalette] = useState<{ open: boolean; scope?: string }>({ open: false });
+  const [liveAgentId, setLiveAgentId] = useState<string | null>(null);
   const bootTimer = useRef<number | null>(null);
 
   function enter(update: (current: PrototypeState) => PrototypeState) {
@@ -40,6 +47,23 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   const turn = useRef<Turn | null>(null);
   const applied = useRef(new Set<string>());
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
+  const dispatch = (action: Action) => setState((current) => reducer(current, action));
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key === "b") {
+        event.preventDefault();
+        setNavOpen((open) => !open);
+      } else if (key === "k") {
+        event.preventDefault();
+        setPalette((current) => ({ open: !current.open }));
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const chat = useChat({
     transport,
@@ -51,6 +75,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
       if (!pending || pending.done) return;
       setOffline(true);
       pending.done = true;
+      setLiveAgentId(null);
       setState((current) => {
         const script = scriptedTurn(pending.agentId, pending.text, current.storeName);
         const withText = reducer(current, { type: "commit", agentId: pending.agentId, text: script.text });
@@ -63,35 +88,59 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     const pending = turn.current;
     if (!pending || pending.done) return;
     pending.done = true;
+    setLiveAgentId(null);
     const text = replyText(message);
     const scripted = scriptedEffects(message);
     setOffline(scripted !== null || !text);
     const effects = scripted ?? effectsFrom(message, applied.current);
+    const segments = committedSegments(message);
+    const sources = sourcesOf(message);
+    let answer = text;
     setState((current) => {
       if (!text) {
         const script = scriptedTurn(pending.agentId, pending.text, current.storeName);
+        answer = script.text;
         const withScript = reducer(current, { type: "commit", agentId: pending.agentId, text: script.text });
         return reducer(withScript, { type: "effects", effects: script.effects });
       }
-      const withText = reducer(current, { type: "commit", agentId: pending.agentId, text });
+      const withText = reducer(current, { type: "commit", agentId: pending.agentId, text, segments, sources });
       return reducer(withText, { type: "effects", effects });
     });
+    if (pending.first) void nameThread(pending.agentId, pending.text, answer);
+  }
+
+  async function nameThread(agentId: string, question: string, answer: string) {
+    try {
+      const response = await fetch("/api/title", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question, answer }),
+      });
+      const data = (await response.json()) as { title?: string };
+      if (data.title) dispatch({ type: "title", agentId, title: data.title });
+    } catch {
+      // The question itself stays as the title.
+    }
   }
 
   const agent = selectedAgent(state);
   const liveMessage = chat.messages.at(-1);
   const streaming = (chat.status === "streaming" || chat.status === "submitted") && liveMessage?.role === "assistant";
-  const liveText = streaming ? replyText(liveMessage) : chat.status === "submitted" ? "" : null;
-  const liveStatus = streaming ? toolStatus(liveMessage) : null;
+  const liveSegments = streaming ? segmentsOf(liveMessage) : null;
+  const busy = chat.status === "submitted" || chat.status === "streaming";
 
-  function send(text: string) {
+  function send(text: string, target?: string) {
     const current = state;
-    const agentId = current.mode === "add" ? "sidekick" : current.selectedAgentId;
-    const transcript = (current.threads[agentId] ?? []).flatMap((block) =>
-      block.type === "text" ? [{ role: block.role, content: block.text }] : [],
-    );
-    turn.current = { agentId, text, done: false };
-    setState((prev) => reducer(prev, { type: "user", agentId, text }));
+    const agentId = target ?? (current.mode === "add" ? "sidekick" : current.selectedAgentId);
+    const thread = current.threads[agentId] ?? [];
+    const transcript = thread.flatMap((block) => (block.type === "text" ? [{ role: block.role, content: block.text }] : []));
+    const first = !thread.some((block) => block.type === "text" && block.role === "user");
+    turn.current = { agentId, text, done: false, first };
+    setLiveAgentId(agentId);
+    setState((prev) => {
+      const selected = target ? reducer(prev, { type: "select", id: target }) : prev;
+      return reducer(selected, { type: "user", agentId, text });
+    });
     void chat.sendMessage(
       { text },
       {
@@ -109,6 +158,16 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     );
   }
 
+  function stop() {
+    const pending = turn.current;
+    const partial = liveMessage?.role === "assistant" ? replyText(liveMessage) : "";
+    void chat.stop();
+    setLiveAgentId(null);
+    if (!pending || pending.done) return;
+    pending.done = true;
+    dispatch({ type: "commit", agentId: pending.agentId, text: partial || "Stopped.", segments: liveMessage ? committedSegments(liveMessage) : undefined });
+  }
+
   if (!state.signedIn) {
     return (
       <Signup
@@ -123,50 +182,99 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
       <div className="p-partial-theme-admin-next-dark flex min-w-0 flex-1 gap-1 bg-[#0c0d0c] text-white">
         <AgentNav
           state={state}
-          onSelect={(id) => setState((current) => reducer(current, { type: "select", id }))}
-          onAdd={() => setState((current) => reducer(current, { type: "toggle-add" }))}
-          onSearch={() => setState((current) => reducer(current, { type: "toggle-search" }))}
-          onQuery={(query) => setState((current) => reducer(current, { type: "search", query }))}
-          onExperiments={() => setState((current) => reducer(current, { type: "toggle-experiments" }))}
+          navOpen={navOpen}
+          onToggleNav={() => setNavOpen((open) => !open)}
+          onSelect={(id) => dispatch({ type: "select", id })}
+          onAdd={() => dispatch({ type: "toggle-add" })}
+          onSearch={() => dispatch({ type: "toggle-search" })}
+          onQuery={(query) => dispatch({ type: "search", query })}
+          onExperiments={() => dispatch({ type: "toggle-experiments" })}
         />
         <div className="my-3 w-px shrink-0 bg-white/10" />
         <ChatColumn
           state={state}
-          liveText={liveText}
-          liveStatus={liveStatus}
+          liveSegments={liveAgentId === agent.id ? liveSegments : null}
           offline={offline}
-          busy={chat.status === "submitted" || chat.status === "streaming"}
-          onChip={(label) => setState((current) => reducer(current, { type: "chip", label }))}
+          busy={busy && liveAgentId === agent.id}
+          locked={busy}
+          onChip={(label) => dispatch({ type: "chip", label })}
           onSend={send}
-          onPurpose={(id) => setState((current) => reducer(current, { type: "toggle-purpose", id }))}
-          onStart={() => setState((current) => reducer(current, { type: "chip", label: "Start working" }))}
-          onAddCatalog={(id) => setState((current) => reducer(current, { type: "add-catalog", id }))}
-          onCreate={(name, purpose) => setState((current) => reducer(current, { type: "create-agent", name, purpose }))}
-          onScenario={(scenario) => setState((current) => reducer(current, { type: "scenario", scenario }))}
-          onMotion={(on) => setState((current) => reducer(current, { type: "motion", on }))}
-          onReset={() => setState((current) => reducer(current, { type: "reset" }))}
-          onCloseExperiments={() => setState((current) => reducer(current, { type: "toggle-experiments" }))}
+          onStop={stop}
+          onPurpose={(id) => dispatch({ type: "toggle-purpose", id })}
+          onStart={() => dispatch({ type: "chip", label: "Start working" })}
+          onAddCatalog={(id) => dispatch({ type: "add-catalog", id })}
+          onCreate={(name, purpose) => dispatch({ type: "create-agent", name, purpose })}
+          onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
+          onMotion={(on) => dispatch({ type: "motion", on })}
+          onReset={() => dispatch({ type: "reset" })}
+          onCloseExperiments={() => dispatch({ type: "toggle-experiments" })}
+          onConversations={(open) => dispatch({ type: "conversations", open })}
+          onNewChat={() => dispatch({ type: "new-chat" })}
+          onOpenConversation={(id) => dispatch({ type: "open-conversation", id })}
+          onDeleteConversation={(id) => dispatch({ type: "delete-conversation", id })}
+          onRate={(id, value) => dispatch({ type: "rate", id, value })}
         />
       </div>
       <PreviewColumn
         state={state}
-        onPreview={(page, wide) => setState((current) => reducer(current, { type: "preview", page, wide }))}
-        onChip={(label) => setState((current) => reducer(current, { type: "chip", label }))}
-        onBusiness={(value) => setState((current) => reducer(current, { type: "business-type", value }))}
-        onIdentity={(patch) => setState((current) => reducer(current, { type: "identity", patch }))}
-        onPaymentsNext={() => setState((current) => reducer(current, { type: "payments-next" }))}
-        onProduct={(id) => setState((current) => reducer(current, { type: "product", id }))}
-        onUpdateProduct={(id, patch) => setState((current) => reducer(current, { type: "update-product", id, patch }))}
-        onAddProduct={() => setState((current) => reducer(current, { type: "add-blank-product" }))}
-        onRail={(id) => setState((current) => reducer(current, { type: "rail", id }))}
+        onPreview={(page, wide) => dispatch({ type: "preview", page, wide })}
+        onChip={(label) => dispatch({ type: "chip", label })}
+        onCard={(id) => {
+          if (id === "pos") window.open("https://hardware.shopify.com/", "_blank", "noopener");
+          dispatch({ type: "card", id });
+        }}
+        onDismissCard={(id) => dispatch({ type: "dismiss-card", id })}
+        onAsk={(text) => {
+          if (!busy) send(text, "sidekick");
+        }}
+        onRecents={() => {
+          dispatch({ type: "select", id: "sidekick" });
+          dispatch({ type: "conversations", open: true });
+        }}
+        onBusiness={(value) => dispatch({ type: "business-type", value })}
+        onIdentity={(patch) => dispatch({ type: "identity", patch })}
+        onPaymentsNext={() => dispatch({ type: "payments-next" })}
+        onProduct={(id) => dispatch({ type: "product", id })}
+        onUpdateProduct={(id, patch) => dispatch({ type: "update-product", id, patch })}
+        onAddProduct={() => dispatch({ type: "add-blank-product" })}
+        onRail={(id) => dispatch({ type: "rail", id })}
       />
       <div className="p-partial-theme-admin-next-dark flex">
-        <ProductRail preview={state.preview} onOpen={(id) => setState((current) => reducer(current, { type: "rail", id }))} />
+        <AdminRail
+          expanded={navOpen}
+          preview={state.preview}
+          storeName={state.storeName}
+          onOpen={(id) => dispatch({ type: "rail", id })}
+          onGo={(page) => dispatch({ type: "preview", page })}
+          onSearch={(scope) => setPalette({ open: true, scope })}
+          onLogout={() => {
+            setNavOpen(false);
+            dispatch({ type: "logout" });
+          }}
+        />
       </div>
+      {palette.open ? (
+        <SearchPalette
+          state={state}
+          initialScope={palette.scope}
+          onClose={() => setPalette({ open: false })}
+          onGo={(page) => dispatch({ type: "preview", page })}
+          onRail={(id) => dispatch({ type: "rail", id })}
+          onProduct={(id) => dispatch({ type: "product", id })}
+          onAsk={(text) => {
+            if (!busy) send(text, "sidekick");
+          }}
+        />
+      ) : null}
       <span className="sr-only">{agent.name}</span>
       {booting ? <BootScreen storeName={state.storeName} /> : null}
     </div>
   );
+}
+
+function committedSegments(message: UIMessage): Segment[] | undefined {
+  const segments = segmentsOf(message).map((segment) => (segment.type === "tool" ? { type: "tool" as const, label: segment.label } : segment));
+  return segments.some((segment) => segment.type === "tool") ? segments : undefined;
 }
 
 function BootScreen({ storeName }: { storeName: string }) {
@@ -197,26 +305,6 @@ function replyText(message: UIMessage) {
   return message.parts
     .flatMap((part) => (part.type === "text" && part.text.trim() ? [part.text.trim()] : []))
     .join("\n\n");
-}
-
-function toolStatus(message: UIMessage) {
-  const last = message.parts.filter((part) => part.type !== "step-start").at(-1);
-  if (!last?.type.startsWith("tool-") || !("state" in last) || last.state === "output-available") return null;
-  const input = ("input" in last ? last.input : undefined) as { url?: string } | undefined;
-  if (last.type === "tool-searchShopifyHelp") return "Searching the Shopify Help Center";
-  if (last.type === "tool-searchShopifyDevDocs") return "Searching shopify.dev";
-  if (last.type === "tool-readShopifyHelpArticle") {
-    const found = message.parts
-      .flatMap((part) => {
-        if (part.type !== "tool-searchShopifyHelp" || !("output" in part)) return [];
-        return ((part.output as { results?: { title: string; url: string }[] })?.results ?? []);
-      })
-      .find((result) => result.url === input?.url);
-    if (found) return `Reading “${found.title}”`;
-    const slug = input?.url?.split("/").filter(Boolean).at(-1)?.replace(/\.md$/, "").replace(/-/g, " ");
-    return slug ? `Reading “${slug[0].toUpperCase()}${slug.slice(1)}”` : "Reading the Help Center";
-  }
-  return "Working in the admin";
 }
 
 function scriptedEffects(message: UIMessage): Effect[] | null {
