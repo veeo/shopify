@@ -28,6 +28,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     initialScenario === "active" ? activeState() : setupState(),
   );
   const [booting, setBooting] = useState(false);
+  const [offline, setOffline] = useState(false);
   const bootTimer = useRef<number | null>(null);
 
   function enter(update: (current: PrototypeState) => PrototypeState) {
@@ -48,6 +49,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     onError() {
       const pending = turn.current;
       if (!pending || pending.done) return;
+      setOffline(true);
       pending.done = true;
       setState((current) => {
         const script = scriptedTurn(pending.agentId, pending.text, current.storeName);
@@ -61,12 +63,9 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     const pending = turn.current;
     if (!pending || pending.done) return;
     pending.done = true;
-    const text = message.parts
-      .filter((part) => part.type === "text")
-      .map((part) => ("text" in part ? part.text : ""))
-      .join("")
-      .trim();
+    const text = replyText(message);
     const scripted = scriptedEffects(message);
+    setOffline(scripted !== null || !text);
     const effects = scripted ?? effectsFrom(message, applied.current);
     setState((current) => {
       if (!text) {
@@ -81,15 +80,9 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
 
   const agent = selectedAgent(state);
   const liveMessage = chat.messages.at(-1);
-  const liveText =
-    (chat.status === "streaming" || chat.status === "submitted") && liveMessage?.role === "assistant"
-      ? liveMessage.parts
-          .filter((part) => part.type === "text")
-          .map((part) => ("text" in part ? part.text : ""))
-          .join("")
-      : chat.status === "submitted"
-        ? ""
-        : null;
+  const streaming = (chat.status === "streaming" || chat.status === "submitted") && liveMessage?.role === "assistant";
+  const liveText = streaming ? replyText(liveMessage) : chat.status === "submitted" ? "" : null;
+  const liveStatus = streaming ? toolStatus(liveMessage) : null;
 
   function send(text: string) {
     const current = state;
@@ -140,6 +133,8 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         <ChatColumn
           state={state}
           liveText={liveText}
+          liveStatus={liveStatus}
+          offline={offline}
           busy={chat.status === "submitted" || chat.status === "streaming"}
           onChip={(label) => setState((current) => reducer(current, { type: "chip", label }))}
           onSend={send}
@@ -196,6 +191,32 @@ function agentPersona(state: PrototypeState, agentId: string) {
   if (agentId !== "chief" || state.purposes.length === 0) return base;
   const chosen = purposes.filter((item) => state.purposes.includes(item.id)).map((item) => item.title);
   return `${base} The merchant asked you to focus on: ${chosen.join(", ")}.`;
+}
+
+function replyText(message: UIMessage) {
+  return message.parts
+    .flatMap((part) => (part.type === "text" && part.text.trim() ? [part.text.trim()] : []))
+    .join("\n\n");
+}
+
+function toolStatus(message: UIMessage) {
+  const last = message.parts.filter((part) => part.type !== "step-start").at(-1);
+  if (!last?.type.startsWith("tool-") || !("state" in last) || last.state === "output-available") return null;
+  const input = ("input" in last ? last.input : undefined) as { url?: string } | undefined;
+  if (last.type === "tool-searchShopifyHelp") return "Searching the Shopify Help Center";
+  if (last.type === "tool-searchShopifyDevDocs") return "Searching shopify.dev";
+  if (last.type === "tool-readShopifyHelpArticle") {
+    const found = message.parts
+      .flatMap((part) => {
+        if (part.type !== "tool-searchShopifyHelp" || !("output" in part)) return [];
+        return ((part.output as { results?: { title: string; url: string }[] })?.results ?? []);
+      })
+      .find((result) => result.url === input?.url);
+    if (found) return `Reading “${found.title}”`;
+    const slug = input?.url?.split("/").filter(Boolean).at(-1)?.replace(/\.md$/, "").replace(/-/g, " ");
+    return slug ? `Reading “${slug[0].toUpperCase()}${slug.slice(1)}”` : "Reading the Help Center";
+  }
+  return "Working in the admin";
 }
 
 function scriptedEffects(message: UIMessage): Effect[] | null {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ChipButton, IconButton, Orb } from "@/components/marks";
+import { Markdown } from "@/components/markdown";
 import { PIcon } from "@/components/polaris-icon";
 import {
   catalog,
@@ -16,7 +17,9 @@ import {
 export function ChatColumn({
   state,
   liveText,
+  liveStatus,
   busy,
+  offline,
   onChip,
   onSend,
   onPurpose,
@@ -30,7 +33,9 @@ export function ChatColumn({
 }: {
   state: PrototypeState;
   liveText: string | null;
+  liveStatus: string | null;
   busy: boolean;
+  offline: boolean;
   onChip: (label: string) => void;
   onSend: (text: string) => void;
   onPurpose: (id: string) => void;
@@ -149,26 +154,31 @@ export function ChatColumn({
                 <BlockView key={block.id} block={block} state={state} onChip={onChip} onCreate={onCreate} />
               ),
             )}
-            {busy && !liveText ? (
-              <div className="rise flex items-center py-3 text-[#8e8f8b]" aria-live="polite">
-                <span className="sr-only">{agent.name} is working</span>
+            {liveText ? (
+              <div className="rise max-w-[560px] py-2 text-[15px] leading-[1.4] tracking-[-0.15px]">
+                <Markdown text={liveText} />
+                {liveStatus ? null : <span className="caret ml-0.5 inline-block h-4 w-px translate-y-0.5 bg-white" />}
+              </div>
+            ) : null}
+            {busy && (!liveText || liveStatus) ? (
+              <div className="rise flex items-center gap-2.5 py-3 text-[13px] text-[#8e8f8b]" aria-live="polite">
                 <span className="sk-dots" aria-hidden>
                   <i />
                   <i />
                   <i />
                 </span>
+                <span className={liveStatus ? "" : "sr-only"}>{liveStatus ?? `${agent.name} is working`}</span>
               </div>
-            ) : null}
-            {liveText ? (
-              <p className="rise max-w-[560px] whitespace-pre-wrap py-2 text-[15px] leading-[1.4] tracking-[-0.15px]">
-                {liveText}
-                <span className="caret ml-0.5 inline-block h-4 w-px translate-y-0.5 bg-white" />
-              </p>
             ) : null}
           </div>
         )}
       </div>
 
+      {offline && state.mode === "thread" ? (
+        <p className="mb-1 mt-2 px-4 text-[12px] text-[#8e8f8b]">
+          Claude isn’t connected on this deployment, so this reply is scripted.
+        </p>
+      ) : null}
       <form
         className="mt-2 flex items-center gap-2.5 rounded-full border border-[#2e302d] p-2 transition-[border-color,box-shadow] duration-150 focus-within:border-[#4a4a4a] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.04)]"
         onSubmit={(event) => {
@@ -293,7 +303,9 @@ function BlockView({
   }
   if (block.type === "text") {
     return (
-      <p className="rise max-w-[560px] whitespace-pre-wrap py-2 text-[15px] leading-[1.4] tracking-[-0.15px]">{block.text}</p>
+      <div className="rise max-w-[560px] py-2 text-[15px] leading-[1.4] tracking-[-0.15px]">
+        <Markdown text={block.text} />
+      </div>
     );
   }
   if (block.type === "chips") {
