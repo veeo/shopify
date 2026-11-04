@@ -116,7 +116,7 @@ export function AgentNav({
           <IconButton label="Apps" onClick={onExperiments}>
             <PIcon name="Apps" size={20} />
           </IconButton>
-          <IconButton label="Experiments" onClick={onExperiments} active={state.experimentsOpen}>
+          <IconButton label="Experiments" onClick={onExperiments} active={state.experimentsOpen} controls="experiments-menu">
             <PIcon name="Settings" size={20} />
           </IconButton>
         </span>

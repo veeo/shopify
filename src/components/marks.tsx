@@ -173,18 +173,22 @@ export function IconButton({
   children,
   onClick,
   active,
+  controls,
 }: {
   label: string;
   children: ReactNode;
   onClick?: () => void;
   active?: boolean;
+  controls?: string;
 }) {
   return (
     <button
       type="button"
       aria-label={label}
       title={label}
-      aria-pressed={active}
+      aria-pressed={controls ? undefined : active}
+      aria-controls={controls}
+      aria-expanded={controls ? Boolean(active) : undefined}
       onClick={onClick}
       className="press btn-dark grid size-8 place-items-center rounded-full"
     >

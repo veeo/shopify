@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChipButton, IconButton, Orb } from "@/components/marks";
 import { Markdown } from "@/components/markdown";
 import { PIcon } from "@/components/polaris-icon";
@@ -84,6 +84,7 @@ export function ChatColumn({
               setMoreOpen(false);
             }}
             active={historyOpen}
+            controls="history-menu"
           >
             <PIcon name="Clock" size={20} />
           </IconButton>
@@ -94,6 +95,7 @@ export function ChatColumn({
               setHistoryOpen(false);
             }}
             active={moreOpen}
+            controls="more-menu"
           >
             <PIcon name="MenuHorizontal" size={20} />
           </IconButton>
@@ -101,7 +103,7 @@ export function ChatColumn({
       </header>
 
       {historyOpen ? (
-        <Popover className="right-8 top-16 w-72 p-3">
+        <Popover id="history-menu" onDismiss={() => setHistoryOpen(false)} className="right-8 top-16 w-72 p-3">
           <p className="mb-1 px-1 text-[12px] text-[#8e8f8b]">This conversation</p>
           {history.length === 0 ? (
             <p className="px-1 py-1 text-[13px] text-white/80">No questions yet.</p>
@@ -117,7 +119,7 @@ export function ChatColumn({
         </Popover>
       ) : null}
       {moreOpen ? (
-        <Popover className="right-8 top-16 w-56 p-1.5">
+        <Popover id="more-menu" onDismiss={() => setMoreOpen(false)} className="right-8 top-16 w-56 p-1.5">
           <MenuItem
             onClick={() => {
               setMoreOpen(false);
@@ -227,7 +229,11 @@ export function ChatColumn({
       </form>
 
       {state.experimentsOpen ? (
-        <Popover className="bottom-20 left-8 w-72 origin-bottom-left p-4">
+        <Popover
+          id="experiments-menu"
+          onDismiss={onCloseExperiments}
+          className="bottom-20 left-8 w-72 origin-bottom-left p-4"
+        >
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[13px] font-medium">Experiments</p>
             <s-button variant="tertiary" onClick={onCloseExperiments}>
@@ -259,9 +265,44 @@ export function ChatColumn({
   );
 }
 
-function Popover({ className, children }: { className: string; children: React.ReactNode }) {
+function Popover({
+  id,
+  onDismiss,
+  className,
+  children,
+}: {
+  id: string;
+  onDismiss: () => void;
+  className: string;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const dismiss = useRef(onDismiss);
+  useEffect(() => {
+    dismiss.current = onDismiss;
+  });
+  useEffect(() => {
+    function onPointerDown(event: PointerEvent) {
+      const path = event.composedPath();
+      if (ref.current && path.includes(ref.current)) return;
+      // The trigger toggles on its own click; closing here too would reopen it.
+      if (path.some((node) => node instanceof Element && node.getAttribute("aria-controls") === id)) return;
+      dismiss.current();
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") dismiss.current();
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [id]);
   return (
     <div
+      ref={ref}
+      id={id}
       className={`pop-in absolute z-30 rounded-2xl border border-white/10 bg-[#1a1a1a] text-white shadow-[0_16px_40px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)] ${className}`}
     >
       {children}

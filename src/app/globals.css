@@ -77,7 +77,8 @@ body {
   box-shadow: var(--shadow-button-dark-inset);
 }
 
-.btn-dark[aria-pressed="true"]:not(:active) {
+.btn-dark[aria-pressed="true"]:not(:active),
+.btn-dark[aria-expanded="true"]:not(:active) {
   background: #3a3a3a;
   color: #fff;
 }
