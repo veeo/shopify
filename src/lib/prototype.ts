@@ -1,4 +1,4 @@
-import { navFor, previewPages, type PreviewId } from "@/lib/admin-nav";
+import { findNav, navFor, previewPages, type PreviewId } from "@/lib/admin-nav";
 
 export { previewPages, type PreviewId };
 
@@ -36,8 +36,11 @@ export type Agent = {
 
 export type Chip = { label: string; tone: "secondary" | "primary"; send?: boolean };
 
+export type Segment = { type: "text"; text: string } | { type: "tool"; label: string };
+export type Source = { title: string; url: string };
+
 export type Block =
-  | { id: string; type: "text"; role: "user" | "assistant"; text: string; typed?: boolean }
+  | { id: string; type: "text"; role: "user" | "assistant"; text: string; typed?: boolean; segments?: Segment[]; sources?: Source[] }
   | { id: string; type: "steps" }
   | { id: string; type: "sellers" }
   | { id: string; type: "chips"; chips: Chip[] }
@@ -103,7 +106,75 @@ export type PrototypeState = {
   experimentsOpen: boolean;
   motion: boolean;
   seq: number;
+  conversations: Record<string, Conversation[]>;
+  conversationsOpen: boolean;
+  ratings: Record<string, "up" | "down">;
+  cardsDone: string[];
+  cardsDismissed: string[];
 };
+
+export type Conversation = { id: string; title: string; at: number; blocks: Block[] };
+
+export const homeCards = [
+  { id: "theme", title: "Choose your store design", chip: "Choose theme →" },
+  { id: "payments", title: "You're ready to accept payments", chip: "Review payments →" },
+  { id: "domain", title: "Get a custom domain", chip: "Set up domain →" },
+  { id: "shipping", title: "Review shipping rates", chip: "Review rates →" },
+  { id: "address", title: "Add your retail address", chip: "Add address →" },
+  { id: "pos", title: "Order POS hardware", chip: "Order hardware →" },
+] as const;
+
+const day = 86_400_000;
+
+function seedConversations(now: number): Conversation[] {
+  const convo = (n: string, title: string, ago: number, ask: string, reply: string): Conversation => ({
+    id: `seed-${n}`,
+    title,
+    at: now - ago,
+    blocks: [
+      { id: `seed-${n}-u`, type: "text", role: "user", text: ask },
+      { id: `seed-${n}-a`, type: "text", role: "assistant", text: reply },
+    ],
+  });
+  return [
+    convo("payments", "You're ready to accept payments", day + 3_600_000, "Review payments", paymentsReply),
+    convo(
+      "start",
+      "Getting started with your Shopify store",
+      day + 7_200_000,
+      "How do I get started with my Shopify store?",
+      "Start with the basics: pick a theme, add a few products, and set up payments. The setup guide on Home walks through each step, and I can do most of them with you.",
+    ),
+    convo(
+      "agentic",
+      "Agentic storefronts explained",
+      2 * day,
+      "What are agentic storefronts?",
+      "Agentic storefronts let AI shopping agents like ChatGPT, Copilot, and Shop find and sell your products. Shopify syncs your catalog and policies so agents can answer questions and check out on your behalf. You can manage them under **Sales channels › Agentic**.",
+    ),
+    convo(
+      "product",
+      "Add your first product",
+      2 * day + 3_600_000,
+      "Help me add my first product",
+      "Open **Products › Add product**, then add a title, a clear photo, a description, and a price. Set inventory if you track stock. Save it as a draft until it looks right, then make it active.",
+    ),
+    convo(
+      "pos",
+      "Order POS hardware",
+      3 * day,
+      "Order POS hardware",
+      "The POS retail kit is a card reader, a dock, and a receipt printer. You can order it from the Shopify Hardware Store, and Point of Sale has a QR code to install the app.",
+    ),
+    convo(
+      "theme",
+      "Choose your store design",
+      3 * day + 3_600_000,
+      "Choose a theme",
+      "Your store is on Horizon, Shopify’s free default theme. Tinker and Dwell are worth a look if you want something more editorial.",
+    ),
+  ];
+}
 
 export const setupChips: Chip[] = [
   { label: "Review payments", tone: "secondary" },
@@ -505,6 +576,19 @@ function push(state: PrototypeState, agentId: string, block: Block) {
   state.threads[agentId] = [...(state.threads[agentId] ?? []), block];
 }
 
+/** Moves the agent's current thread into its conversation list and starts a fresh one. */
+function archive(state: PrototypeState, agentId: string) {
+  const thread = state.threads[agentId] ?? [];
+  if (thread.some((block) => block.type === "text" && block.role === "user")) {
+    const agent = state.agents.find((item) => item.id === agentId);
+    const firstAsk = thread.find((block) => block.type === "text" && block.role === "user");
+    const title = agent?.topic || (firstAsk?.type === "text" ? firstAsk.text : "New conversation");
+    state.conversations[agentId] = [{ id: id(state), title, at: Date.now(), blocks: thread }, ...(state.conversations[agentId] ?? [])];
+  }
+  state.threads[agentId] = [];
+  patchAgent(state, agentId, { topic: "" });
+}
+
 function patchAgent(state: PrototypeState, agentId: string, patch: Partial<Agent>) {
   state.agents = state.agents.map((item) => (item.id === agentId ? { ...item, ...patch } : item));
 }
@@ -539,6 +623,11 @@ export function setupState(storeName = "My Store"): PrototypeState {
     experimentsOpen: false,
     motion: true,
     seq: 10,
+    conversations: { sidekick: seedConversations(Date.now()) },
+    conversationsOpen: false,
+    ratings: {},
+    cardsDone: [],
+    cardsDismissed: [],
   };
 }
 
@@ -1053,7 +1142,7 @@ export type Action =
   | { type: "reset" }
   | { type: "chip"; label: string }
   | { type: "user"; agentId: string; text: string }
-  | { type: "commit"; agentId: string; text: string }
+  | { type: "commit"; agentId: string; text: string; segments?: Segment[]; sources?: Source[] }
   | { type: "effects"; effects: Effect[] }
   | { type: "business-type"; value: BusinessType }
   | { type: "identity"; patch: Partial<PrototypeState["identity"]> }
@@ -1065,7 +1154,16 @@ export type Action =
   | { type: "product"; id: string }
   | { type: "update-product"; id: string; patch: Partial<Product> }
   | { type: "rail"; id: string }
-  | { type: "add-blank-product" };
+  | { type: "add-blank-product" }
+  | { type: "card"; id: string }
+  | { type: "dismiss-card"; id: string }
+  | { type: "new-chat" }
+  | { type: "conversations"; open: boolean }
+  | { type: "open-conversation"; id: string }
+  | { type: "delete-conversation"; id: string }
+  | { type: "title"; agentId: string; title: string }
+  | { type: "rate"; id: string; value: "up" | "down" }
+  | { type: "logout" };
 
 export function reducer(state: PrototypeState, action: Action): PrototypeState {
   const next: PrototypeState = {
@@ -1076,6 +1174,10 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
     purposes: [...state.purposes],
     products: state.products.map((product) => ({ ...product })),
     identity: { ...state.identity },
+    conversations: Object.fromEntries(Object.entries(state.conversations).map(([key, list]) => [key, [...list]])),
+    ratings: { ...state.ratings },
+    cardsDone: [...state.cardsDone],
+    cardsDismissed: [...state.cardsDismissed],
   };
 
   switch (action.type) {
@@ -1123,17 +1225,72 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
     case "chip":
       runChip(next, action.label);
       return next;
-    case "user":
+    case "user": {
+      const first = !(next.threads[action.agentId] ?? []).some((block) => block.type === "text" && block.role === "user");
       push(next, action.agentId, { id: id(next), type: "text", role: "user", text: action.text });
-      patchAgent(next, action.agentId, { preview: action.text });
+      patchAgent(next, action.agentId, first ? { preview: action.text, topic: action.text } : { preview: action.text });
+      next.conversationsOpen = false;
       return next;
+    }
+    case "title":
+      patchAgent(next, action.agentId, { topic: action.title });
+      return next;
+    case "card": {
+      const card = homeCards.find((item) => item.id === action.id);
+      if (!card) return state;
+      archive(next, "sidekick");
+      next.selectedAgentId = "sidekick";
+      next.mode = "thread";
+      next.conversationsOpen = false;
+      const before = next.preview;
+      runChip(next, card.chip);
+      if (card.id === "pos") next.preview = before;
+      patchAgent(next, "sidekick", { topic: card.title });
+      if (!next.cardsDone.includes(card.id)) next.cardsDone.push(card.id);
+      return next;
+    }
+    case "dismiss-card":
+      if (!next.cardsDismissed.includes(action.id)) next.cardsDismissed.push(action.id);
+      return next;
+    case "new-chat":
+      archive(next, next.selectedAgentId);
+      next.mode = "thread";
+      next.conversationsOpen = false;
+      return next;
+    case "conversations":
+      next.conversationsOpen = action.open;
+      next.mode = "thread";
+      return next;
+    case "open-conversation": {
+      const agentId = next.selectedAgentId;
+      const list = next.conversations[agentId] ?? [];
+      const found = list.find((item) => item.id === action.id);
+      if (!found) return state;
+      next.conversations[agentId] = list.filter((item) => item.id !== action.id);
+      archive(next, agentId);
+      next.threads[agentId] = found.blocks;
+      patchAgent(next, agentId, { topic: found.title });
+      next.conversationsOpen = false;
+      return next;
+    }
+    case "delete-conversation": {
+      const agentId = next.selectedAgentId;
+      next.conversations[agentId] = (next.conversations[agentId] ?? []).filter((item) => item.id !== action.id);
+      return next;
+    }
+    case "rate":
+      if (next.ratings[action.id] === action.value) delete next.ratings[action.id];
+      else next.ratings[action.id] = action.value;
+      return next;
+    case "logout":
+      return { ...setupState(state.storeName), motion: state.motion };
     case "commit": {
       const text = action.text.trim();
       if (!text) return state;
       const thread = next.threads[action.agentId] ?? [];
       const last = thread[thread.length - 1];
       if (last?.type === "text" && last.role === "assistant" && last.text === text) return state;
-      push(next, action.agentId, { id: id(next), type: "text", role: "assistant", text });
+      push(next, action.agentId, { id: id(next), type: "text", role: "assistant", text, segments: action.segments, sources: action.sources });
       patchAgent(next, action.agentId, { preview: text.replace(/\s+/g, " ").slice(0, 72) });
       return next;
     }
@@ -1261,7 +1418,7 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
     case "add-blank-product": {
       const product: Product = {
         id: id(next),
-        title: "New product",
+        title: "",
         price: "0.00",
         status: "Draft",
         tone: "sand",
@@ -1287,6 +1444,8 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
 
 function railPage(id: string, state: PrototypeState): PreviewId {
   if (id === "home") return state.scenario === "active" || state.chiefPhase === "working" ? "home-active" : "home-setup";
+  const item = findNav(id);
+  if (item && item.page !== "home") return item.page;
   return (previewPages as readonly string[]).includes(id) ? (id as PreviewId) : state.preview;
 }
 

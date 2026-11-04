@@ -1,4 +1,3 @@
-import { anthropic } from "@ai-sdk/anthropic";
 import {
   convertToModelMessages,
   createUIMessageStream,
@@ -6,11 +5,11 @@ import {
   stepCountIs,
   streamText,
   tool,
-  type LanguageModel,
   type UIMessage,
 } from "ai";
 import { z } from "zod";
 import { businessTypes, personaFor, previewPages, scriptedTurn } from "@/lib/prototype";
+import { chatModel } from "@/lib/model";
 import { readHelpArticle, searchDevDocs, searchHelpCenter } from "@/lib/shopify-help";
 
 export const maxDuration = 60;
@@ -93,11 +92,12 @@ function scriptedResponse(agentId: string, text: string, storeName: string) {
   const stream = createUIMessageStream({
     async execute({ writer }) {
       writer.write({ type: "data-effects", data: { effects: turn.effects } });
+      await new Promise((resolve) => setTimeout(resolve, 700));
       const id = "scripted";
       writer.write({ type: "text-start", id });
       for (const word of turn.text.split(/(\s+)/)) {
         writer.write({ type: "text-delta", id, delta: word });
-        if (word.trim()) await new Promise((resolve) => setTimeout(resolve, 28));
+        if (word.trim()) await new Promise((resolve) => setTimeout(resolve, 60));
       }
       writer.write({ type: "text-end", id });
     },
@@ -105,13 +105,6 @@ function scriptedResponse(agentId: string, text: string, storeName: string) {
   return createUIMessageStreamResponse({ stream });
 }
 
-function chatModel(request: Request): LanguageModel | null {
-  if (process.env.ANTHROPIC_API_KEY) return anthropic(process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5");
-  if (process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN || request.headers.has("x-vercel-oidc-token")) {
-    return process.env.AI_GATEWAY_MODEL || "anthropic/claude-sonnet-5.5";
-  }
-  return null;
-}
 
 type PrototypeContext = {
   agentId?: string;
@@ -137,7 +130,8 @@ function systemPrompt(context: PrototypeContext | undefined, persona: string, st
     "",
     "Getting facts right:",
     "- For anything about how Shopify works (payments, payouts, fees, shipping, taxes, domains, checkout, markets, POS, apps, plans, eligibility, policies), call searchShopifyHelp, then readShopifyHelpArticle on the best match, and base your answer on what the article says. Read a second article or follow a link inside one if the first doesn't cover it.",
-    "- Link the articles you used inline, for example [Setting up Shopify Payments](https://help.shopify.com/en/manual/payments/shopify-payments/onboarding). Only link URLs a tool returned.",
+    "- Before you look something up, write one short sentence saying what you'll check (for example \"I'll check the setup guidance and suggest the best place to start.\"), then call the tools.",
+    "- Don't paste article links into your answer. The articles you read are shown to the merchant as source chips under it.",
     "- If the Help Center doesn't cover something, say so plainly and give your best general guidance, labeled as such. Never invent settings, fees, limits, or deadlines.",
     "- Use searchShopifyDevDocs only for developer questions (APIs, Liquid, theme code, apps).",
     "- Don't look things up for greetings, opinions, or requests to change this admin.",
