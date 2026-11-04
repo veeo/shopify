@@ -56,7 +56,7 @@ export type Agent = {
   persona: string;
 };
 
-export type Chip = { label: string; tone: "secondary" | "primary" };
+export type Chip = { label: string; tone: "secondary" | "primary"; send?: boolean };
 
 export type Block =
   | { id: string; type: "text"; role: "user" | "assistant"; text: string; typed?: boolean }
@@ -572,6 +572,7 @@ function activeThread(agentId: string): Block[] {
         type: "text",
         role: "assistant",
         text: "This week: $184,600 in sales, 1,284 orders and 2.8% conversion. Sales are up 9%; orders are up 12%.",
+        typed: true,
       },
       { id: "c2", type: "text", role: "user", text: "Why are sales growing slower than orders?" },
       {
@@ -592,16 +593,59 @@ function activeThread(agentId: string): Block[] {
       },
     ];
   }
+  const greeting = activeGreetings[agentId];
   const item = catalog.find((agent) => agent.id === agentId);
+  if (!greeting) {
+    return [{ id: `${agentId}-intro`, type: "text", role: "assistant", text: item?.preview ?? "Ready when you are.", typed: true }];
+  }
   return [
+    { id: `${agentId}-intro`, type: "text", role: "assistant", text: greeting.text, typed: true },
     {
-      id: `${agentId}-intro`,
-      type: "text",
-      role: "assistant",
-      text: item?.preview ?? "Ready when you are.",
+      id: `${agentId}-intro-chips`,
+      type: "chips",
+      chips: greeting.asks.map((label, index) => ({ label, tone: index === 0 ? "primary" : "secondary", send: true })),
     },
   ];
 }
+
+const activeGreetings: Record<string, { text: string; asks: [string, string] }> = {
+  ideas: {
+    text: "I’ve been watching what first-time buyers put in their carts. A starter bundle — Cloud Headphones, a case, and a cable — could lift average order value without a discount. Want me to draft it?",
+    asks: ["Draft the starter bundle", "What else could we sell?"],
+  },
+  trends: {
+    text: "Searches for gift sets are climbing this week, and shoppers keep pairing headphones with desk accessories. If we list a gift set now, we catch the holiday ramp early.",
+    asks: ["Which products fit a gift set?", "What’s driving the trend?"],
+  },
+  grok: {
+    text: "Shoppers on X keep asking whether the headphones come in a smaller size. Most of it is in the replies to your launch post, so one clear answer there would land with everyone.",
+    asks: ["Draft a reply for X", "Summarize what people are saying"],
+  },
+  slack: {
+    text: "Morning. I tightened the copy for your welcome email, and the team flagged two orders missing tracking in #ops. Want the draft or the rundown first?",
+    asks: ["Show me the email draft", "What did the team flag?"],
+  },
+  muse: {
+    text: "I have a direction for the lamp: a quieter campaign. One photo at dusk, one line about shipping tomorrow, nothing else. Want to riff on it?",
+    asks: ["Give me three headlines", "Name the campaign"],
+  },
+  store: {
+    text: "The Studio Desk Lamp page says it ships in 5–7 days, but the ads promise this week. That mismatch is probably costing you checkouts. I can tighten the delivery copy.",
+    asks: ["Rewrite the delivery copy", "What else on the storefront needs work?"],
+  },
+  agentic: {
+    text: "Orders from AI shopping agents bunch up around lunch, and that rush is pushing delivery promises late. Capping same-day delivery at noon would keep the promises honest.",
+    asks: ["How would a noon cutoff work?", "What are agentic storefronts?"],
+  },
+  customers: {
+    text: "Repeat buyers keep asking for a loyalty perk. The smallest useful test is a $10 thank-you after someone’s second order. Want me to sketch it?",
+    asks: ["Sketch the loyalty perk", "How do customer segments work?"],
+  },
+  orders: {
+    text: "Two orders from yesterday still need tracking numbers. Everything else shipped on time. Want me to open them?",
+    asks: ["Open the orders", "How do I add tracking to an order?"],
+  },
+};
 
 export function activeState(storeName = "My Store"): PrototypeState {
   const base = setupState(storeName);
@@ -1015,7 +1059,7 @@ export function scriptedTurn(agentId: string, text: string, storeName: string): 
     orders: "Two orders still need tracking. I can open orders in the preview.",
     custom: "Tell me what you want this sidekick to take off your plate.",
   };
-  return { text: fallback[agentId] ?? fallback.sidekick, effects };
+  return { text: fallback[agentId] ?? (agentId.startsWith("custom-") ? fallback.custom : fallback.sidekick), effects };
 }
 
 export type Action =
@@ -1184,6 +1228,7 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
             type: "text",
             role: "assistant",
             text: `${verb} ${source.name}. ${source.preview}`,
+            typed: true,
           },
         ];
         next.selectedAgentId = action.id;
@@ -1214,6 +1259,7 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
           text: action.purpose.trim()
             ? `I’m ${name}. I’ll ${action.purpose.trim().replace(/\.$/, "")}. What should we do first?`
             : `I’m ${name}. Tell me what you want me to take on.`,
+          typed: true,
         },
       ];
       next.selectedAgentId = slug;

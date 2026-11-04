@@ -151,9 +151,24 @@ export function ChatColumn({
           <div className="flex max-w-[640px] flex-col gap-2">
             {visibleBlocks(thread, typedDone).map((block) =>
               block.type === "text" && block.typed && !typedDone.has(block.id) ? (
-                <TypeOut key={block.id} text={block.text} instant={!state.motion} onDone={() => markTyped(block.id)} />
+                <TypeOut
+                  key={block.id}
+                  text={block.text}
+                  instant={!state.motion}
+                  delay={block.id === "hello" ? 1100 : 350}
+                  onDone={() => markTyped(block.id)}
+                />
               ) : (
-                <BlockView key={block.id} block={block} state={state} onChip={onChip} onCreate={onCreate} />
+                <BlockView
+                  key={block.id}
+                  block={block}
+                  state={state}
+                  onChip={onChip}
+                  onAsk={(text) => {
+                    if (!busy) onSend(text);
+                  }}
+                  onCreate={onCreate}
+                />
               ),
             )}
             {liveText ? (
@@ -326,11 +341,13 @@ function BlockView({
   block,
   state,
   onChip,
+  onAsk,
   onCreate,
 }: {
   block: Block;
   state: PrototypeState;
   onChip: (label: string) => void;
+  onAsk: (text: string) => void;
   onCreate: (name: string, purpose: string) => void;
 }) {
   if (block.type === "text" && block.role === "user") {
@@ -353,7 +370,12 @@ function BlockView({
     return (
       <div className="rise flex flex-wrap gap-2 py-1">
         {block.chips.map((chip) => (
-          <ChipButton key={chip.label} label={chip.label} tone={chip.tone} onClick={() => onChip(chip.label)} />
+          <ChipButton
+            key={chip.label}
+            label={chip.label}
+            tone={chip.tone}
+            onClick={() => (chip.send ? onAsk(chip.label) : onChip(chip.label))}
+          />
         ))}
       </div>
     );
@@ -535,8 +557,22 @@ function visibleBlocks(thread: Block[], done: Set<string>) {
   return pending === -1 ? thread : thread.slice(0, pending + 1);
 }
 
-function TypeOut({ text, instant, onDone }: { text: string; instant: boolean; onDone: () => void }) {
+function TypeOut({
+  text,
+  instant,
+  delay,
+  onDone,
+}: {
+  text: string;
+  instant: boolean;
+  delay: number;
+  onDone: () => void;
+}) {
   const [count, setCount] = useState(0);
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  });
   useEffect(() => {
     const reduce = instant || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let shown = 0;
@@ -545,15 +581,15 @@ function TypeOut({ text, instant, onDone }: { text: string; instant: boolean; on
       shown = reduce ? text.length : Math.min(text.length, shown + 2);
       setCount(shown);
       if (shown >= text.length) {
-        onDone();
+        done.current();
         return;
       }
       const pause = /[.!?]\s*$/.test(text.slice(0, shown)) ? 220 : 16;
       timer = window.setTimeout(tick, pause);
     };
-    timer = window.setTimeout(tick, reduce ? 0 : 1100);
+    timer = window.setTimeout(tick, reduce ? 0 : delay);
     return () => window.clearTimeout(timer);
-  }, [text, instant, onDone]);
+  }, [text, instant, delay]);
   return (
     <p className="max-w-[560px] whitespace-pre-wrap py-2 text-[15px] leading-[1.4] tracking-[-0.15px]" aria-label={text}>
       <span aria-hidden>{text.slice(0, count)}</span>
