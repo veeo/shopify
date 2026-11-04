@@ -11,6 +11,7 @@ import {
 } from "ai";
 import { z } from "zod";
 import { businessTypes, personaFor, previewPages, scriptedTurn } from "@/lib/prototype";
+import { readHelpArticle, searchDevDocs, searchHelpCenter } from "@/lib/shopify-help";
 
 export const maxDuration = 60;
 
@@ -18,6 +19,26 @@ const previewSchema = z.enum(previewPages);
 const businessSchema = z.enum(businessTypes);
 
 const tools = {
+  searchShopifyHelp: tool({
+    description:
+      "Search the Shopify Help Center (help.shopify.com) for merchant documentation. Returns article titles, URLs, and one-line summaries. Follow up with readShopifyHelpArticle before answering.",
+    inputSchema: z.object({ query: z.string().min(2).describe("Plain-language search, e.g. 'Shopify Payments payout schedule'") }),
+    execute: async ({ query }) => {
+      const results = searchHelpCenter(query);
+      return results.length ? { results } : { results, note: "No matches. Try different words or a broader topic." };
+    },
+  }),
+  readShopifyHelpArticle: tool({
+    description:
+      "Read a Shopify Help Center article as Markdown. Accepts any help.shopify.com/en/manual URL, including links found inside other articles.",
+    inputSchema: z.object({ url: z.string() }),
+    execute: async ({ url }) => readHelpArticle(url),
+  }),
+  searchShopifyDevDocs: tool({
+    description: "Search shopify.dev developer docs (APIs, Liquid, themes, apps, Functions). Only for developer questions.",
+    inputSchema: z.object({ query: z.string().min(2) }),
+    execute: async ({ query }) => searchDevDocs(query),
+  }),
   navigatePreview: tool({
     description: "Open a page in the live Shopify admin preview. Set wide when the merchant needs the payments form.",
     inputSchema: z.object({
@@ -85,26 +106,56 @@ function scriptedResponse(agentId: string, text: string, storeName: string) {
 }
 
 function chatModel(request: Request): LanguageModel | null {
-  if (process.env.ANTHROPIC_API_KEY) return anthropic(process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5");
+  if (process.env.ANTHROPIC_API_KEY) return anthropic(process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5");
   if (process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN || request.headers.has("x-vercel-oidc-token")) {
     return process.env.AI_GATEWAY_MODEL || "anthropic/claude-sonnet-5.5";
   }
   return null;
 }
 
+type PrototypeContext = {
+  agentId?: string;
+  agentName?: string;
+  persona?: string;
+  storeName?: string;
+  preview?: string;
+  scenario?: string;
+  products?: string[];
+};
+
+function systemPrompt(context: PrototypeContext | undefined, persona: string, storeName: string) {
+  const name = context?.agentName || "Sidekick";
+  return [
+    persona,
+    `Your name in this conversation is ${name}. You work inside the Shopify admin for ${storeName}, alongside the merchant.`,
+    "",
+    "How to talk:",
+    "- Sound like a sharp, warm colleague who knows Shopify inside out, not a help-desk script. Answer the actual question first, then the detail that matters.",
+    "- Match length to the question. Small talk gets a sentence or two. How-to questions get a short walkthrough.",
+    "- Use Markdown lightly: numbered steps for procedures, **bold** for admin labels and buttons, inline links. No headings, no tables.",
+    "- Skip filler like \"Great question\" or \"I hope this helps\". Ask a follow-up question when you genuinely need one.",
+    "",
+    "Getting facts right:",
+    "- For anything about how Shopify works (payments, payouts, fees, shipping, taxes, domains, checkout, markets, POS, apps, plans, eligibility, policies), call searchShopifyHelp, then readShopifyHelpArticle on the best match, and base your answer on what the article says. Read a second article or follow a link inside one if the first doesn't cover it.",
+    "- Link the articles you used inline, for example [Setting up Shopify Payments](https://help.shopify.com/en/manual/payments/shopify-payments/onboarding). Only link URLs a tool returned.",
+    "- If the Help Center doesn't cover something, say so plainly and give your best general guidance, labeled as such. Never invent settings, fees, limits, or deadlines.",
+    "- Use searchShopifyDevDocs only for developer questions (APIs, Liquid, theme code, apps).",
+    "- Don't look things up for greetings, opinions, or requests to change this admin.",
+    "",
+    "This admin:",
+    "- It's a prototype with sample data. Use the admin tools to change the preview, payments form, catalog, and sidekick list when the merchant asks you to do something. Never claim you changed something unless you called the tool.",
+    `- Scenario: ${context?.scenario ?? "setup"}. Page open in the preview: ${context?.preview ?? "home-setup"}.`,
+    context?.products?.length ? `- Catalog: ${context.products.slice(0, 30).join(", ")}.` : "",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+}
+
 export async function POST(request: Request) {
   let body: {
     messages?: UIMessage[];
     transcript?: { role: "user" | "assistant"; content: string }[];
-    prototype?: {
-      agentId?: string;
-      agentName?: string;
-      persona?: string;
-      storeName?: string;
-      preview?: string;
-      scenario?: string;
-      products?: string[];
-    };
+    prototype?: PrototypeContext;
   };
   try {
     body = await request.json();
@@ -133,19 +184,10 @@ export async function POST(request: Request) {
   try {
     const result = streamText({
       model,
-      system: [
-        persona,
-        body.prototype?.agentName ? `Your name in this chat is ${body.prototype.agentName}.` : "",
-        "You are inside a Shopify admin prototype. Use tools to change the preview, payments form, catalog, and sidekick list. Do not claim you changed something unless you called the tool.",
-        "Write two to six short sentences in plain text. No markdown, bullets, or headings.",
-        `Store: ${storeName}. Scenario: ${body.prototype?.scenario ?? "setup"}. Preview: ${body.prototype?.preview ?? "home-setup"}.`,
-        body.prototype?.products?.length ? `Catalog: ${body.prototype.products.slice(0, 30).join(", ")}.` : "",
-      ]
-        .filter(Boolean)
-        .join("\n"),
+      system: systemPrompt(body.prototype, persona, storeName),
       messages: await convertToModelMessages(messages),
       tools,
-      stopWhen: stepCountIs(4),
+      stopWhen: stepCountIs(8),
     });
     return result.toUIMessageStreamResponse({
       onError: (error) => {
