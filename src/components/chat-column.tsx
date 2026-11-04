@@ -394,7 +394,7 @@ function BlockView({
                     done ? "bg-[#003800] text-[#00ff00]" : "bg-[#2e302d]"
                   }`}
                 >
-                  {done ? <PIcon name="Check" size={16} /> : step.n}
+                  {done ? <PIcon name="Check" size={20} /> : step.n}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] leading-[1.4] tracking-[-0.15px]">{step.title}</span>
@@ -416,7 +416,7 @@ function BlockView({
         <div>
           <p className="text-[15px]">Your best sellers</p>
           <p className="flex items-center gap-0.5 text-[15px] text-[#8e8f8b]">
-            Last 30 days <PIcon name="ChevronDown" size={16} />
+            Last 30 days <PIcon name="ChevronDown" size={20} />
           </p>
         </div>
         {sellers.map((item) => (
@@ -479,7 +479,7 @@ function AddGrid({ onAdd, onChip }: { onAdd: (id: string) => void; onChip: (labe
         Sidekicks are AI agents that get things done for you. Choose one below or create your own.
       </p>
       <p className="mb-3 flex items-center gap-0.5 text-[15px] text-[#8e8f8b]">
-        Recommended <PIcon name="ChevronDown" size={16} />
+        Recommended <PIcon name="ChevronDown" size={20} />
       </p>
       <div className="grid grid-cols-3 gap-3">
         {cards.map((card, index) => {

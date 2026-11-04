@@ -16,7 +16,7 @@ const items: RailItem[] = [
   { id: "finance", label: "Finance", icon: "Finance", filled: "FinanceFilled" },
   { id: "content", label: "Content", icon: "Content", filled: "ContentFilled" },
   { id: "divider-1", divider: true },
-  { id: "online-store", label: "Online Store", icon: "Store", filled: "StoreFilled" },
+  { id: "online-store", label: "Online Store", icon: "StoreOnline", filled: "StoreOnline" },
   { id: "divider-2", divider: true },
   { id: "email", label: "Email", icon: "Email", filled: "Email" },
 ];

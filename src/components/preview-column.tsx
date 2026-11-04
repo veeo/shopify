@@ -184,7 +184,7 @@ function Screen(props: {
           rows={[
             { icon: "Clock", label: "Trial ends in 1 day", meta: "Pick a plan to keep selling", badge: "Action" },
             { icon: "Money", label: "Payout of $2,184.60 is on the way", meta: "Today at 8:00 AM", go: () => nav.onRail("finance") },
-            { icon: "Package", label: "2 orders need tracking", meta: "Fulfillment", go: () => nav.onRail("customers") },
+            { icon: "Delivery", label: "2 orders need tracking", meta: "Fulfillment", go: () => nav.onRail("customers") },
           ]}
         />
       );
@@ -207,7 +207,7 @@ function Screen(props: {
           onHome={home}
           rows={[
             { icon: "Email", label: "Welcome back", meta: "Email · Draft", badge: "Draft" },
-            { icon: "DiscountFilled", label: "Headphones bundle", meta: "Discount · Paused" },
+            { icon: "Discount", label: "Headphones bundle", meta: "Discount · Paused" },
             { icon: "Target", label: "Gift sets", meta: "Campaign · This week", badge: "Live" },
           ]}
         />
@@ -232,9 +232,9 @@ function Screen(props: {
           title="Content"
           onHome={home}
           rows={[
-            { icon: "Content", label: "Homepage hero", meta: "Metaobject" },
-            { icon: "Content", label: "Lamp delivery note", meta: "Page" },
-            { icon: "Content", label: "About the studio", meta: "Page" },
+            { icon: "Metaobject", label: "Homepage hero", meta: "Metaobject" },
+            { icon: "Page", label: "Lamp delivery note", meta: "Page" },
+            { icon: "Page", label: "About the studio", meta: "Page" },
           ]}
         />
       );
@@ -245,9 +245,9 @@ function Screen(props: {
           onHome={home}
           rows={[
             { icon: "Theme", label: "Themes", meta: "PITCH · Draft", go: () => nav.onPreview("theme") },
-            { icon: "Content", label: "Pages", meta: "4 pages" },
-            { icon: "MenuHorizontal", label: "Navigation", meta: "Main menu" },
-            { icon: "Globe", label: "Domains", meta: "mystore.myshopify.com", go: () => nav.onPreview("domain") },
+            { icon: "Page", label: "Pages", meta: "4 pages" },
+            { icon: "Menu", label: "Navigation", meta: "Main menu" },
+            { icon: "Domain", label: "Domains", meta: "mystore.myshopify.com", go: () => nav.onPreview("domain") },
           ]}
         />
       );
@@ -270,10 +270,10 @@ function Screen(props: {
           onHome={home}
           rows={[
             { icon: "Store", label: "Store details", meta: "My Store" },
-            { icon: "Clock", label: "Plan", meta: "Trial · 1 day left", badge: "Action" },
+            { icon: "Plan", label: "Plan", meta: "Trial · 1 day left", badge: "Action" },
             { icon: "Payment", label: "Payments", meta: "Shopify Payments", go: () => nav.onPreview("payments") },
-            { icon: "DeliveryFilled", label: "Shipping and delivery", meta: "2 rates", go: () => nav.onPreview("shipping") },
-            { icon: "LocationFilled", label: "Locations", meta: "1 location", go: () => nav.onPreview("address") },
+            { icon: "Delivery", label: "Shipping and delivery", meta: "2 rates", go: () => nav.onPreview("shipping") },
+            { icon: "Location", label: "Locations", meta: "1 location", go: () => nav.onPreview("address") },
           ]}
         />
       );
@@ -336,7 +336,7 @@ function BackPill({ onBack, onHome, icon = "Home" }: { onBack: () => void; onHom
     <div className="flex">
       <span className="inline-flex h-8 items-center overflow-hidden rounded-full border border-[#e3e3e3] bg-white shadow-[0_3px_15px_rgba(0,0,0,0.03)]">
         <button type="button" aria-label="Back" onClick={onBack} className="press grid h-full place-items-center pl-2 pr-0.5 hover:bg-[#f7f7f7]">
-          <PIcon name="ChevronLeft" size={16} />
+          <PIcon name="ChevronLeft" size={20} />
         </button>
         <button type="button" aria-label="Home" onClick={onHome ?? onBack} className="press grid h-full place-items-center pl-1 pr-3 hover:bg-[#f7f7f7]">
           <PIcon name={icon} size={20} />
@@ -450,7 +450,12 @@ function SetupCard({ art, title, body, cta, onClick }: { art: ReactNode; title: 
           <p className="font-medium text-black">{title}</p>
           <p className="text-[#737572]">{body}</p>
         </div>
-        <Pill onClick={onClick}>{cta} →</Pill>
+        <Pill onClick={onClick}>
+          {cta}
+          <span className="-mr-1.5">
+            <PIcon name="ArrowRight" size={20} />
+          </span>
+        </Pill>
       </div>
     </Card>
   );
@@ -515,13 +520,13 @@ function HomeActive({ nav }: { nav: Nav }) {
               ))}
             </span>
             <span className="text-[#171817] transition-transform group-hover:translate-x-0.5">
-              <PIcon name="ChevronRight" size={16} />
+              <PIcon name="ChevronRight" size={20} />
             </span>
           </button>
         </div>
         <div className="-mr-8 flex gap-2 overflow-x-auto pr-8 [scrollbar-width:none]">
           <Pill tone="ink" onClick={() => setRange(next[range])} className="pl-3 pr-[13px]">
-            <PIcon name="Calendar" size={16} />
+            <PIcon name="Calendar" size={20} />
             {data.label}
           </Pill>
           <Pill tone="soft" className="px-[13px]">
@@ -557,7 +562,7 @@ function HomeActive({ nav }: { nav: Nav }) {
         <div className="flex flex-col">
           <Activity icon="Order" title="Danielle Hudson placed order #1078." meta="$369.99 · 3 items · 7 minutes ago" onClick={() => nav.onRail("customers")} />
           <Activity icon="Money" title="Your payout is on its way." meta="$2,184.60 · Today at 8:00 AM" onClick={() => nav.onRail("finance")} />
-          <Activity icon="Package" title="Order #1071 was delivered." meta="Maya Chen · Today at 7:42 AM" onClick={() => nav.onRail("customers")} />
+          <Activity icon="Delivery" title="Order #1071 was delivered." meta="Maya Chen · Today at 7:42 AM" onClick={() => nav.onRail("customers")} />
         </div>
       </section>
 
@@ -569,13 +574,13 @@ function HomeActive({ nav }: { nav: Nav }) {
           <Forward
             title="Your best seller is picking up speed"
             body="Flora Sneakers sales are up 32%. You have 126 units left across 8 variants."
-            cta="Review inventory →"
+            cta="Review inventory"
             onClick={() => nav.onRail("products")}
           />
           <Forward
             title="Bring customers back for a second look"
             body="Turn this month’s new shoppers into repeat customers with a welcome-back email."
-            cta="Plan a campaign with Sidekick →"
+            cta="Plan a campaign with Sidekick"
             onClick={() => nav.onRail("marketing")}
           />
         </div>
@@ -591,6 +596,9 @@ function Forward({ title, body, cta, onClick }: { title: string; body: string; c
       <p className="text-[12px] leading-[1.4] text-[#737572]">{body}</p>
       <button type="button" onClick={onClick} className="press text-left text-[12px] font-medium leading-[1.4] hover:underline">
         {cta}
+        <span className="-my-1 ml-0.5 inline-block align-middle">
+          <PIcon name="ArrowRight" size={20} />
+        </span>
       </button>
     </div>
   );
@@ -645,7 +653,10 @@ function Delta({ up, children }: { up: boolean; children: ReactNode }) {
         up ? "bg-[rgb(215,255,215)] text-black" : "bg-[#f4f5f3] text-[#787878]"
       }`}
     >
-      {up ? "↑" : "↓"} {children}
+      <span className="-my-1 -ml-1">
+        <PIcon name={up ? "ArrowUp" : "ArrowDown"} size={20} />
+      </span>
+      {children}
     </span>
   );
 }
@@ -779,7 +790,7 @@ const payPoints = [
 const configRows: { icon: PolarisIconName; label: string }[] = [
   { icon: "Payment", label: "Payment capture method" },
   { icon: "Settings", label: "Payment method customizations" },
-  { icon: "Clock", label: "Gift card expiration" },
+  { icon: "GiftCard", label: "Gift card expiration" },
   { icon: "Wallet", label: "Apple Wallet passes" },
 ];
 
@@ -797,7 +808,7 @@ function Payments({ nav }: { nav: Nav }) {
               {payPoints.map((point) => (
                 <li key={point} className="flex gap-2 text-[13px] leading-[1.4] tracking-[-0.13px] text-black">
                   <span className="mt-0.5 shrink-0">
-                    <PIcon name="Check" size={16} />
+                    <PIcon name="Check" size={20} />
                   </span>
                   {point}
                 </li>
@@ -841,7 +852,7 @@ function Payments({ nav }: { nav: Nav }) {
                 >
                   {row.label}
                   <span className="text-[#8a8a8a] transition-transform group-hover:translate-x-0.5">
-                    <PIcon name="ChevronRight" size={16} />
+                    <PIcon name="ChevronRight" size={20} />
                   </span>
                 </span>
               </button>
@@ -1041,7 +1052,7 @@ function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduc
 
       <div className="flex flex-col rounded-2xl bg-[#f4f5f3] px-4 pb-2.5 pt-4">
         <span className="mb-3 flex h-5 items-center gap-1.5 text-[12px] text-[#171817]">
-          <PIcon name="Calendar" size={16} />
+          <PIcon name="Calendar" size={20} />
           30 days
         </span>
         {[
@@ -1060,7 +1071,7 @@ function Products({ state, onProduct, onAdd }: { state: PrototypeState; onProduc
         <div className="flex h-9 items-center rounded-xl border border-[#e3e3e3] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus-within:border-[#171817]">
           <button type="button" className="press flex h-full items-center gap-0.5 pl-3 pr-2.5 text-[13px] font-medium">
             All
-            <PIcon name="ChevronDown" size={16} />
+            <PIcon name="ChevronDown" size={20} />
           </button>
           <span className="h-4 w-px bg-[#e3e3e3]" />
           <span className="pl-2.5 text-[#737572]">
@@ -1134,7 +1145,7 @@ function Thumb({ product, size = 40 }: { product: Product; size?: number }) {
   return (
     <span className={`grid shrink-0 place-items-center ${toneClass[product.tone]}`} style={{ width: size, height: size, borderRadius: radius }}>
       <span className="text-black/25">
-        <PIcon name="Image" size={Math.round(size * 0.5)} />
+        <PIcon name="Image" size={20} />
       </span>
     </span>
   );
@@ -1343,7 +1354,7 @@ function ListPage({ title, rows, onHome }: { title: string; rows: ListRow[]; onH
                 </span>
                 {row.badge ? <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${badgeClass[row.badge]}`}>{row.badge}</span> : null}
                 <span className="text-[#8a8a8a] transition-transform group-hover:translate-x-0.5">
-                  <PIcon name="ChevronRight" size={16} />
+                  <PIcon name="ChevronRight" size={20} />
                 </span>
               </span>
             </button>
