@@ -117,11 +117,11 @@ export function AgentNav({
                         aria-label={item.name}
                         title={item.name}
                         onClick={() => onSelect(item.id)}
-                        className={`press relative grid size-9 shrink-0 place-items-center rounded-full transition-shadow duration-150 ${
+                        className={`press relative grid size-8 shrink-0 place-items-center rounded-full transition-shadow duration-150 ${
                           selected ? "shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]" : "hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_rgba(255,255,255,0.25)]"
                         }`}
                       >
-                        <Orb id={item.orb} size={36} />
+                        <Orb id={item.orb} size={32} />
                         {item.unread > 0 ? (
                           <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-[#5631f4] text-[10px] font-medium text-white ring-2 ring-[#0c0d0c]">
                             {item.unread}
