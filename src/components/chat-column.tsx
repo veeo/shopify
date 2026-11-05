@@ -156,7 +156,7 @@ export function ChatColumn({
             ) : purpose ? (
               <Purpose state={state} onPurpose={onPurpose} onStart={onStart} onChip={onChip} />
             ) : (
-              <div className="flex max-w-[640px] flex-col gap-2">
+              <div className="flex w-full flex-col gap-2">
                 {visibleBlocks(thread, typedSettled).map((block, index, list) =>
                   block.type === "text" && block.typed && !typedSettled.has(block.id) ? (
                     <SimulatedTurn

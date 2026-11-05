@@ -20,6 +20,7 @@ import {
   TableSearch,
   Thumb,
   Toggle,
+  HeaderExtras,
   TopBar,
   type BarAction,
 } from "@/components/admin-ui";
@@ -746,13 +747,16 @@ function Analytics({ state, nav }: Props) {
       ]
     : ["Gross sales", "Discounts", "Sales reversals", "Net sales", "Shipping charges", "Return fees", "Taxes", "Total sales"].map((label) => [label, "$0.00"]);
   return (
-    <Shell
-      page="analytics"
-      nav={nav}
-      aside={<span className="truncate text-[12px] text-[#616161]">Last refreshed: 9:56 AM</span>}
-      actions={[{ label: "New exploration", tone: "primary" }]}
-      more={[{ label: "Try targets" }, { label: "Reports", onClick: () => nav.go("reports") }, { label: "Live View", onClick: () => nav.go("live-view") }]}
-    >
+    <>
+      <HeaderExtras>
+        <span className="min-w-0 truncate text-[12px] leading-4 text-[#616161]">Last refreshed: 9:56 AM</span>
+      </HeaderExtras>
+      <Shell
+        page="analytics"
+        nav={nav}
+        actions={[{ label: "New exploration", tone: "primary" }]}
+        more={[{ label: "Try targets" }, { label: "Reports", onClick: () => nav.go("reports") }, { label: "Live View", onClick: () => nav.go("live-view") }]}
+      >
       <s-banner tone="info">
         Beginning Sept 21, 2026, sessions and related metrics may shift as Shopify Analytics enables better visibility into real shopper activity. <s-link>Learn more</s-link>
       </s-banner>
@@ -821,6 +825,7 @@ function Analytics({ state, nav }: Props) {
         </div>
       </Card>
     </Shell>
+    </>
   );
 }
 

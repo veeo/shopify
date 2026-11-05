@@ -111,24 +111,22 @@ export function AgentNav({
       style={{ transition: `width ${move}` }}
     >
       <div className={`relative z-0 flex bg-transparent ${collapsed ? "flex-col items-center gap-4" : "items-center gap-1.5 pb-4 pl-2"}`}>
-        <Tip label={navOpen ? "Collapse navigation" : "Expand navigation"} keys={["Ctrl", "B"]} side="right" fixed>
-          <button
-            type="button"
-            data-flip="logo"
-            aria-label={navOpen ? "Collapse navigation" : "Expand navigation"}
-            aria-expanded={navOpen}
-            aria-keyshortcuts="Control+B Meta+B"
-            onClick={onToggleNav}
-            className={`group/logo press relative grid size-8 shrink-0 place-items-center rounded-full transition-colors hover:bg-white/[0.08] ${collapsed ? "mb-2" : ""}`}
-          >
-            <span className="transition-opacity duration-150 group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0">
-              <ShopifyMark />
-            </span>
-            <span className="absolute inset-0 grid place-items-center text-white opacity-0 transition-opacity duration-150 group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100">
-              <PIcon name="LayoutSidebarLeft" size={20} />
-            </span>
-          </button>
-        </Tip>
+        <button
+          type="button"
+          data-flip="logo"
+          aria-label={navOpen ? "Collapse navigation" : "Expand navigation"}
+          aria-expanded={navOpen}
+          aria-keyshortcuts="Control+B Meta+B"
+          onClick={onToggleNav}
+          className={`group/logo press relative grid size-8 shrink-0 place-items-center rounded-full transition-colors hover:bg-white/[0.08] ${collapsed ? "mb-2" : ""}`}
+        >
+          <span className="transition-opacity duration-150 group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0">
+            <ShopifyMark />
+          </span>
+          <span className="absolute inset-0 grid place-items-center text-white opacity-0 transition-opacity duration-150 group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100">
+            <PIcon name="LayoutSidebarLeft" size={20} />
+          </span>
+        </button>
         <span data-flip="add" className={collapsed ? "" : "ml-auto"}>
           <IconButton label="Add a sidekick" onClick={onAdd} active={state.mode === "add"}>
             <PIcon name="Plus" size={20} />
@@ -233,7 +231,7 @@ export function AgentNav({
       </div>
 
       {collapsed ? <div className="mx-auto mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
-      <div className={`flex ${collapsed ? "mt-6 flex-col items-center" : "h-12 items-center pl-2"}`}>
+      <div className={`mb-3 flex items-center ${collapsed ? "mt-6 flex-col" : "pl-2"}`}>
         <span className={`group/ids relative flex ${collapsed ? "flex-col items-center" : "items-center"}`} data-open={menu ? "" : undefined}>
           <span className="relative z-10" data-flip="account">
             <button

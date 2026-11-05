@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import type { PreviewId } from "@/lib/admin-nav";
 
-/** The right side of the panel's hamburger header. Pages portal companions into it. */
+/** The right side of the panel's hamburger header. Pages portal status notes and actions into it. */
 const HeaderSlot = createContext<HTMLElement | null>(null);
 
 export function HeaderSlotProvider({ slot, children }: { slot: HTMLElement | null; children: ReactNode }) {
