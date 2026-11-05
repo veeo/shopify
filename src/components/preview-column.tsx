@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
-import { AdminRail } from "@/components/admin-rail";
 import { Badge, Body, Btn, Card as AdminCard, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
+import { sectionChoices } from "@/lib/admin-nav";
 import type { BusinessType, PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
 
 type Nav = PageNav & {
@@ -77,23 +78,41 @@ export function PreviewColumn({
       }`}
       style={{ width: wide ? 584 : 393 }}
     >
-      <div
-        key={state.preview}
-        inert={menu ? true : undefined}
-        className={`${state.motion ? "page-in" : ""} h-full overflow-y-auto [scrollbar-width:none]`}
-      >
-        <Screen
-          state={state}
-          nav={nav}
-          onCard={onCard}
-          onDismissCard={onDismissCard}
-          onBusiness={onBusiness}
-          onIdentity={onIdentity}
-          onPaymentsNext={onPaymentsNext}
-          onProduct={onProduct}
-          onUpdateProduct={onUpdateProduct}
-          onAddProduct={onAddProduct}
-        />
+      <div className="h-full overflow-y-auto [scrollbar-width:none]">
+        {state.menuStyle === "push" ? (
+          <div
+            className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+              menu ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`}
+          >
+            <div className="overflow-hidden" inert={menu ? undefined : true}>
+              <div id={menu ? "admin-menu" : undefined} className="border-b border-[#ebebeb] px-6 pb-3 pt-[68px]">
+                <AdminMenu
+                  preview={state.preview}
+                  onOpen={(id) => nav.rail(id)}
+                  onSearch={(scope) => {
+                    setMenu(false);
+                    onSearch(scope);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+        <div key={state.preview} className={state.motion ? "page-in" : ""}>
+          <Screen
+            state={state}
+            nav={nav}
+            onCard={onCard}
+            onDismissCard={onDismissCard}
+            onBusiness={onBusiness}
+            onIdentity={onIdentity}
+            onPaymentsNext={onPaymentsNext}
+            onProduct={onProduct}
+            onUpdateProduct={onUpdateProduct}
+            onAddProduct={onAddProduct}
+          />
+        </div>
       </div>
       <button
         type="button"
@@ -112,36 +131,26 @@ export function PreviewColumn({
           </span>
         </span>
       </button>
-      <div className={`absolute inset-0 z-30 ${menu ? "" : "pointer-events-none"}`} inert={menu ? undefined : true}>
-        <button
-          type="button"
-          aria-label="Close admin menu"
-          tabIndex={menu ? 0 : -1}
-          onClick={() => setMenu(false)}
-          className={`absolute inset-0 bg-[#0c0d0c]/30 transition-opacity duration-300 motion-reduce:transition-none ${menu ? "opacity-100" : "opacity-0"}`}
-        />
-        <div
-          id="admin-menu"
-          role="dialog"
-          aria-label="Admin menu"
-          className={`p-partial-theme-admin-next-dark absolute inset-y-0 right-0 flex w-[260px] max-w-[calc(100%-48px)] rounded-l-2xl bg-[#0c0d0c] text-white shadow-[-16px_0_40px_rgba(0,0,0,0.22)] transition-[translate] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-            menu ? "translate-x-0" : "translate-x-full"
-          }`}
-        >
-          <AdminRail
-            embedded
-            revealed={menu}
-            expanded
-            preview={state.preview}
-            onOpen={(id) => nav.rail(id)}
-            onGo={(page) => nav.go(page)}
-            onSearch={(scope) => {
-              setMenu(false);
-              onSearch(scope);
-            }}
-          />
-        </div>
-      </div>
+      {state.menuStyle === "drop" && menu ? (
+        <>
+          <button type="button" aria-label="Close admin menu" onClick={() => setMenu(false)} className="absolute inset-0 z-20" />
+          <div
+            id="admin-menu"
+            role="menu"
+            aria-label="Admin menu"
+            className="pop-in absolute inset-x-6 top-[68px] z-30 max-h-[calc(100%-88px)] overflow-y-auto rounded-2xl bg-white p-2 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.16)]"
+          >
+            <AdminMenu
+              preview={state.preview}
+              onOpen={(id) => nav.rail(id)}
+              onSearch={(scope) => {
+                setMenu(false);
+                onSearch(scope);
+              }}
+            />
+          </div>
+        </>
+      ) : null}
     </aside>
   );
 }
@@ -916,9 +925,8 @@ const configRows: { icon: PolarisIconName; label: string }[] = [
 function Payments({ nav }: { nav: Nav }) {
   return (
     <>
-      <TopBar back="Settings" onBack={() => nav.go("settings")} title="Settings" />
+      <TopBar title="Payments" sections={sectionChoices("payments") ?? undefined} current="payments" onSection={(page) => nav.go(page)} />
       <Body>
-        <h2 className="pt-2 text-[20px] font-bold leading-7 tracking-[-0.3px]">Payments</h2>
         <Section
           title="Shopify Payments"
           aside={
@@ -1006,10 +1014,12 @@ function Products({ state, onProduct, onAdd, nav }: { state: PrototypeState; onP
   return (
     <>
       <TopBar
-        icon="Product"
         title="Products"
+        sections={sectionChoices("products") ?? undefined}
+        current="products"
+        onSection={(page) => nav.go(page)}
         actions={[{ label: "Add product", tone: "primary", onClick: onAdd }]}
-        more={[{ label: "View as" }, { label: "Import" }, { label: "Export" }, { label: "Collections", onClick: () => nav.go("collections") }, { label: "Inventory", onClick: () => nav.go("inventory") }]}
+        more={[{ label: "View as" }, { label: "Import" }, { label: "Export" }]}
       />
       <Body>
         <AdminCard flush>

@@ -83,10 +83,13 @@ export type Effect =
   | { type: "artifact"; name: "payments-plan" | "best-sellers" }
   | { type: "purpose-mode" };
 
+export type MenuStyle = "push" | "drop";
+
 export type PrototypeState = {
   signedIn: boolean;
   storeName: string;
   scenario: Scenario;
+  menuStyle: MenuStyle;
   agents: Agent[];
   selectedAgentId: string;
   threads: Record<string, Block[]>;
@@ -619,6 +622,7 @@ export function setupState(storeName = "My Store"): PrototypeState {
     signedIn: false,
     storeName,
     scenario: "setup",
+    menuStyle: "push",
     agents: [kick],
     selectedAgentId: "sidekick",
     threads: {
@@ -1167,6 +1171,7 @@ export type Action =
   | { type: "toggle-search" }
   | { type: "search"; query: string }
   | { type: "scenario"; scenario: Scenario }
+  | { type: "menu-style"; style: MenuStyle }
   | { type: "reset" }
   | { type: "chip"; label: string }
   | { type: "user"; agentId: string; text: string }
@@ -1215,7 +1220,10 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       return next;
     }
     case "boot-active":
-      return { ...activeState(state.storeName), motion: state.motion };
+      return { ...activeState(state.storeName), motion: state.motion, menuStyle: state.menuStyle };
+    case "menu-style":
+      next.menuStyle = action.style;
+      return next;
     case "select": {
       if (!next.agents.some((item) => item.id === action.id && item.installed)) return state;
       next.selectedAgentId = action.id;
@@ -1238,12 +1246,12 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       return next;
     case "scenario":
       return action.scenario === "active"
-        ? { ...activeState(next.storeName), motion: true, signedIn: true }
-        : { ...setupState(next.storeName), motion: true, signedIn: true };
+        ? { ...activeState(next.storeName), motion: true, signedIn: true, menuStyle: state.menuStyle }
+        : { ...setupState(next.storeName), motion: true, signedIn: true, menuStyle: state.menuStyle };
     case "reset":
       return state.scenario === "active"
-        ? { ...activeState(state.storeName), motion: state.motion, signedIn: true }
-        : { ...setupState(state.storeName), motion: state.motion, signedIn: true };
+        ? { ...activeState(state.storeName), motion: state.motion, signedIn: true, menuStyle: state.menuStyle }
+        : { ...setupState(state.storeName), motion: state.motion, signedIn: true, menuStyle: state.menuStyle };
     case "chip":
       return revealNew(next, () => runChip(next, action.label));
     case "user": {

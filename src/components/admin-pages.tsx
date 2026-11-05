@@ -24,7 +24,7 @@ import {
   type BarAction,
 } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
-import { navFor, pageMeta, settingsNav, type PreviewId } from "@/lib/admin-nav";
+import { navFor, pageMeta, sectionChoices, settingsNav, type PreviewId } from "@/lib/admin-nav";
 import type { PrototypeState } from "@/lib/prototype";
 
 export type PageNav = {
@@ -55,16 +55,19 @@ function Shell({
   children: ReactNode;
 }) {
   const meta = pageMeta(page);
+  const sections = sectionChoices(page);
   return (
     <>
       <TopBar
-        icon={meta.icon}
         title={meta.title}
         back={back?.label}
         onBack={back ? () => nav.go(back.page) : undefined}
         actions={actions}
         more={more}
         aside={aside}
+        sections={sections ?? undefined}
+        current={page}
+        onSection={(next) => nav.go(next)}
       />
       <Body>{children}</Body>
     </>
@@ -663,7 +666,6 @@ function Finance({ state, nav }: Props) {
   const active = state.scenario === "active";
   return (
     <Shell page="finance" nav={nav} actions={[{ label: "Pay bills" }]} more={[{ label: "Documents" }]}>
-      <H1>Finance</H1>
       <Section title={<span className="flex items-center gap-1">Payout balance <PIcon name="Info" size={16} /></span>}>
         <Card className="flex items-start justify-between gap-3">
           <span className="flex flex-col gap-6">
@@ -1448,7 +1450,7 @@ function Segments({ nav }: Props) {
 function SettingsHome({ state, nav }: Props) {
   return (
     <>
-      <TopBar back="Settings" onBack={() => nav.rail("home")} title="Settings" />
+      <TopBar title="Settings" />
       <Body>
         <SearchField placeholder="Search settings" />
         <Card flush>
@@ -1470,11 +1472,18 @@ function SettingsHome({ state, nav }: Props) {
 }
 
 function SettingsShell({ page, nav, title, children, aside }: { page: PreviewId; nav: PageNav; title?: ReactNode; aside?: ReactNode; children: ReactNode }) {
+  const sections = sectionChoices(page);
   return (
     <>
-      <TopBar back="Settings" onBack={() => nav.go("settings")} title="Settings" />
+      <TopBar
+        title={page === "settings-general" ? "General" : pageMeta(page).title}
+        sections={sections ?? undefined}
+        current={page}
+        onSection={(next) => nav.go(next)}
+        aside={title ? undefined : aside}
+      />
       <Body>
-        <H1 aside={aside}>{title ?? pageMeta(page).title}</H1>
+        {title ? <H1 aside={aside}>{title}</H1> : null}
         {children}
       </Body>
     </>

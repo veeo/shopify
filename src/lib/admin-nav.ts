@@ -283,3 +283,27 @@ export function pageMeta(page: PreviewId): { title: string; icon: PolarisIconNam
 export function findNav(id: string) {
   return allNav.find((item) => item.id === id) ?? null;
 }
+
+/** Pages you can switch between from the large title on this page. */
+export function sectionChoices(page: PreviewId): { label: string; page: PreviewId }[] | null {
+  if (page === "product" || page === "payments-setup" || page === "home-setup" || page === "home-active" || page === "settings") {
+    return null;
+  }
+  for (const item of allNav) {
+    if (item.page === "home") continue;
+    const pages: { label: string; page: PreviewId }[] = [];
+    const seen = new Set<string>();
+    const add = (label: string, id: PreviewId) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      pages.push({ label, page: id });
+    };
+    add(item.label, item.page);
+    for (const child of item.children ?? []) add(child.label, child.page);
+    if (seen.has(page) && pages.length > 1) return pages;
+  }
+  if (page === "settings-general" || settingsNav.some((row) => row.page === page)) {
+    return [{ label: "General", page: "settings-general" }, ...settingsNav.map((row) => ({ label: row.label, page: row.page }))];
+  }
+  return null;
+}

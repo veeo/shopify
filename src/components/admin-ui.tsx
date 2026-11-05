@@ -2,19 +2,22 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
+import type { PreviewId } from "@/lib/admin-nav";
 
 /* Top bar: page icon + 13px title on the left, actions on the right; sub-pages show "‹ Parent". */
 
 export type BarAction = { label: string; tone?: "primary" | "white" | "gray"; icon?: PolarisIconName; onClick?: () => void; disabled?: boolean };
 
 export function TopBar({
-  icon,
   title,
   back,
   onBack,
   actions = [],
   more = [],
   aside,
+  sections,
+  current,
+  onSection,
 }: {
   icon?: PolarisIconName;
   title: ReactNode;
@@ -23,33 +26,83 @@ export function TopBar({
   actions?: BarAction[];
   more?: { label: string; onClick?: () => void }[];
   aside?: ReactNode;
+  sections?: { label: string; page: PreviewId }[];
+  current?: PreviewId;
+  onSection?: (page: PreviewId) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const menu = useRef<HTMLSpanElement>(null);
+  useDismiss(open, menu, () => setOpen(false));
+  const hasActions = actions.length > 0 || more.length > 0;
   return (
-    <header className="sticky top-0 z-20 flex shrink-0 items-center gap-2 bg-white/95 pb-3 pl-6 pr-[72px] pt-7 backdrop-blur-sm">
-      {back ? (
-        <button
-          type="button"
-          onClick={onBack}
-          className="press -ml-1.5 flex min-w-0 items-center gap-0.5 rounded-lg py-1 pl-0.5 pr-1.5 text-[13px] font-semibold text-[#303030] hover:bg-[#f1f1f1]"
-        >
-          <PIcon name="ChevronLeft" size={20} />
-          <span className="truncate">{back}</span>
-        </button>
+    <header className="sticky top-0 z-20 bg-white/95 pt-7 backdrop-blur-sm">
+      <div className="flex h-8 items-center gap-2 pl-6 pr-[72px]">
+        {back ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="press -ml-1 flex min-w-0 items-center gap-0.5 rounded-lg py-1 pl-0.5 pr-1.5 text-[13px] font-semibold text-[#303030] hover:bg-[#f1f1f1]"
+          >
+            <PIcon name="ChevronLeft" size={20} />
+            <span className="truncate">{back}</span>
+          </button>
+        ) : sections && sections.length > 0 ? (
+          <span ref={menu} className="relative min-w-0">
+            <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={open}
+              onClick={() => setOpen((value) => !value)}
+              className="press flex min-w-0 items-center gap-1 rounded-lg py-0.5 pr-1 text-left hover:bg-[#f6f6f6]"
+            >
+              <h2 className="truncate text-[22px] font-medium leading-8 tracking-[-0.44px] text-[#171817]">{title}</h2>
+              <span className={`shrink-0 text-[#616161] transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
+                <PIcon name="ChevronDown" size={16} />
+              </span>
+            </button>
+            {open ? (
+              <span
+                role="menu"
+                className="pop-in absolute left-0 top-full z-30 mt-1 flex max-h-64 w-56 flex-col overflow-y-auto rounded-xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.14)]"
+              >
+                {sections.map((item) => {
+                  const on = item.page === current;
+                  return (
+                    <button
+                      key={item.page}
+                      type="button"
+                      role="menuitem"
+                      aria-current={on ? "page" : undefined}
+                      onClick={() => {
+                        setOpen(false);
+                        onSection?.(item.page);
+                      }}
+                      className={`press rounded-lg px-2.5 py-1.5 text-left text-[13px] ${on ? "bg-[#f1f1f1] font-medium text-[#171817]" : "text-[#303030] hover:bg-[#f6f6f6]"}`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </span>
+            ) : null}
+          </span>
+        ) : (
+          <h2 className="min-w-0 truncate text-[22px] font-medium leading-8 tracking-[-0.44px] text-[#171817]">{title}</h2>
+        )}
+        {aside}
+      </div>
+      {hasActions ? (
+        <div className="flex items-center justify-end gap-1.5 px-6 pb-3 pt-2">
+          {more.length > 0 ? <MoreMenu items={more} /> : null}
+          {actions.map((action) => (
+            <Btn key={action.label} tone={action.tone ?? "white"} icon={action.icon} onClick={action.onClick} disabled={action.disabled}>
+              {action.label}
+            </Btn>
+          ))}
+        </div>
       ) : (
-        <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold text-[#303030]">
-          {icon ? <PIcon name={icon} size={20} /> : null}
-          <span className="truncate">{title}</span>
-        </span>
+        <div className="h-3" />
       )}
-      {aside}
-      <span className="ml-auto flex shrink-0 items-center gap-1.5">
-        {more.length > 0 ? <MoreMenu items={more} /> : null}
-        {actions.map((action) => (
-          <Btn key={action.label} tone={action.tone ?? "white"} icon={action.icon} onClick={action.onClick} disabled={action.disabled}>
-            {action.label}
-          </Btn>
-        ))}
-      </span>
     </header>
   );
 }

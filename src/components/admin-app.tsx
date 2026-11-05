@@ -205,6 +205,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onSearch={() => dispatch({ type: "toggle-search" })}
           onQuery={(query) => dispatch({ type: "search", query })}
           onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
+          onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
         />
         <div className="my-3 w-px shrink-0 bg-white/10" />
         <ChatColumn

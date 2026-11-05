@@ -26,6 +26,7 @@ export function AgentNav({
   onSearch,
   onQuery,
   onScenario,
+  onMenuStyle,
   onSettings,
   onLogout,
 }: {
@@ -39,6 +40,7 @@ export function AgentNav({
   onSearch: () => void;
   onQuery: (query: string) => void;
   onScenario: (scenario: "setup" | "active") => void;
+  onMenuStyle: (style: "push" | "drop") => void;
 }) {
   const agents = visibleAgents(state);
   const [menu, setMenu] = useState<"account" | "store" | null>(null);
@@ -250,11 +252,13 @@ export function AgentNav({
               <AccountMenu
                 storeName={state.storeName}
                 scenario={state.scenario}
+                menuStyle={state.menuStyle}
                 className={collapsed ? "bottom-0 left-[calc(100%+10px)] origin-bottom-left" : "bottom-[calc(100%+8px)] left-0 origin-bottom-left"}
                 onClose={() => setMenu(null)}
                 onSettings={onSettings}
                 onLogout={onLogout}
                 onScenario={onScenario}
+                onMenuStyle={onMenuStyle}
               />
             ) : null}
           </span>

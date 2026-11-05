@@ -397,19 +397,23 @@ export function StoreMenu({
 export function AccountMenu({
   storeName,
   scenario,
+  menuStyle,
   className,
   onClose,
   onSettings,
   onLogout,
   onScenario,
+  onMenuStyle,
 }: {
   storeName: string;
   scenario: "setup" | "active";
+  menuStyle: "push" | "drop";
   className: string;
   onClose: () => void;
   onSettings: () => void;
   onLogout: () => void;
   onScenario: (scenario: "setup" | "active") => void;
+  onMenuStyle: (style: "push" | "drop") => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(true, ref, onClose);
@@ -463,6 +467,30 @@ export function AccountMenu({
             </button>
           );
         })}
+      </div>
+      <div className="px-1 pb-1">
+        <p className="px-1 pb-1 text-[11px] text-[#616161]">Navigation</p>
+        <div role="group" aria-label="Navigation" className="grid grid-cols-2 gap-1">
+          {(
+            [
+              ["push", "Push down"],
+              ["drop", "Dropdown"],
+            ] as const
+          ).map(([value, label]) => {
+            const on = menuStyle === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={on}
+                onClick={() => onMenuStyle(value)}
+                className={`rounded-lg px-2 py-1.5 text-[12px] ${on ? "bg-[#303030] font-semibold text-white" : "text-[#303030] hover:bg-[#f1f1f1]"}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
