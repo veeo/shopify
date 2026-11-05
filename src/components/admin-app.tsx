@@ -5,7 +5,7 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
-import { Orb, ShopifyMark } from "@/components/marks";
+import { Orb } from "@/components/marks";
 import { PreviewColumn } from "@/components/preview-column";
 import { AdminRail } from "@/components/admin-rail";
 import { SearchPalette } from "@/components/search-palette";
@@ -25,25 +25,37 @@ import {
 } from "@/lib/prototype";
 import { segmentsOf, sourcesOf } from "@/lib/turn";
 
+const bootMs = 1500;
+
 type Turn = { agentId: string; text: string; done: boolean; first: boolean };
 
 export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "setup" | "active" }) {
   const [state, setState] = useState<PrototypeState>(() =>
-    initialScenario === "active" ? activeState() : setupState(),
+    initialScenario === "active" ? activeState() : { ...setupState(), signedIn: true },
   );
-  const [booting, setBooting] = useState(false);
+  const [booting, setBooting] = useState(true);
   const [offline, setOffline] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [palette, setPalette] = useState<{ open: boolean; scope?: string }>({ open: false });
-  const [liveAgentId, setLiveAgentId] = useState<string | null>(null);
+  // The turn being streamed. Cleared in the same update that commits its reply, so the live view and
+  // the committed message swap in one render instead of leaving a blank frame between them.
+  const [live, setLive] = useState<{ agentId: string; from: number } | null>(null);
   const bootTimer = useRef<number | null>(null);
 
   function enter(update: (current: PrototypeState) => PrototypeState) {
     setState(update);
     if (bootTimer.current) window.clearTimeout(bootTimer.current);
     setBooting(true);
-    bootTimer.current = window.setTimeout(() => setBooting(false), 980);
+    bootTimer.current = window.setTimeout(() => setBooting(false), bootMs);
   }
+
+  useEffect(() => {
+    bootTimer.current = window.setTimeout(() => setBooting(false), bootMs);
+    return () => {
+      if (bootTimer.current) window.clearTimeout(bootTimer.current);
+    };
+  }, []);
   const turn = useRef<Turn | null>(null);
   const applied = useRef(new Set<string>());
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
@@ -55,7 +67,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
       const key = event.key.toLowerCase();
       if (key === "b") {
         event.preventDefault();
-        setNavOpen((open) => !open);
+        setSidebarOpen((open) => !open);
       } else if (key === "k") {
         event.preventDefault();
         setPalette((current) => ({ open: !current.open }));
@@ -75,7 +87,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
       if (!pending || pending.done) return;
       setOffline(true);
       pending.done = true;
-      setLiveAgentId(null);
+      setLive(null);
       setState((current) => {
         const script = scriptedTurn(pending.agentId, pending.text, current.storeName);
         const withText = reducer(current, { type: "commit", agentId: pending.agentId, text: script.text });
@@ -88,7 +100,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     const pending = turn.current;
     if (!pending || pending.done) return;
     pending.done = true;
-    setLiveAgentId(null);
+    setLive(null);
     const text = replyText(message);
     const scripted = scriptedEffects(message);
     setOffline(scripted !== null || !text);
@@ -103,7 +115,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         const withScript = reducer(current, { type: "commit", agentId: pending.agentId, text: script.text });
         return reducer(withScript, { type: "effects", effects: script.effects });
       }
-      const withText = reducer(current, { type: "commit", agentId: pending.agentId, text, segments, sources });
+      const withText = reducer(current, { type: "commit", agentId: pending.agentId, text, segments, sources, streamed: true });
       return reducer(withText, { type: "effects", effects });
     });
     if (pending.first) void nameThread(pending.agentId, pending.text, answer);
@@ -124,10 +136,10 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   }
 
   const agent = selectedAgent(state);
-  const liveMessage = chat.messages.at(-1);
-  const streaming = (chat.status === "streaming" || chat.status === "submitted") && liveMessage?.role === "assistant";
-  const liveSegments = streaming ? segmentsOf(liveMessage) : null;
-  const busy = chat.status === "submitted" || chat.status === "streaming";
+  const liveMessage = live ? chat.messages.slice(live.from).findLast((message) => message.role === "assistant") : undefined;
+  const liveSegments = live ? segmentsOf(liveMessage) : null;
+  const busy = live !== null;
+  const liveAgentId = live?.agentId ?? null;
 
   function send(text: string, target?: string) {
     const current = state;
@@ -136,7 +148,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     const transcript = thread.flatMap((block) => (block.type === "text" ? [{ role: block.role, content: block.text }] : []));
     const first = !thread.some((block) => block.type === "text" && block.role === "user");
     turn.current = { agentId, text, done: false, first };
-    setLiveAgentId(agentId);
+    setLive({ agentId, from: chat.messages.length });
     setState((prev) => {
       const selected = target ? reducer(prev, { type: "select", id: target }) : prev;
       return reducer(selected, { type: "user", agentId, text });
@@ -158,32 +170,39 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     );
   }
 
-  function stop() {
-    const pending = turn.current;
-    const partial = liveMessage?.role === "assistant" ? replyText(liveMessage) : "";
-    void chat.stop();
-    setLiveAgentId(null);
-    if (!pending || pending.done) return;
-    pending.done = true;
-    dispatch({ type: "commit", agentId: pending.agentId, text: partial || "Stopped.", segments: liveMessage ? committedSegments(liveMessage) : undefined });
+  function logout() {
+    setNavOpen(false);
+    setSidebarOpen(true);
+    enter((current) => ({ ...setupState(current.storeName), motion: current.motion, signedIn: true }));
   }
 
-  if (!state.signedIn) {
+  function stop() {
+    const pending = turn.current;
+    const partial = liveMessage ? replyText(liveMessage) : "";
+    void chat.stop();
+    setLive(null);
+    if (!pending || pending.done) return;
+    pending.done = true;
+    dispatch({ type: "commit", agentId: pending.agentId, text: partial || "Stopped.", segments: liveMessage ? committedSegments(liveMessage) : undefined, streamed: Boolean(partial) });
+  }
+
+  if (booting) {
     return (
-      <Signup
-        onSubmit={(storeName) => enter((current) => reducer(current, { type: "sign-in", storeName }))}
-        onActive={() => enter((current) => ({ ...activeState(current.storeName), motion: current.motion }))}
-      />
+      <div className="relative h-dvh bg-[#0c0d0c]">
+        <BootScreen storeName={state.storeName} />
+      </div>
     );
   }
 
   return (
-    <div className="relative flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white">
+    <div className="fade-in relative flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white">
       <div className="p-partial-theme-admin-next-dark flex min-w-0 flex-1 gap-1 bg-[#0c0d0c] text-white">
         <AgentNav
           state={state}
-          navOpen={navOpen}
-          onToggleNav={() => setNavOpen((open) => !open)}
+          navOpen={sidebarOpen}
+          onToggleNav={() => setSidebarOpen((open) => !open)}
+          onSettings={() => dispatch({ type: "rail", id: "settings" })}
+          onLogout={logout}
           onSelect={(id) => dispatch({ type: "select", id })}
           onAdd={() => dispatch({ type: "toggle-add" })}
           onSearch={() => dispatch({ type: "toggle-search" })}
@@ -196,6 +215,8 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           liveSegments={liveAgentId === agent.id ? liveSegments : null}
           offline={offline}
           busy={busy && liveAgentId === agent.id}
+          onSwitch={(id) => dispatch({ type: "select", id })}
+          onAddAgent={() => dispatch({ type: "toggle-add" })}
           locked={busy}
           onChip={(label) => dispatch({ type: "chip", label })}
           onSend={send}
@@ -243,14 +264,10 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         <AdminRail
           expanded={navOpen}
           preview={state.preview}
-          storeName={state.storeName}
           onOpen={(id) => dispatch({ type: "rail", id })}
           onGo={(page) => dispatch({ type: "preview", page })}
           onSearch={(scope) => setPalette({ open: true, scope })}
-          onLogout={() => {
-            setNavOpen(false);
-            dispatch({ type: "logout" });
-          }}
+          onToggle={() => setNavOpen((open) => !open)}
         />
       </div>
       {palette.open ? (
@@ -267,7 +284,6 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         />
       ) : null}
       <span className="sr-only">{agent.name}</span>
-      {booting ? <BootScreen storeName={state.storeName} /> : null}
     </div>
   );
 }
@@ -354,46 +370,4 @@ function mapTool(name: string, input: unknown): Effect | null {
     return { type: "artifact", name: value.name };
   }
   return null;
-}
-
-function Signup({ onSubmit, onActive }: { onSubmit: (storeName: string) => void; onActive: () => void }) {
-  const [storeName, setStoreName] = useState("My Store");
-  const [email, setEmail] = useState("");
-  return (
-    <main className="p-partial-theme-admin-next-dark grid min-h-dvh place-items-center bg-[#0c0d0c] px-6 text-white">
-      <div className="w-full max-w-[440px]">
-        <ShopifyMark className="mb-6 h-8 w-7" />
-        <s-section
-          heading="Create your store"
-          subheading="You’ll land with Sidekick expanded, ready to set up payments, a theme, and the rest of the store."
-        >
-          <s-stack gap="base">
-            <s-text-field
-              label="Store name"
-              name="store-name"
-              required
-              value={storeName}
-              onInput={(event) => setStoreName(event.currentTarget.value)}
-            />
-            <s-email-field
-              label="Email"
-              name="email"
-              required
-              autocomplete="email"
-              placeholder="you@store.com"
-              value={email}
-              onInput={(event) => setEmail(event.currentTarget.value)}
-            />
-            <s-password-field label="Password" name="password" required minLength={4} autocomplete="new-password" />
-            <s-button variant="primary" inlineSize="fill" onClick={() => onSubmit(storeName || "My Store")}>
-              Create store
-            </s-button>
-            <s-button variant="tertiary" inlineSize="fill" onClick={onActive}>
-              Skip to the live store
-            </s-button>
-          </s-stack>
-        </s-section>
-      </div>
-    </main>
-  );
 }
