@@ -98,7 +98,11 @@ export function useDismiss(open: boolean, ref: React.RefObject<HTMLElement | nul
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: PointerEvent) {
-      if (ref.current && event.composedPath().includes(ref.current)) return;
+      const path = event.composedPath();
+      if (ref.current && path.includes(ref.current)) return;
+      // The trigger toggles on its own click; closing here too would reopen it.
+      const id = ref.current?.id;
+      if (id && path.some((node) => node instanceof Element && node.getAttribute("aria-controls") === id)) return;
       dismiss.current();
     }
     function onKeyDown(event: KeyboardEvent) {

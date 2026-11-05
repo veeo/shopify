@@ -248,10 +248,6 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         onAsk={(text) => {
           if (!busy) send(text, "sidekick");
         }}
-        onRecents={() => {
-          dispatch({ type: "select", id: "sidekick" });
-          dispatch({ type: "conversations", open: true });
-        }}
         onBusiness={(value) => dispatch({ type: "business-type", value })}
         onIdentity={(patch) => dispatch({ type: "identity", patch })}
         onPaymentsNext={() => dispatch({ type: "payments-next" })}

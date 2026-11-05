@@ -329,7 +329,48 @@ function Alerts({ read, onRead, onClose, onOpen }: { read: boolean; onRead: () =
   );
 }
 
+const menuShell =
+  "pop-in absolute z-50 flex w-[240px] flex-col rounded-2xl bg-white p-1.5 text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)]";
+const menuItem = "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] hover:bg-[#f1f1f1]";
+
+/** The store itself: switch stores or create one. */
 export function StoreMenu({
+  storeName,
+  className,
+  onClose,
+  onSettings,
+}: {
+  storeName: string;
+  className: string;
+  onClose: () => void;
+  onSettings: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDismiss(true, ref, onClose);
+  return (
+    <div ref={ref} id="store-menu" className={`${menuShell} ${className}`}>
+      <button
+        type="button"
+        onClick={() => {
+          onClose();
+          onSettings();
+        }}
+        className={`${menuItem} bg-[#f1f1f1] font-semibold`}
+      >
+        <span className="grid size-6 place-items-center rounded-full bg-[#36fba1] text-[10px] font-bold text-[#0b3b26]">{initials(storeName)}</span>
+        <span className="flex-1">{storeName}</span>
+        <PIcon name="Check" size={16} />
+      </button>
+      <button type="button" className={menuItem}>
+        <PIcon name="Plus" size={16} />
+        Create store
+      </button>
+    </div>
+  );
+}
+
+/** The merchant's account: admin, help, and log out. */
+export function AccountMenu({
   storeName,
   className,
   onClose,
@@ -344,45 +385,31 @@ export function StoreMenu({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(true, ref, onClose);
-  const item = "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] hover:bg-[#f1f1f1]";
   return (
-    <div
-      ref={ref}
-      id="store-menu"
-      className={`pop-in absolute z-50 flex w-[240px] flex-col ${className} rounded-2xl bg-white p-1.5 text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)]`}
-    >
+    <div ref={ref} id="account-menu" className={`${menuShell} ${className}`}>
       <button
         type="button"
         onClick={() => {
           onClose();
           onSettings();
         }}
-        className={`${item} bg-[#f1f1f1] font-semibold`}
+        className={menuItem}
       >
-        <span className="grid size-6 place-items-center rounded-full bg-[#36fba1] text-[10px] font-bold text-[#0b3b26]">{initials(storeName)}</span>
-        <span className="flex-1">{storeName}</span>
-        <PIcon name="Code" size={16} />
-      </button>
-      <button type="button" className={item}>
-        <PIcon name="Plus" size={16} />
-        Create store
-      </button>
-      <span className="my-1 h-px bg-[#ebebeb]" />
-      <button type="button" className={item}>
-        <span className="grid size-6 place-items-center rounded-full bg-[#ffc2e0] text-[10px] font-bold text-[#6b0036]">{initials(storeName)}</span>
+        <img src="/assets/user.png" alt="" className="size-6 rounded-full object-cover" />
         {storeName} Admin
       </button>
-      <button type="button" className={item}>
+      <a href="https://help.shopify.com" target="_blank" rel="noreferrer" onClick={onClose} className={menuItem}>
         <PIcon name="QuestionCircle" size={16} />
         Help Center
-      </button>
+      </a>
+      <span className="my-1 h-px bg-[#ebebeb]" />
       <button
         type="button"
         onClick={() => {
           onClose();
           onLogout();
         }}
-        className={item}
+        className={menuItem}
       >
         <PIcon name="Exit" size={16} />
         Log out
