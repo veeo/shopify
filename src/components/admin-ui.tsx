@@ -19,7 +19,7 @@ export function HeaderExtras({ children }: { children: ReactNode }) {
 }
 
 export const circleButton =
-  "press grid size-8 shrink-0 place-items-center rounded-full bg-white text-[#303030] shadow-[0_0_0_1px_#e3e3e3,0_1px_0_#e3e3e3] hover:bg-[#fafafa] active:bg-[#f1f1f1]";
+  "press grid size-8 shrink-0 place-items-center rounded-full bg-white text-[#303030] shadow-[0_0_0_1px_#e3e3e3,0_1px_1px_rgba(0,0,0,0.06),0_2px_4px_-1px_rgba(0,0,0,0.14)] hover:bg-[#fafafa] active:bg-[#f1f1f1]";
 
 /* Top bar: page icon + 13px title on the left, actions on the right; sub-pages show "‹ Parent". */
 
@@ -49,7 +49,6 @@ export function TopBar({
 }) {
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLSpanElement>(null);
-  const slot = useContext(HeaderSlot);
   useDismiss(open, menu, () => setOpen(false));
   const hasActions = actions.length > 0 || more.length > 0;
   const companions = hasActions ? (
@@ -63,9 +62,8 @@ export function TopBar({
     </>
   ) : null;
   return (
-    <header className="px-6 pt-6">
-      {slot && companions ? createPortal(companions, slot) : null}
-      <div className="flex h-8 items-center gap-2">
+    <header className="px-6 pb-6 pt-5">
+      <div className="flex min-h-8 items-center gap-2">
         {back ? (
           <button
             type="button"
@@ -82,7 +80,7 @@ export function TopBar({
               aria-haspopup="menu"
               aria-expanded={open}
               onClick={() => setOpen((value) => !value)}
-              className="press flex min-w-0 items-center gap-1 rounded-lg py-0.5 pr-1 text-left hover:bg-[#f6f6f6]"
+              className="press flex min-w-0 items-center gap-1 rounded-lg pr-1 text-left hover:bg-[#f6f6f6]"
             >
               <h2 className="truncate text-[22px] font-medium leading-8 tracking-[-0.44px] text-[#171817]">{title}</h2>
               <span className={`shrink-0 text-[#616161] transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
@@ -118,7 +116,12 @@ export function TopBar({
         ) : (
           <h2 className="min-w-0 truncate text-[22px] font-medium leading-8 tracking-[-0.44px] text-[#171817]">{title}</h2>
         )}
-        {aside ? <span className="ml-auto">{aside}</span> : null}
+        {aside || companions ? (
+          <span className="ml-auto flex shrink-0 items-center gap-1.5">
+            {aside}
+            {companions}
+          </span>
+        ) : null}
       </div>
     </header>
   );
@@ -188,7 +191,7 @@ export function useDismiss(open: boolean, ref: React.RefObject<HTMLElement | nul
 }
 
 export function Body({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`flex flex-col gap-4 px-6 pb-10 pt-1 ${className}`}>{children}</div>;
+  return <div className={`flex flex-col gap-4 px-6 pb-10 ${className}`}>{children}</div>;
 }
 
 /* Buttons. Primary, gray, and critical come from Polaris (s-button); the admin's white bordered header buttons don't exist there. */

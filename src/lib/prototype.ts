@@ -21,6 +21,8 @@ export type OrbId =
   | "orders"
   | "custom";
 
+export type Connection = { id: string; label: string; on: boolean };
+
 export type Agent = {
   id: string;
   name: string;
@@ -32,6 +34,8 @@ export type Agent = {
   unread: number;
   installed: boolean;
   persona: string;
+  purpose: string;
+  connections: Connection[];
 };
 
 export type Chip = { label: string; tone: "secondary" | "primary"; send?: boolean };
@@ -298,14 +302,49 @@ const persona = {
   custom: "You are a custom Sidekick the merchant just created. Help them make progress in the Shopify admin.",
 };
 
+export const connectionChoices: Connection[] = [
+  { id: "shop", label: "Shop", on: false },
+  { id: "admin", label: "Shopify admin", on: false },
+  { id: "slack", label: "Slack", on: false },
+  { id: "x", label: "X", on: false },
+  { id: "email", label: "Email", on: false },
+];
+
+const purposeFor: Record<string, string> = {
+  sidekick: "Your AI assistant for getting your store ready to sell.",
+  chief: "Set priorities and keep the store moving.",
+  ideas: "Turn store signals into product concepts worth trying.",
+  trends: "Watch what shoppers are searching for and suggest one next step.",
+  slack: "Summarize team chatter and draft updates.",
+  grok: "Bring in what shoppers are asking on X.",
+  muse: "Offer directions, names, and campaign angles.",
+  store: "Look after merchandising, delivery promises, and theme content.",
+  agentic: "Watch agent-driven shopping and delivery times.",
+  customers: "Speak for buyers and the perks they ask for.",
+  orders: "Keep fulfillment moving and flag orders that need a tracking update.",
+};
+
+function connectionsFor(id: string): Connection[] {
+  const on = new Set(id === "slack" ? ["slack"] : id === "grok" ? ["x"] : id === "sidekick" ? ["shop", "admin"] : ["admin"]);
+  return connectionChoices.map((item) => ({ ...item, on: on.has(item.id) }));
+}
+
 function agent(
-  partial: Omit<Agent, "persona" | "installed" | "unread"> & { unread?: number; installed?: boolean },
+  partial: Omit<Agent, "persona" | "installed" | "unread" | "purpose" | "connections"> & {
+    unread?: number;
+    installed?: boolean;
+    purpose?: string;
+    connections?: Connection[];
+  },
 ): Agent {
+  const { purpose, connections, ...rest } = partial;
   return {
     unread: partial.unread ?? 0,
     installed: partial.installed ?? false,
-    persona: persona[partial.orb === "custom" ? "custom" : partial.id as keyof typeof persona] ?? persona.custom,
-    ...partial,
+    persona: persona[partial.orb === "custom" ? "custom" : (partial.id as keyof typeof persona)] ?? persona.custom,
+    purpose: purpose ?? purposeFor[partial.id] ?? partial.preview,
+    connections: connections ?? connectionsFor(partial.id),
+    ...rest,
   };
 }
 
@@ -1183,6 +1222,7 @@ export type Action =
   | { type: "toggle-purpose"; id: string }
   | { type: "add-catalog"; id: string }
   | { type: "create-agent"; name: string; purpose: string }
+  | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[] }
   | { type: "preview"; page: PreviewId; wide?: boolean }
   | { type: "product"; id: string }
   | { type: "update-product"; id: string; patch: Partial<Product> }
@@ -1428,6 +1468,22 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       ];
       next.selectedAgentId = slug;
       next.mode = "thread";
+      return next;
+    }
+    case "edit-agent": {
+      const current = next.agents.find((item) => item.id === action.id);
+      if (!current) return state;
+      const name = action.name.trim() || current.name;
+      const purpose = action.purpose.trim() || current.purpose;
+      const placeholder = current.placeholder.includes(current.name) ? current.placeholder.replaceAll(current.name, name) : current.placeholder;
+      patchAgent(next, action.id, {
+        name,
+        purpose,
+        orb: action.orb,
+        connections: action.connections.map((item) => ({ ...item })),
+        placeholder,
+        persona: `You are ${name}, a Shopify sidekick. Purpose: ${purpose}.`,
+      });
       return next;
     }
     case "preview":

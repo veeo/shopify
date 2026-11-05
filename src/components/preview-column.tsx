@@ -125,7 +125,7 @@ export function PreviewColumn({
       style={{ width: wide ? 584 : 393 }}
     >
       <HeaderSlotProvider slot={slot}>
-        <header ref={headerRef} className="relative z-30 flex shrink-0 items-center justify-between gap-3 px-6 pt-7">
+        <header ref={headerRef} className="relative z-30 flex shrink-0 items-center justify-between gap-3 px-6 pb-1 pt-7">
           <button
             type="button"
             aria-label={menu ? "Close admin menu" : "Open admin menu"}
@@ -153,7 +153,7 @@ export function PreviewColumn({
               }`}
             >
               <div className="overflow-hidden" inert={menu ? undefined : true}>
-                <div id={menu ? "admin-menu" : undefined} className="border-b border-[#ebebeb] px-6 pb-3 pt-6">
+                <div id={menu ? "admin-menu" : undefined} className="border-b border-[#ebebeb] px-6 pb-3 pt-5">
                   <AdminMenu {...menuProps} />
                 </div>
               </div>
@@ -161,7 +161,7 @@ export function PreviewColumn({
           ) : null}
           <div
             key={state.preview}
-            className={state.motion ? "page-in" : ""}
+            className={`${state.motion ? "page-in" : ""} ${menu && state.menuStyle === "push" ? "opacity-40 transition-opacity duration-300" : "opacity-100 transition-opacity duration-300"}`}
             onPointerDownCapture={(event) => {
               if (!menu || state.menuStyle !== "push") return;
               swallow.current = true;
@@ -252,7 +252,7 @@ function Screen(props: {
 /* Shared pieces for the Figma-designed screens (active home, payments setup) */
 
 function Page({ children }: { children: ReactNode; wide?: boolean }) {
-  return <div className="flex flex-col gap-6 px-6 pb-[86px] pt-6">{children}</div>;
+  return <div className="flex flex-col gap-6 px-6 pb-[86px] pt-5">{children}</div>;
 }
 
 function H1({ children }: { children: ReactNode }) {
@@ -387,7 +387,7 @@ function HomeSetup({
 }) {
   const hidden = new Set([...state.cardsDone, ...state.cardsDismissed]);
   return (
-    <div className="flex flex-col gap-6 px-6 pb-10 pt-6">
+    <div className="flex flex-col gap-6 px-6 pb-10 pt-5">
       <HeaderExtras>
         <span className="flex items-center gap-1.5 text-[12px] text-[#616161]">
           Trial end in 1 day
@@ -613,7 +613,7 @@ function HomeActive({ nav }: { nav: Nav }) {
   const next: Record<RangeId, RangeId> = { today: "week", week: "month", month: "today" };
   const analytics = () => nav.onRail("analytics");
   return (
-    <div className="flex flex-col gap-6 px-6 pb-[86px] pt-6">
+    <div className="flex flex-col gap-6 px-6 pb-[86px] pt-5">
       <div className="flex flex-col gap-6">
         <div className="flex h-8 items-center justify-between">
           <H1>Home</H1>

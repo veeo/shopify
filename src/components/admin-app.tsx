@@ -223,7 +223,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onStart={() => dispatch({ type: "chip", label: "Start working" })}
           onAddCatalog={(id) => dispatch({ type: "add-catalog", id })}
           onCreate={(name, purpose) => dispatch({ type: "create-agent", name, purpose })}
-          onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
+          onEditAgent={(patch) => dispatch({ type: "edit-agent", ...patch })}
           onConversations={(open) => dispatch({ type: "conversations", open })}
           onNewChat={() => dispatch({ type: "new-chat" })}
           onOpenConversation={(id) => dispatch({ type: "open-conversation", id })}

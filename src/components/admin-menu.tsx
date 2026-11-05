@@ -18,7 +18,7 @@ export function AdminMenu({
   onGo: (page: PreviewId) => void;
   onSearch: (scope?: string) => void;
 }) {
-  const { id: active } = navFor(preview);
+  const { id: active, child } = navFor(preview);
   const [channelsOpen, setChannelsOpen] = useState(true);
   const [alerts, setAlerts] = useState(false);
   return (
@@ -33,7 +33,7 @@ export function AdminMenu({
         <span className="text-[11px] text-[#8a8a8a]">Ctrl K</span>
       </button>
       {mainNav.map((item) => (
-        <Item key={item.id} id={item.id} icon={item.icon} label={item.label} active={active} preview={preview} onOpen={onOpen} onGo={onGo} />
+        <Item key={item.id} id={item.id} icon={item.icon} label={item.label} active={active} child={child} preview={preview} onOpen={onOpen} onGo={onGo} />
       ))}
       <span className="my-1.5 h-px bg-[#ebebeb]" />
       <button
@@ -49,12 +49,12 @@ export function AdminMenu({
       </button>
       {channelsOpen
         ? channelNav.map((item) => (
-            <Item key={item.id} id={item.id} icon={item.icon} label={item.label} active={active} preview={preview} channel onOpen={onOpen} onGo={onGo} />
+            <Item key={item.id} id={item.id} icon={item.icon} label={item.label} active={active} child={child} preview={preview} channel onOpen={onOpen} onGo={onGo} />
           ))
         : null}
       <span className="my-1.5 h-px bg-[#ebebeb]" />
       <Row icon="Apps" label="Apps" on={false} onClick={() => onSearch("Apps")} />
-      <Item id="settings" icon="Settings" label="Settings" active={active} preview={preview} onOpen={onOpen} onGo={onGo} />
+      <Item id="settings" icon="Settings" label="Settings" active={active} child={child} preview={preview} onOpen={onOpen} onGo={onGo} />
       <button
         type="button"
         aria-expanded={alerts}
@@ -86,6 +86,7 @@ function Item({
   icon,
   label,
   active,
+  child,
   preview,
   channel,
   onOpen,
@@ -95,20 +96,22 @@ function Item({
   icon: PolarisIconName;
   label: string;
   active: string;
+  child: PreviewId | null;
   preview: PreviewId;
   channel?: boolean;
   onOpen: (id: string) => void;
   onGo: (page: PreviewId) => void;
 }) {
-  const on = active === id;
+  const section = active === id;
+  const parentCurrent = section && child == null;
   const kids = id === "settings" ? settingsChildren : (findNav(id)?.children ?? []);
   return (
     <div className="flex flex-col">
-      <Row icon={icon} label={label} on={on} channel={channel} onClick={() => onOpen(id)} />
-      {on && kids.length > 0 ? (
+      <Row icon={icon} label={label} on={parentCurrent} section={section && !parentCurrent} channel={channel} onClick={() => onOpen(id)} />
+      {section && kids.length > 0 ? (
         <div className="flex flex-col pb-1">
           {kids.map((entry) => {
-            const current = entry.page === preview;
+            const current = entry.page === preview || entry.page === child;
             return (
               <button
                 key={entry.page}
@@ -133,12 +136,14 @@ function Row({
   icon,
   label,
   on,
+  section,
   channel,
   onClick,
 }: {
   icon: PolarisIconName;
   label: string;
   on: boolean;
+  section?: boolean;
   channel?: boolean;
   onClick: () => void;
 }) {
@@ -147,7 +152,9 @@ function Row({
       type="button"
       aria-current={on ? "page" : undefined}
       onClick={onClick}
-      className={`press flex h-9 items-center gap-2 rounded-lg px-2.5 text-left ${on ? "bg-[#f1f1f1] font-medium text-[#171817]" : "hover:bg-[#f6f6f6]"}`}
+      className={`press flex h-9 items-center gap-2 rounded-lg px-2.5 text-left ${
+        on ? "bg-[#f1f1f1] font-medium text-[#171817]" : section ? "font-medium text-[#171817] hover:bg-[#f6f6f6]" : "hover:bg-[#f6f6f6]"
+      }`}
     >
       {channel ? (
         <span className={`grid size-5 shrink-0 place-items-center rounded-[5px] ${on ? "bg-[#303030] text-white" : "bg-[#f1f1f1] text-[#303030]"}`}>

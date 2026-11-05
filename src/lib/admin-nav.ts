@@ -258,8 +258,10 @@ const allNav = [...mainNav, ...channelNav];
 export function navFor(page: PreviewId): { id: string; child: PreviewId | null } {
   if (page === "home-setup" || page === "home-active") return { id: "home", child: null };
   if (page === "product") return { id: "products", child: null };
-  if (page === "settings" || page === "settings-general" || page === "payments-setup" || settingsNav.some((row) => row.page === page)) {
-    return { id: "settings", child: null };
+  if (page === "settings") return { id: "settings", child: null };
+  if (page === "payments-setup") return { id: "settings", child: "payments" };
+  if (page === "settings-general" || settingsNav.some((row) => row.page === page)) {
+    return { id: "settings", child: page === "settings-general" ? "settings-general" : page };
   }
   for (const item of allNav) {
     if (item.page === page && !item.children?.some((child) => child.page === page)) return { id: item.id, child: null };
