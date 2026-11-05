@@ -1,8 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import type { PreviewId } from "@/lib/admin-nav";
+
+/** The right side of the panel's hamburger header. Pages portal companions into it. */
+const HeaderSlot = createContext<HTMLElement | null>(null);
+
+export function HeaderSlotProvider({ slot, children }: { slot: HTMLElement | null; children: ReactNode }) {
+  return <HeaderSlot.Provider value={slot}>{children}</HeaderSlot.Provider>;
+}
+
+export function HeaderExtras({ children }: { children: ReactNode }) {
+  const slot = useContext(HeaderSlot);
+  if (!slot) return null;
+  return createPortal(children, slot);
+}
+
+export const circleButton =
+  "press grid size-8 shrink-0 place-items-center rounded-full bg-white text-[#303030] shadow-[0_0_0_1px_#e3e3e3,0_1px_0_#e3e3e3] hover:bg-[#fafafa] active:bg-[#f1f1f1]";
 
 /* Top bar: page icon + 13px title on the left, actions on the right; sub-pages show "‹ Parent". */
 
@@ -32,11 +49,23 @@ export function TopBar({
 }) {
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLSpanElement>(null);
+  const slot = useContext(HeaderSlot);
   useDismiss(open, menu, () => setOpen(false));
   const hasActions = actions.length > 0 || more.length > 0;
+  const companions = hasActions ? (
+    <>
+      {actions.map((action) => (
+        <Btn key={action.label} tone={action.tone ?? "white"} icon={action.icon} onClick={action.onClick} disabled={action.disabled}>
+          {action.label}
+        </Btn>
+      ))}
+      {more.length > 0 ? <MoreMenu items={more} /> : null}
+    </>
+  ) : null;
   return (
-    <header className="sticky top-0 z-20 bg-white/95 pt-7 backdrop-blur-sm">
-      <div className="flex h-8 items-center gap-2 pl-6 pr-[72px]">
+    <header className="px-6 pt-6">
+      {slot && companions ? createPortal(companions, slot) : null}
+      <div className="flex h-8 items-center gap-2">
         {back ? (
           <button
             type="button"
@@ -89,20 +118,8 @@ export function TopBar({
         ) : (
           <h2 className="min-w-0 truncate text-[22px] font-medium leading-8 tracking-[-0.44px] text-[#171817]">{title}</h2>
         )}
-        {aside}
+        {aside ? <span className="ml-auto">{aside}</span> : null}
       </div>
-      {hasActions ? (
-        <div className="flex items-center justify-end gap-1.5 px-6 pb-3 pt-2">
-          {more.length > 0 ? <MoreMenu items={more} /> : null}
-          {actions.map((action) => (
-            <Btn key={action.label} tone={action.tone ?? "white"} icon={action.icon} onClick={action.onClick} disabled={action.disabled}>
-              {action.label}
-            </Btn>
-          ))}
-        </div>
-      ) : (
-        <div className="h-3" />
-      )}
     </header>
   );
 }
@@ -118,7 +135,7 @@ function MoreMenu({ items }: { items: { label: string; onClick?: () => void }[] 
         aria-label="More actions"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="press grid size-7 place-items-center rounded-lg text-[#303030] hover:bg-[#f1f1f1]"
+        className={circleButton}
       >
         <PIcon name="MenuHorizontal" size={20} />
       </button>

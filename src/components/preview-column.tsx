@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
-import { Badge, Body, Btn, Card as AdminCard, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
+import { Badge, Body, Btn, Card as AdminCard, circleButton, HeaderExtras, HeaderSlotProvider, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { sectionChoices } from "@/lib/admin-nav";
 import type { BusinessType, PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
@@ -47,15 +47,40 @@ export function PreviewColumn({
 }) {
   const wide = state.previewWide || state.preview === "payments-setup";
   const [menu, setMenu] = useState(false);
+  const menuRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const savedScroll = useRef(0);
+  // A click on the pushed page dismisses the menu. The pointerdown closes it
+  // before the click, so the click is swallowed here or it would activate whatever it landed on.
+  const swallow = useRef(false);
+  function setMenuOpen(next: boolean, restore: boolean) {
+    const el = scrollRef.current;
+    if (el && state.menuStyle === "push") {
+      if (next && !menuRef.current) {
+        savedScroll.current = el.scrollTop;
+        el.scrollTop = 0;
+      } else if (!next && menuRef.current && restore) {
+        el.scrollTop = savedScroll.current;
+      }
+    }
+    menuRef.current = next;
+    setMenu(next);
+  }
+  const closeMenu = useRef(setMenuOpen);
+  useEffect(() => {
+    closeMenu.current = setMenuOpen;
+  });
   const nav: Nav = {
     onPreview,
     onRail,
     onChip,
     go: (page) => {
+      menuRef.current = false;
       setMenu(false);
       onPreview(page);
     },
     rail: (id) => {
+      menuRef.current = false;
       setMenu(false);
       onRail(id);
     },
@@ -63,94 +88,123 @@ export function PreviewColumn({
     ask: onAsk,
   };
   const grey = state.preview === "product";
+  const headerRef = useRef<HTMLElement>(null);
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  const [menuTop, setMenuTop] = useState(84);
+  useLayoutEffect(() => {
+    if (!headerRef.current) return;
+    setMenuTop(headerRef.current.offsetHeight + 24);
+  }, [state.preview, menu]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = 0;
+    savedScroll.current = 0;
+  }, [state.preview]);
   useEffect(() => {
     if (!menu) return;
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setMenu(false);
+      if (event.key === "Escape") closeMenu.current(false, true);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [menu]);
+  const menuProps = {
+    preview: state.preview,
+    onOpen: (id: string) => nav.rail(id),
+    onGo: (page: PreviewId) => nav.go(page),
+    onSearch: (scope?: string) => {
+      setMenuOpen(false, true);
+      onSearch(scope);
+    },
+  };
   return (
     <aside
-      className={`p-partial-theme-admin-next-light relative h-full shrink-0 overflow-hidden rounded-[20px] text-[#303030] ${grey ? "bg-[#f7f7f7]" : "bg-white"} ${
+      className={`p-partial-theme-admin-next-light relative flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${grey ? "bg-[#f7f7f7]" : "bg-white"} ${
         state.motion ? "transition-[width] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
       }`}
       style={{ width: wide ? 584 : 393 }}
     >
-      <div className="h-full overflow-y-auto [scrollbar-width:none]">
-        {state.menuStyle === "push" ? (
-          <div
-            className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-              menu ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-            }`}
+      <HeaderSlotProvider slot={slot}>
+        <header ref={headerRef} className="relative z-30 flex shrink-0 items-center justify-between gap-3 px-6 pt-7">
+          <button
+            type="button"
+            aria-label={menu ? "Close admin menu" : "Open admin menu"}
+            aria-expanded={menu}
+            aria-controls="admin-menu"
+            onClick={() => setMenuOpen(!menu, true)}
+            className={circleButton}
           >
-            <div className="overflow-hidden" inert={menu ? undefined : true}>
-              <div id={menu ? "admin-menu" : undefined} className="border-b border-[#ebebeb] px-6 pb-3 pt-[68px]">
-                <AdminMenu
-                  preview={state.preview}
-                  onOpen={(id) => nav.rail(id)}
-                  onSearch={(scope) => {
-                    setMenu(false);
-                    onSearch(scope);
-                  }}
-                />
+            <span className="relative grid size-5 place-items-center">
+              <span className={`absolute transition-all duration-200 ${menu ? "scale-75 rotate-90 opacity-0" : "opacity-100"}`}>
+                <PIcon name="Menu" size={20} />
+              </span>
+              <span className={`absolute transition-all duration-200 ${menu ? "opacity-100" : "-rotate-90 scale-75 opacity-0"}`}>
+                <PIcon name="X" size={20} />
+              </span>
+            </span>
+          </button>
+          <div ref={setSlot} className="flex min-w-0 items-center justify-end gap-1.5" />
+        </header>
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none]">
+          {state.menuStyle === "push" ? (
+            <div
+              className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+                menu ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+              }`}
+            >
+              <div className="overflow-hidden" inert={menu ? undefined : true}>
+                <div id={menu ? "admin-menu" : undefined} className="border-b border-[#ebebeb] px-6 pb-3 pt-6">
+                  <AdminMenu {...menuProps} />
+                </div>
               </div>
             </div>
-          </div>
-        ) : null}
-        <div key={state.preview} className={state.motion ? "page-in" : ""}>
-          <Screen
-            state={state}
-            nav={nav}
-            onCard={onCard}
-            onDismissCard={onDismissCard}
-            onBusiness={onBusiness}
-            onIdentity={onIdentity}
-            onPaymentsNext={onPaymentsNext}
-            onProduct={onProduct}
-            onUpdateProduct={onUpdateProduct}
-            onAddProduct={onAddProduct}
-          />
-        </div>
-      </div>
-      <button
-        type="button"
-        aria-label={menu ? "Close admin menu" : "Open admin menu"}
-        aria-expanded={menu}
-        aria-controls="admin-menu"
-        onClick={() => setMenu((open) => !open)}
-        className="press absolute right-6 top-7 z-40 grid size-8 place-items-center rounded-full bg-[#f1f1f1] text-[#303030] transition-colors hover:bg-[#e7e7e7]"
-      >
-        <span className="relative grid size-5 place-items-center">
-          <span className={`absolute transition-all duration-200 ${menu ? "scale-75 rotate-90 opacity-0" : "opacity-100"}`}>
-            <PIcon name="Menu" size={18} />
-          </span>
-          <span className={`absolute transition-all duration-200 ${menu ? "opacity-100" : "-rotate-90 scale-75 opacity-0"}`}>
-            <PIcon name="X" size={18} />
-          </span>
-        </span>
-      </button>
-      {state.menuStyle === "drop" && menu ? (
-        <>
-          <button type="button" aria-label="Close admin menu" onClick={() => setMenu(false)} className="absolute inset-0 z-20" />
+          ) : null}
           <div
-            id="admin-menu"
-            role="menu"
-            aria-label="Admin menu"
-            className="pop-in absolute inset-x-6 top-[68px] z-30 max-h-[calc(100%-88px)] overflow-y-auto rounded-2xl bg-white p-2 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.16)]"
+            key={state.preview}
+            className={state.motion ? "page-in" : ""}
+            onPointerDownCapture={(event) => {
+              if (!menu || state.menuStyle !== "push") return;
+              swallow.current = true;
+              event.preventDefault();
+              event.stopPropagation();
+              setMenuOpen(false, true);
+            }}
+            onClickCapture={(event) => {
+              if (!swallow.current) return;
+              swallow.current = false;
+              event.preventDefault();
+              event.stopPropagation();
+            }}
           >
-            <AdminMenu
-              preview={state.preview}
-              onOpen={(id) => nav.rail(id)}
-              onSearch={(scope) => {
-                setMenu(false);
-                onSearch(scope);
-              }}
+            <Screen
+              state={state}
+              nav={nav}
+              onCard={onCard}
+              onDismissCard={onDismissCard}
+              onBusiness={onBusiness}
+              onIdentity={onIdentity}
+              onPaymentsNext={onPaymentsNext}
+              onProduct={onProduct}
+              onUpdateProduct={onUpdateProduct}
+              onAddProduct={onAddProduct}
             />
           </div>
-        </>
-      ) : null}
+        </div>
+        {state.menuStyle === "drop" && menu ? (
+          <>
+            <button type="button" aria-label="Close admin menu" onClick={() => setMenu(false)} className="absolute inset-0 z-20" />
+            <div
+              id="admin-menu"
+              role="menu"
+              aria-label="Admin menu"
+              className="pop-in absolute inset-x-6 z-30 max-h-[calc(100%-108px)] overflow-y-auto rounded-2xl bg-white p-2 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.16)]"
+              style={{ top: menuTop }}
+            >
+              <AdminMenu {...menuProps} />
+            </div>
+          </>
+        ) : null}
+      </HeaderSlotProvider>
     </aside>
   );
 }
@@ -198,7 +252,7 @@ function Screen(props: {
 /* Shared pieces for the Figma-designed screens (active home, payments setup) */
 
 function Page({ children }: { children: ReactNode; wide?: boolean }) {
-  return <div className="flex flex-col gap-6 px-6 pb-[86px] pt-7">{children}</div>;
+  return <div className="flex flex-col gap-6 px-6 pb-[86px] pt-6">{children}</div>;
 }
 
 function H1({ children }: { children: ReactNode }) {
@@ -333,17 +387,14 @@ function HomeSetup({
 }) {
   const hidden = new Set([...state.cardsDone, ...state.cardsDismissed]);
   return (
-    <div className="flex flex-col gap-6 px-6 pb-10 pt-7">
-      <div className="flex h-8 items-center justify-between pr-12 text-[12px]">
-        <ReadyToSell onLaunch={() => nav.go("online-store-preferences")} />
-        <span className="text-[#616161]">
-          Questions?{" "}
-          <a href="tel:8449821186" className="font-semibold text-[#303030] underline underline-offset-2 hover:decoration-2">
-            (844) 982-1186
-          </a>
+    <div className="flex flex-col gap-6 px-6 pb-10 pt-6">
+      <HeaderExtras>
+        <span className="flex items-center gap-1.5 text-[12px] text-[#616161]">
+          Trial end in 1 day
+          <span className="size-2 rounded-full bg-[#e51c00]" />
         </span>
-      </div>
-      <h2 className="pt-4 text-center text-[21px] font-medium leading-[1.25] tracking-[-0.5px] text-[#303030]">
+      </HeaderExtras>
+      <h2 className="text-left text-[22px] font-medium leading-[1.3] tracking-[-0.44px] text-[#171817]">
         <button
           type="button"
           onClick={() => nav.go("settings-general")}
@@ -562,9 +613,9 @@ function HomeActive({ nav }: { nav: Nav }) {
   const next: Record<RangeId, RangeId> = { today: "week", week: "month", month: "today" };
   const analytics = () => nav.onRail("analytics");
   return (
-    <div className="flex flex-col gap-6 px-6 pb-[86px] pt-7">
+    <div className="flex flex-col gap-6 px-6 pb-[86px] pt-6">
       <div className="flex flex-col gap-6">
-        <div className="flex h-8 items-center justify-between pr-12">
+        <div className="flex h-8 items-center justify-between">
           <H1>Home</H1>
           <button type="button" onClick={analytics} className="press group flex items-center gap-1.5 text-[12px] leading-[1.45] tracking-[-0.12px] text-[#737572] hover:text-[#171817]">
             82 visitors right now
