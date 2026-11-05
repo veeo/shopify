@@ -25,7 +25,7 @@ export function AgentNav({
   onAdd,
   onSearch,
   onQuery,
-  onExperiments,
+  onScenario,
   onSettings,
   onLogout,
 }: {
@@ -38,7 +38,7 @@ export function AgentNav({
   onAdd: () => void;
   onSearch: () => void;
   onQuery: (query: string) => void;
-  onExperiments: () => void;
+  onScenario: (scenario: "setup" | "active") => void;
 }) {
   const agents = visibleAgents(state);
   const [menu, setMenu] = useState<"account" | "store" | null>(null);
@@ -46,13 +46,22 @@ export function AgentNav({
   const showHidden = state.scenario === "active" || state.agents.some((item) => item.installed && item.group === "hidden");
   const navRef = useRef<HTMLElement>(null);
   const placed = useRef(new Map<string, { left: number; top: number }>());
+  const skipSlide = useRef(true);
+  const [sliding, setSliding] = useState(false);
 
   // Icons share one layout in both widths. When the column rearranges, each icon
-  // slides from where it was instead of popping.
+  // slides from where it was instead of popping. The list can paint outside its
+  // scroller for that moment so the moving orbs aren't covered by the header.
   useLayoutEffect(() => {
     const root = navRef.current;
     if (!root) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let timer = 0;
+    if (!skipSlide.current && !reduce) {
+      setSliding(true);
+      timer = window.setTimeout(() => setSliding(false), 460);
+    }
+    skipSlide.current = false;
     const nodes = [...root.querySelectorAll<HTMLElement>("[data-flip]")];
     for (const node of nodes) node.getAnimations().forEach((animation) => animation.cancel());
     for (const node of nodes) {
@@ -72,6 +81,7 @@ export function AgentNav({
       }
       placed.current.set(id, { left: box.left, top: box.top });
     }
+    return () => window.clearTimeout(timer);
   }, [collapsed]);
 
   function search() {
@@ -91,7 +101,7 @@ export function AgentNav({
       }`}
       style={{ transition: `width ${move}` }}
     >
-      <div className={`flex gap-1.5 pb-4 pl-2 ${collapsed ? "flex-col items-start" : "items-center"}`}>
+      <div className={`relative z-0 flex bg-transparent gap-1.5 pb-4 pl-2 ${collapsed ? "flex-col items-start" : "items-center"}`}>
         <Tip label={navOpen ? "Collapse navigation" : "Expand navigation"} keys={["Ctrl", "B"]} side="right">
           <button
             type="button"
@@ -134,7 +144,11 @@ export function AgentNav({
         </div>
       ) : null}
 
-      <div className="scroll-thin flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto">
+      <div
+        className={`scroll-thin relative z-10 flex min-h-0 flex-1 flex-col gap-4 ${
+          sliding ? "overflow-visible" : "overflow-x-hidden overflow-y-auto"
+        }`}
+      >
         {groups.map((group) => {
           if (group.id === "hidden" && !showHidden) return null;
           const items = agents.filter((item) => item.group === group.id);
@@ -164,16 +178,17 @@ export function AgentNav({
                       aria-current={selected ? "page" : undefined}
                       aria-label={collapsed ? item.name : undefined}
                       onClick={() => onSelect(item.id)}
-                      className={`press press-row relative flex h-12 w-full min-w-0 items-center gap-2 rounded-full py-2 pl-2 pr-2 text-left transition-[background-color,box-shadow] duration-300 ${
-                        selected && !collapsed ? "btn-dark pr-4" : "hover:bg-white/[0.06] active:bg-white/10"
-                      }`}
+                      className={`press press-row relative flex h-12 w-full min-w-0 items-center gap-2 rounded-full py-2 pl-2 pr-2 text-left ${
+                        collapsed ? "transition-none" : "transition-[background-color,box-shadow] duration-300"
+                      } ${selected && !collapsed ? "btn-dark pr-4" : "hover:bg-white/[0.06] active:bg-white/10"}`}
+                      style={collapsed ? { transition: "none" } : undefined}
                     >
                       <span
-                        className={`grid size-8 shrink-0 place-items-center rounded-full transition-shadow duration-300 ${
+                        className={`grid size-[31px] shrink-0 place-items-center rounded-full transition-shadow duration-300 ${
                           collapsed && selected ? "shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]" : ""
                         }`}
                       >
-                        <Orb id={item.orb} size={collapsed ? 32 : 28} />
+                        <Orb id={item.orb} size={31} />
                         {collapsed && item.unread > 0 ? (
                           <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-[#5631f4] text-[10px] font-medium text-white ring-2 ring-[#0c0d0c]">
                             {item.unread}
@@ -216,15 +231,17 @@ export function AgentNav({
                 menu === "account" ? "shadow-[0_0_0_4px_rgba(255,255,255,0.22)]" : ""
               }`}
             >
-              <img src="/assets/user.png" alt="" className="size-8 rounded-full object-cover" />
+              <img src="/assets/user.png" alt="" className="size-[31px] rounded-full object-cover" />
             </button>
             {menu === "account" ? (
               <AccountMenu
                 storeName={state.storeName}
+                scenario={state.scenario}
                 className={collapsed ? "bottom-0 left-[calc(100%+10px)] origin-bottom-left" : "bottom-[calc(100%+8px)] left-0 origin-bottom-left"}
                 onClose={() => setMenu(null)}
                 onSettings={onSettings}
                 onLogout={onLogout}
+                onScenario={onScenario}
               />
             ) : null}
           </span>
@@ -243,7 +260,7 @@ export function AgentNav({
               aria-expanded={menu === "store"}
               aria-controls="store-menu"
               onClick={() => setMenu(menu === "store" ? null : "store")}
-              className={`press grid size-8 place-items-center rounded-full bg-[#36fba1] text-[11px] font-bold text-[#0b3b26] transition-shadow duration-150 hover:shadow-[0_0_0_4px_rgba(255,255,255,0.14)] ${
+              className={`press grid size-[31px] place-items-center rounded-full bg-[#36fba1] text-[11px] font-bold text-[#0b3b26] transition-shadow duration-150 hover:shadow-[0_0_0_4px_rgba(255,255,255,0.14)] ${
                 menu === "store" ? "shadow-[0_0_0_4px_rgba(255,255,255,0.22)]" : ""
               }`}
             >
@@ -258,16 +275,6 @@ export function AgentNav({
               />
             ) : null}
           </span>
-        </span>
-        <span data-flip="apps" className={collapsed ? "" : "ml-auto"}>
-          <IconButton label="Apps" onClick={onExperiments}>
-            <PIcon name="Apps" size={20} />
-          </IconButton>
-        </span>
-        <span data-flip="settings">
-          <IconButton label="Experiments" onClick={onExperiments} active={state.experimentsOpen} controls="experiments-menu">
-            <PIcon name="Settings" size={20} />
-          </IconButton>
         </span>
       </div>
     </aside>

@@ -36,9 +36,6 @@ export function ChatColumn({
   onAddCatalog,
   onCreate,
   onScenario,
-  onMotion,
-  onReset,
-  onCloseExperiments,
   onConversations,
   onNewChat,
   onOpenConversation,
@@ -60,9 +57,6 @@ export function ChatColumn({
   onAddCatalog: (id: string) => void;
   onCreate: (name: string, purpose: string) => void;
   onScenario: (scenario: "setup" | "active") => void;
-  onMotion: (on: boolean) => void;
-  onReset: () => void;
-  onCloseExperiments: () => void;
   onConversations: (open: boolean) => void;
   onNewChat: () => void;
   onOpenConversation: (id: string) => void;
@@ -161,14 +155,6 @@ export function ChatColumn({
               <MenuItem
                 onClick={() => {
                   setMoreOpen(false);
-                  onReset();
-                }}
-              >
-                Reset this scenario
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  setMoreOpen(false);
                   onScenario(state.scenario === "active" ? "setup" : "active");
                 }}
               >
@@ -237,40 +223,6 @@ export function ChatColumn({
         onAddAgent={onAddAgent}
         lastReply={lastReply}
       />
-
-      {state.experimentsOpen ? (
-        <Popover
-          id="experiments-menu"
-          onDismiss={onCloseExperiments}
-          className="bottom-20 left-8 w-72 origin-bottom-left p-4"
-        >
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-[13px] font-medium">Experiments</p>
-            <s-button variant="tertiary" onClick={onCloseExperiments}>
-              Close
-            </s-button>
-          </div>
-          <p className="mb-2 text-[12px] text-[#8e8f8b]">Scenario</p>
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            {(["setup", "active"] as const).map((scenario) => (
-              <s-button
-                key={scenario}
-                variant={state.scenario === scenario ? "primary" : "secondary"}
-                inlineSize="fill"
-                onClick={() => onScenario(scenario)}
-              >
-                {scenario === "setup" ? "New merchant" : "Active store"}
-              </s-button>
-            ))}
-          </div>
-          <s-switch label="Motion" checked={state.motion} onChange={(event) => onMotion(event.currentTarget.checked)} />
-          <div className="mt-3">
-            <s-button variant="tertiary" onClick={onReset}>
-              Reset scenario
-            </s-button>
-          </div>
-        </Popover>
-      ) : null}
     </section>
   );
 }

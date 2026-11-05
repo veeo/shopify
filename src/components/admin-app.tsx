@@ -207,7 +207,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onAdd={() => dispatch({ type: "toggle-add" })}
           onSearch={() => dispatch({ type: "toggle-search" })}
           onQuery={(query) => dispatch({ type: "search", query })}
-          onExperiments={() => dispatch({ type: "toggle-experiments" })}
+          onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
         />
         <div className="my-3 w-px shrink-0 bg-white/10" />
         <ChatColumn
@@ -226,9 +226,6 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onAddCatalog={(id) => dispatch({ type: "add-catalog", id })}
           onCreate={(name, purpose) => dispatch({ type: "create-agent", name, purpose })}
           onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
-          onMotion={(on) => dispatch({ type: "motion", on })}
-          onReset={() => dispatch({ type: "reset" })}
-          onCloseExperiments={() => dispatch({ type: "toggle-experiments" })}
           onConversations={(open) => dispatch({ type: "conversations", open })}
           onNewChat={() => dispatch({ type: "new-chat" })}
           onOpenConversation={(id) => dispatch({ type: "open-conversation", id })}

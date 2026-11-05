@@ -369,19 +369,23 @@ export function StoreMenu({
   );
 }
 
-/** The merchant's account: admin, help, and log out. */
+/** The merchant's account: admin, help, log out, and the store stage. */
 export function AccountMenu({
   storeName,
+  scenario,
   className,
   onClose,
   onSettings,
   onLogout,
+  onScenario,
 }: {
   storeName: string;
+  scenario: "setup" | "active";
   className: string;
   onClose: () => void;
   onSettings: () => void;
   onLogout: () => void;
+  onScenario: (scenario: "setup" | "active") => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(true, ref, onClose);
@@ -414,6 +418,28 @@ export function AccountMenu({
         <PIcon name="Exit" size={16} />
         Log out
       </button>
+      <span className="my-1 h-px bg-[#ebebeb]" />
+      <div role="group" aria-label="Store" className="grid grid-cols-2 gap-1 p-1">
+        {(
+          [
+            ["setup", "New store"],
+            ["active", "Active store"],
+          ] as const
+        ).map(([value, label]) => {
+          const on = scenario === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onScenario(value)}
+              className={`rounded-lg px-2 py-1.5 text-[12px] ${on ? "bg-[#303030] font-semibold text-white" : "text-[#303030] hover:bg-[#f1f1f1]"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

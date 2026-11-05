@@ -103,7 +103,6 @@ export type PrototypeState = {
   selectedProductId: string;
   searchOpen: boolean;
   search: string;
-  experimentsOpen: boolean;
   motion: boolean;
   seq: number;
   conversations: Record<string, Conversation[]>;
@@ -643,7 +642,6 @@ export function setupState(storeName = "My Store"): PrototypeState {
     selectedProductId: "earbuds",
     searchOpen: false,
     search: "",
-    experimentsOpen: false,
     motion: true,
     seq: 10,
     conversations: { sidekick: seedConversations(Date.now()) },
@@ -1168,9 +1166,7 @@ export type Action =
   | { type: "toggle-add" }
   | { type: "toggle-search" }
   | { type: "search"; query: string }
-  | { type: "toggle-experiments" }
   | { type: "scenario"; scenario: Scenario }
-  | { type: "motion"; on: boolean }
   | { type: "reset" }
   | { type: "chip"; label: string }
   | { type: "user"; agentId: string; text: string }
@@ -1240,16 +1236,10 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       next.search = action.query;
       next.searchOpen = true;
       return next;
-    case "toggle-experiments":
-      next.experimentsOpen = !next.experimentsOpen;
-      return next;
     case "scenario":
       return action.scenario === "active"
-        ? { ...activeState(next.storeName), motion: next.motion, signedIn: true }
-        : { ...setupState(next.storeName), motion: next.motion, signedIn: true };
-    case "motion":
-      next.motion = action.on;
-      return next;
+        ? { ...activeState(next.storeName), motion: true, signedIn: true }
+        : { ...setupState(next.storeName), motion: true, signedIn: true };
     case "reset":
       return state.scenario === "active"
         ? { ...activeState(state.storeName), motion: state.motion, signedIn: true }
