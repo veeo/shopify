@@ -89,7 +89,7 @@ export function PreviewColumn({
     chip: onChip,
     ask: onAsk,
   };
-  const kind = state.preview === "product" ? "product" : state.preview === "payments-setup" ? "payments" : null;
+  const kind = state.preview === "payments-setup" ? "payments" : null;
   const [closing, setClosing] = useState(false);
   const closeTo = useRef<PreviewId>("products");
   const closeTimer = useRef<number | null>(null);
@@ -99,7 +99,7 @@ export function PreviewColumn({
   const settingsRoot = useRef<PreviewId>("home-setup");
   const seenPreview = useRef(state.preview);
   if (kind && menu) setMenu(false);
-  const underlayPage: PreviewId = kind === "product" ? "products" : kind === "payments" ? "payments" : state.preview;
+  const underlayPage: PreviewId = kind === "payments" ? "payments" : state.preview;
   const settingsLevel = underlayPage === "settings" || isSettingsPage(underlayPage);
   const headerRef = useRef<HTMLElement>(null);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
@@ -117,7 +117,7 @@ export function PreviewColumn({
       if (state.preview === "settings" && fromOutside) settingsRoot.current = prev;
       if (isSettingsPage(state.preview) && !isSettingsPage(prev)) settingsBack.current = prev;
     }
-    if (state.preview === "product" || state.preview === "payments-setup") {
+    if (state.preview === "payments-setup") {
       closed.current = false;
       menuRef.current = false;
       if (sheetScroll.current) sheetScroll.current.scrollTop = 0;
@@ -177,7 +177,7 @@ export function PreviewColumn({
   };
   return (
     <aside
-      className={`p-partial-theme-admin-next-light relative flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : "bg-white"} ${
+      className={`p-partial-theme-admin-next-light relative flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
         state.motion ? "transition-[width,background-color] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
       }`}
       style={{ width: wide ? 584 : 393 }}
@@ -189,7 +189,20 @@ export function PreviewColumn({
         >
           <div className="sheet-scrim pointer-events-none absolute inset-0 z-40 bg-black/25" />
         <header ref={headerRef} className="relative z-30 flex shrink-0 items-center justify-between gap-3 px-6 pb-1 pt-7">
-          {settingsLevel ? (
+          {state.preview === "product" ? (
+            <button
+              type="button"
+              aria-label="Back to products"
+              onClick={() => {
+                menuRef.current = false;
+                setMenu(false);
+                onPreview("products");
+              }}
+              className={circleButton}
+            >
+              <PIcon name="ChevronLeft" size={20} />
+            </button>
+          ) : settingsLevel ? (
             <button
               type="button"
               aria-label="Back"
@@ -293,40 +306,31 @@ export function PreviewColumn({
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={kind === "payments" ? "Set up Shopify Payments" : "Edit product"}
+            aria-label="Set up Shopify Payments"
             onAnimationEnd={onSheetAnimationEnd}
             className={`absolute inset-x-0 bottom-0 top-[72px] z-50 flex flex-col overflow-hidden rounded-t-[22px] shadow-[0_-16px_40px_rgba(0,0,0,0.18)] ${
               closing ? "sheet-leave" : "sheet-enter"
-            } ${kind === "product" ? "bg-[#f7f7f7]" : "bg-white"}`}
+            } bg-white`}
           >
             <header className="flex shrink-0 items-center justify-between gap-3 px-6 pb-1 pt-7">
               <button
                 type="button"
-                aria-label={kind === "product" ? "Back to products" : state.paymentsStep === "type" ? "Back to payments" : "Back"}
-                onClick={() => (kind === "product" ? requestClose("products") : retreatPayments())}
+                aria-label={state.paymentsStep === "type" ? "Back to payments" : "Back"}
+                onClick={retreatPayments}
                 className={circleButton}
               >
                 <PIcon name="ChevronLeft" size={20} />
               </button>
             </header>
             <div ref={sheetScroll} className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none]">
-              {kind === "payments" ? (
-                <PaymentsSetup
-                  state={state}
-                  onBusiness={onBusiness}
-                  onIdentity={onIdentity}
-                  onNext={onPaymentsNext}
-                  onBack={onPaymentsBack}
-                  onClose={() => requestClose("payments")}
-                />
-              ) : (
-                <ProductEdit
-                  state={state}
-                  onBack={() => requestClose("products")}
-                  onProduct={onProduct}
-                  onUpdate={onUpdateProduct}
-                />
-              )}
+              <PaymentsSetup
+                state={state}
+                onBusiness={onBusiness}
+                onIdentity={onIdentity}
+                onNext={onPaymentsNext}
+                onBack={onPaymentsBack}
+                onClose={() => requestClose("payments")}
+              />
             </div>
           </div>
         ) : null}
@@ -498,10 +502,7 @@ function HomeSetup({
   return (
     <div className="flex flex-col gap-6 px-6 pb-10 pt-5">
       <HeaderExtras>
-        <span className="flex items-center gap-1.5 text-[12px] text-[#616161]">
-          Trial end in 1 day
-          <span className="size-2 rounded-full bg-[#e51c00]" />
-        </span>
+        <TrialNote onPlan={() => nav.go("plan")} />
       </HeaderExtras>
       <h2 className="text-left text-[22px] font-medium leading-[1.3] tracking-[-0.44px] text-[#171817]">
         <button
@@ -716,6 +717,42 @@ const ranges = {
 
 type RangeId = keyof typeof ranges;
 
+const headerNote = "flex items-center gap-1.5 text-[12px] leading-4 text-[#616161]";
+
+function TrialNote({ onPlan }: { onPlan: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button type="button" aria-expanded={open} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} className={headerNote}>
+        Trial end in 1 day
+        <span className="grid size-[18px] place-items-center">
+          <span className="grid size-4 place-items-center rounded-full bg-[#ffdbd7]">
+            <span className="size-2 rounded-full bg-[#eb1700]" />
+          </span>
+        </span>
+      </button>
+      {open ? (
+        <span className="absolute right-0 top-full z-50 pt-2">
+          <span className="pop-in flex w-[240px] flex-col items-start gap-1.5 rounded-2xl bg-white p-3 text-left text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.16)]">
+            <span className="flex items-center gap-1.5 text-[13px] font-semibold">
+              <span className="grid size-4 place-items-center rounded-full bg-[#ffdbd7]">
+                <span className="size-2 rounded-full bg-[#eb1700]" />
+              </span>
+              Trial ends in 1 day
+            </span>
+            <span className="text-[12px] leading-[1.4] text-[#616161]">Pick a plan to keep selling after the trial.</span>
+            <span className="pt-1">
+              <Btn tone="primary" onClick={onPlan}>
+                Select a plan
+              </Btn>
+            </span>
+          </span>
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function HomeActive({ nav }: { nav: Nav }) {
   const [range, setRange] = useState<RangeId>("month");
   const data = ranges[range];
@@ -723,21 +760,18 @@ function HomeActive({ nav }: { nav: Nav }) {
   const analytics = () => nav.onRail("analytics");
   return (
     <div className="flex flex-col gap-6 px-6 pb-[86px] pt-5">
+      <HeaderExtras>
+        <button type="button" onClick={analytics} className={`press rounded-lg px-1.5 py-1 hover:bg-[#f1f1f1] ${headerNote}`}>
+          82 visitors right now
+          <span className="flex -space-x-2">
+            {["/assets/visitor-a.png", "/assets/visitor-b.png", "/assets/user.png"].map((src) => (
+              <img key={src} src={src} alt="" className="size-5 rounded-full border-[1.5px] border-white object-cover" />
+            ))}
+          </span>
+        </button>
+      </HeaderExtras>
       <div className="flex flex-col gap-6">
-        <div className="flex h-8 items-center justify-between">
-          <H1>Home</H1>
-          <button type="button" onClick={analytics} className="press group flex items-center gap-1.5 text-[12px] leading-[1.45] tracking-[-0.12px] text-[#737572] hover:text-[#171817]">
-            82 visitors right now
-            <span className="flex -space-x-2">
-              {["/assets/visitor-a.png", "/assets/visitor-b.png", "/assets/user.png"].map((src) => (
-                <img key={src} src={src} alt="" className="size-5 rounded-full border-[1.5px] border-white object-cover" />
-              ))}
-            </span>
-            <span className="text-[#171817] transition-transform group-hover:translate-x-0.5">
-              <PIcon name="ChevronRight" size={20} />
-            </span>
-          </button>
-        </div>
+        <H1>Home</H1>
         <div className="-mr-6 flex gap-2 overflow-x-auto pr-6 [scrollbar-width:none]">
           <Pill tone="ink" onClick={() => setRange(next[range])} className="pl-3 pr-[13px]">
             <PIcon name="Calendar" size={20} />
@@ -1333,22 +1367,22 @@ function ProductEdit({
   const product = state.products.find((item) => item.id === state.selectedProductId) ?? state.products[0];
   if (!product) return null;
   const fresh = !product.title && !product.description;
-  const index = state.products.findIndex((item) => item.id === product.id);
   const title = product.title.trim() || (fresh ? "Add product" : "Untitled product");
   return (
     <>
+      <HeaderExtras>
+        <Btn tone="white" onClick={onBack}>
+          Cancel
+        </Btn>
+        <Btn tone="primary" onClick={onBack}>
+          Save
+        </Btn>
+      </HeaderExtras>
       <TopBar
         title={title}
         choices={state.products.map((item) => ({ id: item.id, label: item.title.trim() || "Untitled product" }))}
         choice={product.id}
         onChoice={onProduct}
-        pager={{
-          onPrev: () => onProduct(state.products[index - 1].id),
-          onNext: () => onProduct(state.products[index + 1].id),
-          prevDisabled: index <= 0,
-          nextDisabled: index < 0 || index >= state.products.length - 1,
-        }}
-        actions={[{ label: "Save", tone: "primary", onClick: onBack }]}
       />
       <Body>
         <AdminCard className="flex flex-col gap-3">
