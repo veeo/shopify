@@ -19,6 +19,8 @@ import {
   type Source,
 } from "@/lib/prototype";
 import type { LiveSegment } from "@/lib/turn";
+import { startRecording, transcribeAudio, type Recording } from "@/lib/voice";
+import { VoiceMode } from "@/components/voice-mode";
 
 export function ChatColumn({
   state,
@@ -42,6 +44,8 @@ export function ChatColumn({
   onOpenConversation,
   onDeleteConversation,
   onRate,
+  onSwitch,
+  onAddAgent,
 }: {
   state: PrototypeState;
   liveSegments: LiveSegment[] | null;
@@ -64,6 +68,8 @@ export function ChatColumn({
   onOpenConversation: (id: string) => void;
   onDeleteConversation: (id: string) => void;
   onRate: (id: string, value: "up" | "down") => void;
+  onSwitch: (id: string) => void;
+  onAddAgent: () => void;
 }) {
   const agent = selectedAgent(state);
   const purpose = state.selectedAgentId === "chief" && state.chiefPhase === "purpose" && state.mode === "thread";
@@ -77,6 +83,9 @@ export function ChatColumn({
     setTypedDone(new Set(typedOnce));
   }, []);
   const thread = state.threads[agent.id] ?? [];
+  const typedSettled = settled(thread, typedDone);
+  const lastAssistant = thread.findLast((block) => block.type === "text" && block.role === "assistant");
+  const lastReply = lastAssistant?.type === "text" ? { id: lastAssistant.id, text: lastAssistant.text } : null;
   const scroller = useRef<HTMLDivElement>(null);
   const liveLength = liveSegments?.reduce((sum, segment) => sum + (segment.type === "text" ? segment.text.length : 1), 0) ?? 0;
 
@@ -88,30 +97,21 @@ export function ChatColumn({
 
   return (
     <section className="relative flex min-w-0 flex-1 flex-col px-8 pb-3 pt-7">
-      {listing ? (
-        <ConversationsView
-          agentName={agent.name}
-          current={thread.some((block) => block.type === "text" && block.role === "user") ? agent.topic || "Current conversation" : null}
-          list={state.conversations[agent.id] ?? []}
-          onBack={() => onConversations(false)}
-          onNewChat={onNewChat}
-          onOpen={onOpenConversation}
-          onDelete={onDeleteConversation}
-        />
-      ) : (
-        <>
-          <header className="mb-3 flex items-start justify-between gap-4">
+      <>
+          <header className="relative mb-3 flex items-start justify-between gap-4">
             <h1 className="min-w-0 flex-1 text-[25px] font-medium leading-8 tracking-[-0.75px]">
               {state.mode === "thread" && !purpose ? (
                 <button
                   type="button"
-                  onClick={() => onConversations(true)}
-                  aria-label={`${title}${topic ? ` · ${topic}` : ""}. Show conversations`}
-                  className="group -mx-2 flex max-w-full items-baseline gap-1.5 rounded-xl px-2 text-left transition-colors hover:bg-white/[0.05]"
+                  onClick={() => onConversations(!listing)}
+                  aria-label={`${title}${topic ? ` · ${topic}` : ""}. Show chats`}
+                  aria-expanded={listing}
+                  aria-controls="chats-menu"
+                  className={`group -mx-2 flex max-w-full items-center gap-1.5 rounded-xl px-2 text-left transition-colors hover:bg-white/[0.05] ${listing ? "bg-white/[0.05]" : ""}`}
                 >
                   <span className="max-w-[70%] shrink-0 truncate">{title}</span>
                   {topic ? <span className="min-w-0 truncate font-normal text-[#737373]">· {topic}</span> : null}
-                  <span className="shrink-0 translate-y-1 self-center text-[#8e8f8b] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                  <span className={`grid shrink-0 place-items-center text-[#8e8f8b] transition-transform duration-200 group-hover:text-white ${listing ? "rotate-180" : ""}`}>
                     <PIcon name="ChevronDown" size={20} />
                   </span>
                 </button>
@@ -124,27 +124,40 @@ export function ChatColumn({
             </h1>
             <div className="flex gap-1.5">
               {state.mode === "thread" ? (
-                <>
-                  <Tip label="Conversations">
-                    <IconButton label="Conversations" onClick={() => onConversations(true)}>
-                      <PIcon name="ClockRevert" size={20} />
-                    </IconButton>
-                  </Tip>
-                  <Tip label="New chat">
-                    <IconButton label="New chat" onClick={onNewChat}>
-                      <PIcon name="Compose" size={20} />
-                    </IconButton>
-                  </Tip>
-                </>
+                <Tip label="New chat">
+                  <IconButton label="New chat" onClick={onNewChat}>
+                    <PIcon name="Compose" size={20} />
+                  </IconButton>
+                </Tip>
               ) : null}
               <IconButton label="More" onClick={() => setMoreOpen((open) => !open)} active={moreOpen} controls="more-menu">
                 <PIcon name="MenuHorizontal" size={20} />
               </IconButton>
             </div>
+            {listing ? (
+              <ChatsMenu
+                current={thread.some((block) => block.type === "text" && block.role === "user") ? agent.topic || "Current conversation" : null}
+                list={state.conversations[agent.id] ?? []}
+                onClose={() => onConversations(false)}
+                onNewChat={onNewChat}
+                onOpen={onOpenConversation}
+                onDelete={onDeleteConversation}
+              />
+            ) : null}
           </header>
 
           {moreOpen ? (
             <Popover id="more-menu" onDismiss={() => setMoreOpen(false)} className="right-8 top-16 w-56 p-1.5">
+              {state.mode === "thread" && !purpose ? (
+                <MenuItem
+                  onClick={() => {
+                    setMoreOpen(false);
+                    onConversations(true);
+                  }}
+                >
+                  View all chats
+                </MenuItem>
+              ) : null}
               <MenuItem
                 onClick={() => {
                   setMoreOpen(false);
@@ -175,13 +188,13 @@ export function ChatColumn({
               <Purpose state={state} onPurpose={onPurpose} onStart={onStart} onChip={onChip} />
             ) : (
               <div className="flex max-w-[640px] flex-col gap-2">
-                {visibleBlocks(thread, typedDone).map((block, index, list) =>
-                  block.type === "text" && block.typed && !typedDone.has(block.id) ? (
-                    <TypeOut
+                {visibleBlocks(thread, typedSettled).map((block, index, list) =>
+                  block.type === "text" && block.typed && !typedSettled.has(block.id) ? (
+                    <SimulatedTurn
                       key={block.id}
                       text={block.text}
                       instant={!state.motion}
-                      delay={block.id === "hello" ? 1100 : 350}
+                      delay={block.id === "hello" ? 1200 : 750}
                       onDone={() => markTyped(block.id)}
                     />
                   ) : (
@@ -204,10 +217,9 @@ export function ChatColumn({
               </div>
             )}
           </div>
-        </>
-      )}
+      </>
 
-      {offline && state.mode === "thread" && !listing ? (
+      {offline && state.mode === "thread" ? (
         <p className="mb-1 mt-2 px-4 text-[12px] text-[#8e8f8b]">
           Claude isn’t connected on this deployment, so this reply is scripted.
         </p>
@@ -221,6 +233,9 @@ export function ChatColumn({
         locked={locked}
         onSend={onSend}
         onStop={onStop}
+        onSwitch={onSwitch}
+        onAddAgent={onAddAgent}
+        lastReply={lastReply}
       />
 
       {state.experimentsOpen ? (
@@ -315,94 +330,77 @@ function dayGroup(at: number, now: number) {
   return "Older";
 }
 
-function ConversationsView({
-  agentName,
+function ChatsMenu({
   current,
   list,
-  onBack,
+  onClose,
   onNewChat,
   onOpen,
   onDelete,
 }: {
-  agentName: string;
   current: string | null;
   list: Conversation[];
-  onBack: () => void;
+  onClose: () => void;
   onNewChat: () => void;
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
   const [now] = useState(() => Date.now());
-  const [menu, setMenu] = useState<string | null>(null);
   const rows = [...(current ? [{ id: "current", title: current, at: now }] : []), ...list.toSorted((a, b) => b.at - a.at)];
   const groups = ["Today", "Yesterday", "This week", "Older"].map((name) => ({
     name,
     rows: rows.filter((row) => dayGroup(row.at, now) === name),
   }));
-
   return (
-    <div className="page-in flex min-h-0 flex-1 flex-col">
-      <header className="mb-3 flex items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-2">
-          <Tip label="Back" side="bottom">
-            <IconButton label="Back to conversation" onClick={onBack}>
-              <PIcon name="ArrowLeft" size={20} />
-            </IconButton>
-          </Tip>
-          <h1 className="truncate text-[25px] font-medium leading-8 tracking-[-0.75px]">Conversations</h1>
-        </div>
-        <Tip label="New chat" side="bottom">
-          <IconButton label="New chat" onClick={onNewChat}>
-            <PIcon name="Compose" size={20} />
-          </IconButton>
-        </Tip>
-      </header>
-      <p className="mb-2 text-[13px] text-[#8e8f8b]">{agentName}</p>
-      <div className="scroll-thin min-h-0 max-w-[640px] flex-1 overflow-y-auto pb-4">
-        {rows.length === 0 ? <p className="py-6 text-[15px] text-[#8e8f8b]">No conversations yet.</p> : null}
+    <Popover id="chats-menu" onDismiss={onClose} className="left-0 top-[calc(100%+6px)] w-[340px] origin-top-left p-1.5">
+      <button
+        type="button"
+        onClick={() => {
+          onClose();
+          onNewChat();
+        }}
+        className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] font-medium hover:bg-white/[0.07]"
+      >
+        <PIcon name="Compose" size={18} />
+        Start new chat
+      </button>
+      <div className="my-1 h-px bg-white/10" />
+      <div className="scroll-thin max-h-[380px] overflow-y-auto">
+        {rows.length === 0 ? <p className="px-2.5 py-3 text-[13px] text-[#8e8f8b]">No conversations yet.</p> : null}
         {groups.map((group) =>
           group.rows.length ? (
-            <section key={group.name} className="mb-4">
-              <h2 className="mb-1 px-3 text-[12px] font-medium text-[#8e8f8b]">{group.name}</h2>
+            <section key={group.name} className="pb-1">
+              <h2 className="px-2.5 pb-0.5 pt-2 text-[11px] font-medium text-[#8e8f8b]">{group.name}</h2>
               <ul>
                 {group.rows.map((row) => (
-                  <li key={row.id} className="group relative">
+                  <li key={row.id} className="group/row relative">
                     <button
                       type="button"
-                      onClick={() => (row.id === "current" ? onBack() : onOpen(row.id))}
-                      className="press press-row flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[15px] leading-5 hover:bg-white/[0.06]"
+                      aria-current={row.id === "current" ? "true" : undefined}
+                      onClick={() => {
+                        onClose();
+                        if (row.id !== "current") onOpen(row.id);
+                      }}
+                      className="press press-row flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left text-[13px] leading-5 hover:bg-white/[0.07]"
                     >
                       <span className="min-w-0 flex-1 truncate">{row.title}</span>
-                      <span className="shrink-0 text-[13px] text-[#8e8f8b] transition-opacity group-hover:opacity-0">
-                        {relativeTime(row.at, now)}
-                      </span>
+                      {row.id === "current" ? (
+                        <PIcon name="Check" size={16} />
+                      ) : (
+                        <span className="shrink-0 text-[12px] text-[#8e8f8b] transition-opacity group-hover/row:opacity-0">{relativeTime(row.at, now)}</span>
+                      )}
                     </button>
                     {row.id === "current" ? null : (
                       <button
                         type="button"
-                        aria-label={`More actions for ${row.title}`}
-                        aria-expanded={menu === row.id}
-                        onClick={() => setMenu(menu === row.id ? null : row.id)}
-                        className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-lg text-[#c4c4c4] opacity-0 transition-opacity hover:bg-white/10 focus-visible:opacity-100 group-hover:opacity-100"
+                        aria-label={`Delete ${row.title}`}
+                        title="Delete"
+                        onClick={() => onDelete(row.id)}
+                        className="absolute right-1.5 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-[#c4c4c4] opacity-0 transition-opacity hover:bg-white/10 hover:text-[#ff8a80] focus-visible:opacity-100 group-hover/row:opacity-100"
                       >
-                        <PIcon name="MenuHorizontal" size={18} />
+                        <PIcon name="Delete" size={16} />
                       </button>
                     )}
-                    {menu === row.id ? (
-                      <div className="pop-in absolute right-2 top-full z-20 w-36 rounded-xl border border-white/10 bg-[#1a1a1a] p-1 shadow-[0_12px_32px_rgba(0,0,0,0.5)]">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMenu(null);
-                            onDelete(row.id);
-                          }}
-                          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] text-[#ff8a80] hover:bg-white/[0.06]"
-                        >
-                          <PIcon name="Delete" size={18} />
-                          Delete
-                        </button>
-                      </div>
-                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -410,7 +408,7 @@ function ConversationsView({
           ) : null,
         )}
       </div>
-    </div>
+    </Popover>
   );
 }
 
@@ -471,9 +469,11 @@ export function Composer({
   onSend,
   onStop,
   light = false,
-  rotating,
-  onRecents,
+  onSwitch,
+  onAddAgent,
+  lastReply = null,
 }: {
+  lastReply?: { id: string; text: string } | null;
   state: PrototypeState;
   agent: Agent;
   suggestions: string[];
@@ -482,31 +482,49 @@ export function Composer({
   onSend: (text: string) => void;
   onStop: () => void;
   light?: boolean;
-  rotating?: string[];
-  onRecents?: () => void;
+  onSwitch?: (id: string) => void;
+  onAddAgent?: () => void;
 }) {
   const [draft, setDraft] = useState("");
   const [focused, setFocused] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
+  const [switchOpen, setSwitchOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [files, setFiles] = useState<string[]>([]);
   const [target, setTarget] = useState(false);
-  const [roll, setRoll] = useState(0);
   const input = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const recognition = useRef<SpeechRecognitionLike | null>(null);
+  const recording = useRef<Recording | null>(null);
+  const meter = useRef<HTMLSpanElement>(null);
   const base = useRef("");
-  const showSuggestions = focused && !draft.trim() && !busy && !plusOpen;
-  const rolling = Boolean(rotating?.length) && !focused && !draft;
+  const heard = useRef("");
+  const showSuggestions = focused && !draft.trim() && !busy && !plusOpen && !switchOpen;
+  const canSend = Boolean(draft.trim()) && !busy;
   const placeholder = state.mode === "add" && !light ? "Ask Sidekick…" : focused || light ? `Work with ${agent.name}` : agent.placeholder;
 
-  useEffect(() => () => recognition.current?.stop(), []);
+  useEffect(
+    () => () => {
+      recognition.current?.stop();
+      recording.current?.cancel();
+    },
+    [],
+  );
+
   useEffect(() => {
-    if (!rotating?.length) return;
-    const timer = window.setInterval(() => setRoll((value) => (value + 1) % rotating.length), 3500);
-    return () => window.clearInterval(timer);
-  }, [rotating]);
+    if (!listening) return;
+    let frame = 0;
+    const draw = () => {
+      const level = recording.current?.level() ?? 0;
+      meter.current?.style.setProperty("--level", level.toFixed(3));
+      frame = requestAnimationFrame(draw);
+    };
+    frame = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(frame);
+  }, [listening]);
 
   function submit(text = draft) {
     const value = text.trim();
@@ -519,6 +537,9 @@ export function Composer({
     setFiles([]);
     setTarget(false);
     recognition.current?.stop();
+    recording.current?.cancel();
+    recording.current = null;
+    setListening(false);
     if (light) input.current?.blur();
     onSend(context.length ? `${value}\n\n(${context.join(" · ")})` : value);
   }
@@ -529,38 +550,61 @@ export function Composer({
     requestAnimationFrame(() => input.current?.focus());
   }
 
-  function dictate() {
+  async function dictate() {
+    if (transcribing) return;
     if (listening) {
-      recognition.current?.stop();
+      await finishDictation();
       return;
     }
-    const denied = "Sidekick couldn’t access your microphone.";
-    const Recognition = speechRecognition();
-    if (!Recognition) {
-      setNotice(denied);
-      return;
-    }
-    const session = new Recognition();
-    session.lang = navigator.language || "en-US";
-    session.interimResults = true;
-    session.continuous = true;
-    base.current = draft ? `${draft.trimEnd()} ` : "";
-    session.onresult = (event) => {
-      const heard = Array.from(event.results, (result) => result[0]?.transcript ?? "").join("");
-      setDraft(base.current + heard);
-    };
-    session.onerror = () => {
-      setNotice(denied);
-      setListening(false);
-    };
-    session.onend = () => setListening(false);
-    recognition.current = session;
     try {
-      session.start();
-      setNotice(null);
-      setListening(true);
+      recording.current = await startRecording();
     } catch {
-      setNotice(denied);
+      setNotice("Sidekick couldn’t access your microphone. Check your browser’s microphone permission.");
+      return;
+    }
+    setNotice(null);
+    setListening(true);
+    base.current = draft ? `${draft.trimEnd()} ` : "";
+    heard.current = "";
+    // Live words from the browser's recognizer when it has one; the server transcript replaces them when recording stops.
+    const Recognition = speechRecognition();
+    if (Recognition) {
+      try {
+        const session = new Recognition();
+        session.lang = navigator.language || "en-US";
+        session.interimResults = true;
+        session.continuous = true;
+        session.onresult = (event) => {
+          heard.current = Array.from(event.results, (result) => result[0]?.transcript ?? "").join("");
+          setDraft(base.current + heard.current);
+        };
+        session.onerror = () => undefined;
+        session.start();
+        recognition.current = session;
+      } catch {
+        recognition.current = null;
+      }
+    }
+  }
+
+  async function finishDictation() {
+    const active = recording.current;
+    recording.current = null;
+    recognition.current?.stop();
+    recognition.current = null;
+    setListening(false);
+    if (!active) return;
+    const audio = await active.stop();
+    if (audio.size < 2000) return;
+    setTranscribing(true);
+    try {
+      const text = await transcribeAudio(audio);
+      if (text) setDraft(base.current + text);
+    } catch {
+      if (!heard.current) setNotice("Dictation isn’t available here yet.");
+    } finally {
+      setTranscribing(false);
+      requestAnimationFrame(() => input.current?.focus());
     }
   }
 
@@ -573,7 +617,7 @@ export function Composer({
         send: "grid size-7 place-items-center rounded-lg bg-[#303030] text-white hover:bg-black",
         notice: "bg-[#fee9e8] text-[#8e1f0b]",
         noticeIcon: "text-[#c70a24]",
-        suggestion: "text-[12px] text-[#303030] hover:bg-[#f7f7f7]",
+        suggestion: "text-[12px] text-[#303030] hover:bg-[#f1f1f1]",
         suggestionIcon: "text-[#616161]",
         chip: "bg-[#f1f1f1] text-[#303030]",
       }
@@ -585,7 +629,7 @@ export function Composer({
         send: "grid size-8 place-items-center rounded-full bg-white text-black shadow-[0_1px_2px_rgba(0,0,0,0.3)] hover:bg-[#eee]",
         notice: "bg-[#2a1716] text-[#ffd2cc]",
         noticeIcon: "text-[#ff6d5e]",
-        suggestion: "text-[13px] text-[#c4c4c4] hover:bg-white/[0.05] hover:text-white",
+        suggestion: "text-[13px] text-[#c4c4c4] hover:bg-white/[0.07] hover:text-white",
         suggestionIcon: "text-[#8e8f8b]",
         chip: "bg-white/[0.08] text-white/90",
       };
@@ -599,6 +643,9 @@ export function Composer({
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
       }}
     >
+      {voiceOpen ? (
+        <VoiceMode agent={agent} busy={busy} lastReply={lastReply} onSend={(text) => onSend(text)} onClose={() => setVoiceOpen(false)} />
+      ) : (
       <form
         className={`relative flex flex-col transition-[border-color,box-shadow] duration-150 ${tone.form}`}
         onSubmit={(event) => {
@@ -638,40 +685,60 @@ export function Composer({
                 submit();
               }
             }}
-            placeholder={rolling ? "" : placeholder}
+            placeholder={placeholder}
             className={`block max-h-40 w-full resize-none bg-transparent outline-none [field-sizing:content] ${tone.text}`}
           />
-          {rolling && rotating ? (
-            <span key={roll} aria-hidden className={`placeholder-roll pointer-events-none absolute left-0 top-0 ${tone.text} text-[#8a8a8a]`}>
-              {rotating[roll]}
-            </span>
-          ) : null}
         </span>
         <div className={`flex items-center gap-1 ${light ? "px-2 pb-2" : "gap-1.5 px-2.5 pb-2.5"}`}>
-          <Orb id={state.mode === "add" && !light ? "sidekick" : agent.orb} size={light ? 20 : 24} />
+          {onSwitch ? (
+            <Tip label="Switch sidekick" side="top-start">
+              <button
+                type="button"
+                aria-label={`Switch sidekick, current: ${agent.name}`}
+                aria-expanded={switchOpen}
+                aria-controls="sidekick-switcher"
+                onClick={() => {
+                  setPlusOpen(false);
+                  setSwitchOpen((open) => !open);
+                }}
+                className={`press grid size-8 place-items-center rounded-full transition-[box-shadow] duration-150 hover:shadow-[0_0_0_3px_rgba(255,255,255,0.1)] ${
+                  switchOpen ? "shadow-[0_0_0_3px_rgba(255,255,255,0.16)]" : ""
+                }`}
+              >
+                <Orb id={state.mode === "add" ? "sidekick" : agent.orb} size={32} />
+              </button>
+            </Tip>
+          ) : (
+            <Orb id={agent.orb} size={light ? 20 : 32} />
+          )}
           {listening ? (
-            <span className={`ml-1 flex items-center gap-1.5 text-[12px] ${light ? "text-[#616161]" : "text-[#8e8f8b]"}`}>
-              <span className="size-1.5 animate-pulse rounded-full bg-[#ff6d5e]" />
-              Listening…
+            <span ref={meter} className="ml-1.5 flex h-5 items-center gap-[3px] text-[12px] text-[#8e8f8b]" style={{ "--level": 0 } as React.CSSProperties}>
+              {[0.5, 0.85, 1, 0.7, 0.45].map((weight, index) => (
+                <span
+                  key={index}
+                  className="w-[3px] rounded-full bg-[#ff6d5e] transition-[height] duration-75"
+                  style={{ height: `calc(4px + var(--level) * ${Math.round(weight * 16)}px)` }}
+                />
+              ))}
+              <span className="ml-1.5">Listening</span>
+            </span>
+          ) : transcribing ? (
+            <span className="ml-1.5 flex items-center gap-1.5 text-[12px] text-[#8e8f8b]">
+              <Spinner />
+              <span className="shimmer-text">Transcribing</span>
             </span>
           ) : null}
           <span className={`ml-auto flex items-center ${light ? "gap-0.5" : "gap-1.5"}`}>
-            {onRecents ? (
-              <>
-                <button type="button" onClick={onRecents} className="press flex h-7 items-center gap-1 rounded-lg px-1.5 text-[12px] font-medium text-[#303030] hover:bg-[#f1f1f1]">
-                  <PIcon name="ClockRevert" size={18} />
-                  Recents
-                </button>
-                <span className="mx-1 h-4 w-px bg-[#e3e3e3]" />
-              </>
-            ) : null}
             <Tip label={plusOpen ? "Close" : "Add files and more"}>
               <button
                 type="button"
                 aria-label="Add files and more"
                 aria-expanded={plusOpen}
                 aria-controls="plus-menu"
-                onClick={() => setPlusOpen((open) => !open)}
+                onClick={() => {
+                  setSwitchOpen(false);
+                  setPlusOpen((open) => !open);
+                }}
                 className={`press ${tone.icon}`}
               >
                 <span className={`transition-transform duration-200 ${plusOpen ? "rotate-45" : ""}`}>
@@ -686,17 +753,52 @@ export function Composer({
                 </button>
               </Tip>
             ) : (
-              <Tip label={listening ? "Stop dictating" : "Dictate"}>
-                <button type="button" aria-label="Dictate" aria-pressed={listening} onClick={dictate} className={`press ${tone.icon} ${listening ? tone.on : ""}`}>
-                  <PIcon name="Microphone" size={iconSize} />
-                </button>
-              </Tip>
+              <>
+                <Tip label={listening ? "Stop dictating" : "Dictate"}>
+                  <button
+                    type="button"
+                    aria-label="Dictate"
+                    aria-pressed={listening}
+                    disabled={transcribing}
+                    onClick={() => void dictate()}
+                    className={`press disabled:opacity-50 ${tone.icon} ${listening ? tone.on : ""}`}
+                  >
+                    <PIcon name="Microphone" size={iconSize} />
+                  </button>
+                </Tip>
+                <Tip label="Voice mode">
+                  <button
+                    type="button"
+                    aria-label="Voice mode"
+                    onClick={() => {
+                      recording.current?.cancel();
+                      recording.current = null;
+                      setListening(false);
+                      setVoiceOpen(true);
+                    }}
+                    className={`press ${tone.icon}`}
+                  >
+                    <PIcon name="Sound" size={iconSize} />
+                  </button>
+                </Tip>
+              </>
             )}
-            {draft.trim() && !busy ? (
-              <button type="submit" aria-label="Send" disabled={locked} className={`press fade-in disabled:opacity-40 ${tone.send}`}>
+            <span
+              className={`grid transition-[width,margin,opacity] duration-200 ease-out ${
+                canSend ? `opacity-100 ${light ? "w-7" : "w-8"}` : `w-0 opacity-0 ${light ? "-ml-0.5" : "-ml-1.5"}`
+              }`}
+            >
+              <button
+                type="submit"
+                aria-label="Send"
+                aria-hidden={!canSend}
+                tabIndex={canSend ? 0 : -1}
+                disabled={locked || !canSend}
+                className={`press transition-transform duration-200 ease-out disabled:cursor-default ${canSend ? "scale-100" : "scale-50"} ${locked && canSend ? "opacity-40" : ""} ${tone.send}`}
+              >
                 <PIcon name="ArrowUp" size={iconSize} />
               </button>
-            ) : null}
+            </span>
           </span>
         </div>
         <input
@@ -711,9 +813,16 @@ export function Composer({
           }}
         />
       </form>
+      )}
 
-      {showSuggestions ? (
-        <ul role="listbox" aria-label="Suggestions" className={`rise mt-2 flex flex-col ${light ? "px-1" : ""}`}>
+      {showSuggestions && !voiceOpen ? (
+        <ul
+          role="listbox"
+          aria-label="Suggestions"
+          className={`fade-in absolute bottom-full left-0 right-0 z-30 flex flex-col pb-2 pt-6 ${
+            light ? "bg-[linear-gradient(to_bottom,transparent,#fff_24px)]" : "bg-[linear-gradient(to_bottom,transparent,#0c0d0c_24px)]"
+          }`}
+        >
           {suggestions.map((text) => (
             <li key={text} role="option" aria-selected={false}>
               <button
@@ -730,6 +839,26 @@ export function Composer({
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {switchOpen && onSwitch ? (
+        <SidekickSwitcher
+          state={state}
+          current={state.mode === "add" ? null : agent.id}
+          onDismiss={() => setSwitchOpen(false)}
+          onPick={(id) => {
+            setSwitchOpen(false);
+            onSwitch(id);
+          }}
+          onAdd={
+            onAddAgent
+              ? () => {
+                  setSwitchOpen(false);
+                  onAddAgent();
+                }
+              : undefined
+          }
+        />
       ) : null}
 
       {plusOpen ? (
@@ -766,6 +895,57 @@ function Attachment({ icon, label, className, onRemove }: { icon: PolarisIconNam
         <PIcon name="X" size={14} />
       </button>
     </span>
+  );
+}
+
+function SidekickSwitcher({
+  state,
+  current,
+  onDismiss,
+  onPick,
+  onAdd,
+}: {
+  state: PrototypeState;
+  current: string | null;
+  onDismiss: () => void;
+  onPick: (id: string) => void;
+  onAdd?: () => void;
+}) {
+  const agents = state.agents.filter((item) => item.installed);
+  return (
+    <Popover id="sidekick-switcher" onDismiss={onDismiss} className="bottom-[calc(100%+8px)] left-0 w-64 origin-bottom-left p-1.5">
+      <p className="px-2 pb-1 pt-1.5 text-[12px] text-[#8e8f8b]">Switch sidekick</p>
+      <div className="scroll-thin flex max-h-72 flex-col overflow-y-auto">
+        {agents.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-current={item.id === current ? "true" : undefined}
+            onClick={() => onPick(item.id)}
+            className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] hover:bg-white/[0.07]"
+          >
+            <Orb id={item.orb} size={24} />
+            <span className="min-w-0 flex-1 truncate">{item.name}</span>
+            {item.id === current ? <PIcon name="Check" size={16} /> : null}
+          </button>
+        ))}
+      </div>
+      {onAdd ? (
+        <>
+          <div className="my-1 h-px bg-white/10" />
+          <button
+            type="button"
+            onClick={onAdd}
+            className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] text-[#c4c4c4] hover:bg-white/[0.07] hover:text-white"
+          >
+            <span className="grid size-6 place-items-center rounded-full border border-dashed border-white/20">
+              <PIcon name="Plus" size={16} />
+            </span>
+            Add a sidekick
+          </button>
+        </>
+      ) : null}
+    </Popover>
   );
 }
 
@@ -908,59 +1088,41 @@ function Spinner() {
   );
 }
 
-function ToolRow({ label, running }: { label: string; running?: boolean }) {
+function ToolRow({ label, running, enter = true }: { label: string; running?: boolean; enter?: boolean }) {
   return (
-    <p className="rise flex items-center gap-1.5 py-1 text-[13px] text-[#8e8f8b]">
+    <p className={`${enter ? "rise " : ""}flex items-center gap-1.5 py-1 text-[13px] text-[#8e8f8b]`}>
       {running ? <Spinner /> : <PIcon name="Check" size={16} />}
       <span className={running ? "shimmer-text" : ""}>{label}</span>
     </p>
   );
 }
 
-/** Streaming text: each newly arrived word mounts with a short fade, so the last few words trail in. */
-function StreamText({ text }: { text: string }) {
-  const lines = text.replace(/\*\*/g, "").split("\n");
-  let word = 0;
-  return (
-    <div className="max-w-[560px] py-1 text-[15px] leading-[1.4] tracking-[-0.15px]">
-      {lines.map((line, index) => {
-        if (!line.trim()) return <span key={index} className="block h-3" />;
-        const bullet = /^\s*([-*•]|\d+\.)\s+/.exec(line);
-        const body = bullet ? line.slice(bullet[0].length) : line;
-        const words = body.split(/(\s+)/).map((token, at) =>
-          /^\s+$/.test(token) ? (
-            token
-          ) : (
-            <span key={`${index}-${at}`} className="word-in" data-word={word++}>
-              {token}
-            </span>
-          ),
-        );
-        return bullet ? (
-          <span key={index} className="flex gap-2 pl-1">
-            <span className="text-[#8e8f8b]">{/\d/.test(bullet[1]) ? bullet[1] : "•"}</span>
-            <span>{words}</span>
-          </span>
-        ) : (
-          <span key={index} className="block">
-            {words}
-          </span>
-        );
-      })}
-    </div>
+/**
+ * Tool rows and text for one reply. The live turn and the committed message render through this same
+ * tree, so when streaming finishes the text keeps its exact layout instead of reflowing.
+ */
+function ReplySegments({ segments, live, enter }: { segments: LiveSegment[]; live: boolean; enter: boolean }) {
+  return segments.map((segment, index) =>
+    segment.type === "tool" ? (
+      <ToolRow key={index} label={segment.label} running={segment.running} enter={enter} />
+    ) : (
+      <div key={index} className="py-0.5">
+        <Markdown text={segment.text} streaming={live} />
+      </div>
+    ),
   );
 }
+
+const replyClass = "max-w-[560px] py-2 text-[15px] leading-[1.4] tracking-[-0.15px]";
 
 function LiveTurn({ segments }: { segments: LiveSegment[] }) {
   const last = segments.at(-1);
   const waiting = segments.length === 0 || (last?.type === "tool" && !last.running);
   return (
-    <div className="flex flex-col" aria-live="polite">
-      {segments.map((segment, index) =>
-        segment.type === "tool" ? <ToolRow key={index} label={segment.label} running={segment.running} /> : <StreamText key={index} text={segment.text} />,
-      )}
+    <div className={replyClass} aria-live="polite">
+      <ReplySegments segments={segments} live enter />
       {waiting ? (
-        <p className="rise flex items-center gap-2 py-1.5 text-[13px] text-[#8e8f8b]">
+        <p className="rise flex items-center gap-2 py-1 text-[13px] text-[#8e8f8b]">
           <Spinner />
           <span className="shimmer-text">Working on it</span>
         </p>
@@ -1048,19 +1210,16 @@ function AssistantText({
   onRate: (value: "up" | "down") => void;
 }) {
   const segments: Segment[] = block.segments ?? [{ type: "text", text: block.text }];
+  const settledIn = block.streamed || block.typed;
   return (
-    <div className="rise max-w-[560px] py-2 text-[15px] leading-[1.4] tracking-[-0.15px]">
-      {segments.map((segment, index) =>
-        segment.type === "tool" ? (
-          <ToolRow key={index} label={segment.label} />
-        ) : (
-          <div key={index} className="py-0.5">
-            <Markdown text={segment.text} />
-          </div>
-        ),
-      )}
-      {block.sources?.length ? <SourceChips sources={block.sources} /> : null}
-      {answer ? <ActionRow text={block.text} rating={rating} onRate={onRate} /> : null}
+    <div className={`${settledIn ? "" : "rise "}${replyClass}`}>
+      <ReplySegments segments={segments} live={false} enter={!settledIn} />
+      {block.sources?.length ? <div className="fade-in"><SourceChips sources={block.sources} /></div> : null}
+      {answer ? (
+        <div className={settledIn ? "fade-in" : ""}>
+          <ActionRow text={block.text} rating={rating} onRate={onRate} />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1351,48 +1510,44 @@ function Purpose({
 
 const typedOnce = new Set<string>();
 
+/** Typed blocks finish instantly once the merchant has replied after them, so their message never waits behind an animation. */
+function settled(thread: Block[], typed: Set<string>) {
+  const lastUser = thread.findLastIndex((block) => block.type === "text" && block.role === "user");
+  if (lastUser === -1) return typed;
+  const done = new Set(typed);
+  thread.slice(0, lastUser).forEach((block) => done.add(block.id));
+  return done;
+}
+
 function visibleBlocks(thread: Block[], done: Set<string>) {
   const pending = thread.findIndex((block) => block.type === "text" && block.typed && !done.has(block.id));
   return pending === -1 ? thread : thread.slice(0, pending + 1);
 }
 
-function TypeOut({
-  text,
-  instant,
-  delay,
-  onDone,
-}: {
-  text: string;
-  instant: boolean;
-  delay: number;
-  onDone: () => void;
-}) {
-  const [count, setCount] = useState(0);
+/** Plays a scripted reply back like a live one: "Working on it" for a beat, then the words stream in. */
+function SimulatedTurn({ text, instant, delay, onDone }: { text: string; instant: boolean; delay: number; onDone: () => void }) {
+  const [shown, setShown] = useState<string | null>(null);
   const done = useRef(onDone);
   useEffect(() => {
     done.current = onDone;
   });
   useEffect(() => {
-    const reduce = instant || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let shown = 0;
-    let timer = 0;
-    const tick = () => {
-      shown = reduce ? text.length : Math.min(text.length, shown + 2);
-      setCount(shown);
-      if (shown >= text.length) {
-        done.current();
+    if (instant || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      done.current();
+      return;
+    }
+    const tokens = text.split(/(\s+)/);
+    let at = 0;
+    let timer = window.setTimeout(function tick() {
+      at = Math.min(tokens.length, at + 2);
+      setShown(tokens.slice(0, at).join(""));
+      if (at >= tokens.length) {
+        timer = window.setTimeout(() => done.current(), 120);
         return;
       }
-      const pause = /[.!?]\s*$/.test(text.slice(0, shown)) ? 220 : 16;
-      timer = window.setTimeout(tick, pause);
-    };
-    timer = window.setTimeout(tick, reduce ? 0 : delay);
+      timer = window.setTimeout(tick, /[.!?]$/.test(tokens[at - 2] ?? "") ? 160 : 45);
+    }, delay);
     return () => window.clearTimeout(timer);
   }, [text, instant, delay]);
-  return (
-    <p className="max-w-[560px] whitespace-pre-wrap py-2 text-[15px] leading-[1.4] tracking-[-0.15px]" aria-label={text}>
-      <span aria-hidden>{text.slice(0, count)}</span>
-      <span className="caret ml-0.5 inline-block h-4 w-px translate-y-0.5 bg-white" aria-hidden />
-    </p>
-  );
+  return <LiveTurn segments={shown === null ? [] : [{ type: "text", text: shown }]} />;
 }

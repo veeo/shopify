@@ -40,7 +40,7 @@ export type Segment = { type: "text"; text: string } | { type: "tool"; label: st
 export type Source = { title: string; url: string };
 
 export type Block =
-  | { id: string; type: "text"; role: "user" | "assistant"; text: string; typed?: boolean; segments?: Segment[]; sources?: Source[] }
+  | { id: string; type: "text"; role: "user" | "assistant"; text: string; typed?: boolean; segments?: Segment[]; sources?: Source[]; streamed?: boolean }
   | { id: string; type: "steps" }
   | { id: string; type: "sellers" }
   | { id: string; type: "chips"; chips: Chip[] }
@@ -187,6 +187,15 @@ export const setupChips: Chip[] = [
 
 export const sidekickHello =
   "I'm Sidekick.\n\nYour AI assistant for getting your store ready to sell. I can walk you through setup, answer questions, and help you take action — right here. What would you like to tackle first?";
+
+export const sidekickMakeYourOwn =
+  "You can also build your own sidekicks — agents with a job of their own. A chief of staff that keeps your week on track, a product scout that watches trends, or anything you can describe. Each one gets its own place on the left and its own conversations.";
+
+const makeYourOwnChips: Chip[] = [
+  { label: "Add a chief of staff", tone: "secondary" },
+  { label: "Create my own sidekick", tone: "secondary" },
+  { label: "Browse sidekicks", tone: "secondary" },
+];
 
 export const paymentsReply =
   "For your US store, Shopify Payments setup breaks down into four main parts, it’ll take you only but 10 minutes.";
@@ -576,6 +585,18 @@ function push(state: PrototypeState, agentId: string, block: Block) {
   state.threads[agentId] = [...(state.threads[agentId] ?? []), block];
 }
 
+/** Scripted replies added by `run` play back like a live reply: a short think, then the words stream in. */
+function revealNew(state: PrototypeState, run: () => void) {
+  const before = Object.fromEntries(Object.entries(state.threads).map(([agentId, thread]) => [agentId, new Set(thread.map((block) => block.id))]));
+  run();
+  for (const [agentId, thread] of Object.entries(state.threads)) {
+    state.threads[agentId] = thread.map((block) =>
+      block.type === "text" && block.role === "assistant" && !before[agentId]?.has(block.id) ? { ...block, typed: true } : block,
+    );
+  }
+  return state;
+}
+
 /** Moves the agent's current thread into its conversation list and starts a fresh one. */
 function archive(state: PrototypeState, agentId: string) {
   const thread = state.threads[agentId] ?? [];
@@ -605,6 +626,8 @@ export function setupState(storeName = "My Store"): PrototypeState {
       sidekick: [
         { id: "hello", type: "text", role: "assistant", text: sidekickHello, typed: true },
         { id: "hello-chips", type: "chips", chips: setupChips },
+        { id: "hello-make", type: "text", role: "assistant", text: sidekickMakeYourOwn, typed: true },
+        { id: "hello-make-chips", type: "chips", chips: makeYourOwnChips },
       ],
     },
     preview: "home-setup",
@@ -942,6 +965,15 @@ export function runChip(state: PrototypeState, label: string) {
     });
     return;
   }
+  if (label === "Add a chief of staff") {
+    push(state, "sidekick", { id: id(state), type: "text", role: "user", text: label });
+    applyEffects(state, [{ type: "add-sidekick", id: "chief" }]);
+    return;
+  }
+  if (label === "Browse sidekicks") {
+    state.mode = "add";
+    return;
+  }
   if (label === "Create my own sidekick") {
     state.mode = "thread";
     push(state, "sidekick", { id: id(state), type: "create" });
@@ -1142,7 +1174,7 @@ export type Action =
   | { type: "reset" }
   | { type: "chip"; label: string }
   | { type: "user"; agentId: string; text: string }
-  | { type: "commit"; agentId: string; text: string; segments?: Segment[]; sources?: Source[] }
+  | { type: "commit"; agentId: string; text: string; segments?: Segment[]; sources?: Source[]; streamed?: boolean }
   | { type: "effects"; effects: Effect[] }
   | { type: "business-type"; value: BusinessType }
   | { type: "identity"; patch: Partial<PrototypeState["identity"]> }
@@ -1223,8 +1255,7 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
         ? { ...activeState(state.storeName), motion: state.motion, signedIn: true }
         : { ...setupState(state.storeName), motion: state.motion, signedIn: true };
     case "chip":
-      runChip(next, action.label);
-      return next;
+      return revealNew(next, () => runChip(next, action.label));
     case "user": {
       const first = !(next.threads[action.agentId] ?? []).some((block) => block.type === "text" && block.role === "user");
       push(next, action.agentId, { id: id(next), type: "text", role: "user", text: action.text });
@@ -1243,7 +1274,7 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       next.mode = "thread";
       next.conversationsOpen = false;
       const before = next.preview;
-      runChip(next, card.chip);
+      revealNew(next, () => runChip(next, card.chip));
       if (card.id === "pos") next.preview = before;
       patchAgent(next, "sidekick", { topic: card.title });
       if (!next.cardsDone.includes(card.id)) next.cardsDone.push(card.id);
@@ -1290,7 +1321,7 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       const thread = next.threads[action.agentId] ?? [];
       const last = thread[thread.length - 1];
       if (last?.type === "text" && last.role === "assistant" && last.text === text) return state;
-      push(next, action.agentId, { id: id(next), type: "text", role: "assistant", text, segments: action.segments, sources: action.sources });
+      push(next, action.agentId, { id: id(next), type: "text", role: "assistant", text, segments: action.segments, sources: action.sources, streamed: action.streamed });
       patchAgent(next, action.agentId, { preview: text.replace(/\s+/g, " ").slice(0, 72) });
       return next;
     }

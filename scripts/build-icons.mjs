@@ -49,7 +49,8 @@ for (const name of [...wanted].sort()) {
   const [x, y, w, h] = viewBox.split(/\s+/).map(Number);
   const body = svg
     .replace(/^[\s\S]*?<svg[^>]*>/, "")
-    .replace(/<\/svg>\s*$/, "")
+    // Some CDN files concatenate a second, differently sized <svg>; keep only the first.
+    .replace(/<\/svg>[\s\S]*$/, "")
     .replace(/ fill="currentColor"/g, stroke ? ' fill="currentColor" stroke="none"' : ' fill="currentColor"')
     .replace(/\s+/g, " ")
     .trim();

@@ -2,9 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useDismiss } from "@/components/admin-ui";
-import { ShopifyMark } from "@/components/marks";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
-import { ReadyCard } from "@/components/preview-column";
 import { channelNav, mainNav, navFor, type NavItem, type PreviewId } from "@/lib/admin-nav";
 
 const channelIds = new Set(channelNav.map((item) => item.id));
@@ -13,44 +11,30 @@ const channelIds = new Set(channelNav.map((item) => item.id));
 export function AdminRail({
   expanded,
   preview,
-  storeName,
   onOpen,
   onGo,
   onSearch,
-  onLogout,
+  onToggle,
 }: {
   expanded: boolean;
   preview: PreviewId;
-  storeName: string;
   onOpen: (id: string) => void;
   onGo: (page: PreviewId) => void;
   onSearch: (scope?: string) => void;
-  onLogout: () => void;
+  onToggle: () => void;
 }) {
   const { id: active, child } = navFor(preview);
-  const [menu, setMenu] = useState<"alerts" | "store" | null>(null);
+  const [alerts, setAlerts] = useState(false);
   const [read, setRead] = useState(false);
   const [channelsOpen, setChannelsOpen] = useState(true);
   const shared = { expanded, active, child, onOpen, onGo };
   return (
     <nav
-      className={`relative flex h-full shrink-0 flex-col py-3 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
+      className={`relative flex h-full shrink-0 flex-col pb-3 pt-8 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
         expanded ? "w-[220px] px-2" : "w-[52px] px-[10px]"
       }`}
       aria-label="Shopify admin"
     >
-      <div className="mb-1 flex h-8 items-center">
-        <span className="group relative">
-          <button type="button" aria-label="Store status" onClick={() => onOpen("home")} className="press grid size-8 place-items-center rounded-[10px] hover:bg-white/[0.08]">
-            <ShopifyMark className="h-[22px] w-5" />
-          </button>
-          <span className="pointer-events-none absolute right-full top-0 z-50 hidden pr-2 group-hover:pointer-events-auto group-hover:block group-focus-within:block">
-            <span className="relative block h-[150px] w-[240px]">
-              <ReadyCard onLaunch={() => onGo("online-store-preferences")} className="right-0 top-0" />
-            </span>
-          </span>
-        </span>
-      </div>
       {expanded ? (
         <button
           type="button"
@@ -102,30 +86,27 @@ export function AdminRail({
         <RailButton label="Apps" icon="Apps" onClick={() => onSearch("Apps")} />
       )}
       <div className="mt-auto flex flex-col gap-1">
+        <RailButton
+          label={expanded ? "Collapse admin menu" : "Expand admin menu"}
+          icon="LayoutSidebarRight"
+          onClick={onToggle}
+          text={expanded ? "Collapse" : undefined}
+        />
         <RailItem item={{ id: "settings", label: "Settings", icon: "Settings", page: "settings" }} {...shared} />
-        <div className={`flex gap-1 ${expanded ? "flex-row-reverse items-center" : "flex-col"}`}>
-          <span className="relative">
-            <RailButton label="Alerts" icon="Notification" on={menu === "alerts"} onClick={() => setMenu(menu === "alerts" ? null : "alerts")} controls="alerts-menu" />
-            {read ? null : (
-              <span className="pointer-events-none absolute -right-0.5 -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">1</span>
-            )}
-            {menu === "alerts" ? <Alerts read={read} onRead={() => setRead(true)} onClose={() => setMenu(null)} onOpen={() => onOpen("pos")} /> : null}
-          </span>
-          <span className="relative min-w-0 flex-1">
-            <button
-              type="button"
-              aria-label={`${storeName} menu`}
-              aria-expanded={menu === "store"}
-              aria-controls="store-menu"
-              onClick={() => setMenu(menu === "store" ? null : "store")}
-              className="press flex h-8 w-full items-center gap-2 rounded-[10px] px-1 text-[13px] text-white hover:bg-white/[0.08]"
-            >
-              <span className="grid size-6 shrink-0 place-items-center rounded-md bg-[#36fba1] text-[10px] font-bold text-[#0b3b26]">{initials(storeName)}</span>
-              {expanded ? <span className="fade-in truncate">{storeName}</span> : null}
-            </button>
-            {menu === "store" ? <StoreMenu storeName={storeName} onClose={() => setMenu(null)} onSettings={() => onOpen("settings")} onLogout={onLogout} /> : null}
-          </span>
-        </div>
+        <span className="relative flex flex-col">
+          <RailButton
+            label="Alerts"
+            icon="Notification"
+            on={alerts}
+            onClick={() => setAlerts(!alerts)}
+            controls="alerts-menu"
+            text={expanded ? "Alerts" : undefined}
+          />
+          {read ? null : (
+            <span className="pointer-events-none absolute left-[22px] -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">1</span>
+          )}
+          {alerts ? <Alerts read={read} onRead={() => setRead(true)} onClose={() => setAlerts(false)} onOpen={() => onOpen("pos")} /> : null}
+        </span>
       </div>
     </nav>
   );
@@ -277,7 +258,9 @@ function RailButton({
   onClick,
   shortcut,
   controls,
+  text,
 }: {
+  text?: string;
   label: string;
   icon: PolarisIconName;
   on?: boolean;
@@ -294,11 +277,14 @@ function RailButton({
         aria-current={on && !controls ? "page" : undefined}
         aria-expanded={controls ? on : undefined}
         onClick={onClick}
-        className={`press flex h-8 w-8 items-center rounded-[10px] px-1.5 ${on ? "bg-[#303030] text-white" : "text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white"}`}
+        className={`press flex h-8 items-center gap-2 rounded-[10px] px-1.5 text-[13px] ${text ? "w-full" : "w-8"} ${
+          on ? "bg-[#303030] text-white" : "text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white"
+        }`}
       >
         <PIcon name={icon} size={20} />
+        {text ? <span className="fade-in truncate whitespace-nowrap">{text}</span> : null}
       </button>
-      {controls && on ? null : <RailTip label={label} shortcut={shortcut} />}
+      {(controls && on) || text ? null : <RailTip label={label} shortcut={shortcut} />}
     </span>
   );
 }
@@ -343,48 +329,87 @@ function Alerts({ read, onRead, onClose, onOpen }: { read: boolean; onRead: () =
   );
 }
 
-function StoreMenu({ storeName, onClose, onSettings, onLogout }: { storeName: string; onClose: () => void; onSettings: () => void; onLogout: () => void }) {
+const menuShell =
+  "pop-in absolute z-50 flex w-[240px] flex-col rounded-2xl bg-white p-1.5 text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)]";
+const menuItem = "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] hover:bg-[#f1f1f1]";
+
+/** The store itself: switch stores or create one. */
+export function StoreMenu({
+  storeName,
+  className,
+  onClose,
+  onSettings,
+}: {
+  storeName: string;
+  className: string;
+  onClose: () => void;
+  onSettings: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(true, ref, onClose);
-  const item = "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] hover:bg-[#f1f1f1]";
   return (
-    <div
-      ref={ref}
-      id="store-menu"
-      className="pop-in absolute bottom-0 right-[calc(100%+8px)] z-50 flex w-[240px] origin-bottom-right flex-col rounded-2xl bg-white p-1.5 text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)]"
-    >
+    <div ref={ref} id="store-menu" className={`${menuShell} ${className}`}>
       <button
         type="button"
         onClick={() => {
           onClose();
           onSettings();
         }}
-        className={`${item} bg-[#f1f1f1] font-semibold`}
+        className={`${menuItem} bg-[#f1f1f1] font-semibold`}
       >
-        <span className="grid size-6 place-items-center rounded-md bg-[#ffd400] text-[10px] font-bold text-[#4f3f00]">{initials(storeName)}</span>
+        <span className="grid size-6 place-items-center rounded-full bg-[#36fba1] text-[10px] font-bold text-[#0b3b26]">{initials(storeName)}</span>
         <span className="flex-1">{storeName}</span>
-        <PIcon name="Code" size={16} />
+        <PIcon name="Check" size={16} />
       </button>
-      <button type="button" className={item}>
+      <button type="button" className={menuItem}>
         <PIcon name="Plus" size={16} />
         Create store
       </button>
-      <span className="my-1 h-px bg-[#ebebeb]" />
-      <button type="button" className={item}>
-        <span className="grid size-6 place-items-center rounded-md bg-[#ffc2e0] text-[10px] font-bold text-[#6b0036]">{initials(storeName)}</span>
+    </div>
+  );
+}
+
+/** The merchant's account: admin, help, and log out. */
+export function AccountMenu({
+  storeName,
+  className,
+  onClose,
+  onSettings,
+  onLogout,
+}: {
+  storeName: string;
+  className: string;
+  onClose: () => void;
+  onSettings: () => void;
+  onLogout: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDismiss(true, ref, onClose);
+  return (
+    <div ref={ref} id="account-menu" className={`${menuShell} ${className}`}>
+      <button
+        type="button"
+        onClick={() => {
+          onClose();
+          onSettings();
+        }}
+        className={menuItem}
+      >
+        <img src="/assets/user.png" alt="" className="size-6 rounded-full object-cover" />
         {storeName} Admin
       </button>
-      <button type="button" className={item}>
+      <a href="https://help.shopify.com" target="_blank" rel="noreferrer" onClick={onClose} className={menuItem}>
         <PIcon name="QuestionCircle" size={16} />
         Help Center
-      </button>
+      </a>
+      <span className="my-1 h-px bg-[#ebebeb]" />
       <button
         type="button"
         onClick={() => {
           onClose();
           onLogout();
         }}
-        className={item}
+        className={menuItem}
       >
         <PIcon name="Exit" size={16} />
         Log out

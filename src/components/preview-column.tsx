@@ -3,7 +3,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
 import { Badge, Body, Btn, Card as AdminCard, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
-import { Composer } from "@/components/chat-column";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import type { BusinessType, PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
 
@@ -18,7 +17,6 @@ export function PreviewColumn({
   onPreview,
   onChip,
   onAsk,
-  onRecents,
   onCard,
   onDismissCard,
   onBusiness,
@@ -33,7 +31,6 @@ export function PreviewColumn({
   onPreview: (page: PreviewId, wide?: boolean) => void;
   onChip: (label: string) => void;
   onAsk: (text: string) => void;
-  onRecents: () => void;
   onCard: (id: string) => void;
   onDismissCard: (id: string) => void;
   onBusiness: (value: PrototypeState["businessType"]) => void;
@@ -49,7 +46,7 @@ export function PreviewColumn({
   const grey = state.preview === "product";
   return (
     <aside
-      className={`p-partial-theme-admin-next-light h-full shrink-0 overflow-hidden rounded-xl text-[#303030] ${grey ? "bg-[#f7f7f7]" : "bg-white"} ${
+      className={`p-partial-theme-admin-next-light h-full shrink-0 overflow-hidden rounded-[20px] text-[#303030] ${grey ? "bg-[#f7f7f7]" : "bg-white"} ${
         state.motion ? "transition-[width] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
       }`}
       style={{ width: wide ? 584 : 393 }}
@@ -58,7 +55,6 @@ export function PreviewColumn({
         <Screen
           state={state}
           nav={nav}
-          onRecents={onRecents}
           onCard={onCard}
           onDismissCard={onDismissCard}
           onBusiness={onBusiness}
@@ -76,7 +72,6 @@ export function PreviewColumn({
 function Screen(props: {
   state: PrototypeState;
   nav: Nav;
-  onRecents: () => void;
   onCard: (id: string) => void;
   onDismissCard: (id: string) => void;
   onBusiness: (value: PrototypeState["businessType"]) => void;
@@ -89,7 +84,7 @@ function Screen(props: {
   const { state, nav } = props;
   switch (state.preview) {
     case "home-setup":
-      return <HomeSetup state={state} nav={nav} onRecents={props.onRecents} onCard={props.onCard} onDismiss={props.onDismissCard} />;
+      return <HomeSetup state={state} nav={nav} onCard={props.onCard} onDismiss={props.onDismissCard} />;
     case "home-active":
       return <HomeActive nav={nav} />;
     case "payments":
@@ -236,26 +231,21 @@ const setupCards: { id: string; art: ReactNode; title: string; body: string; cta
   },
 ];
 
-const homePlaceholders = ["Help me choose a theme", "Customize my current theme", "Which theme should I use?", "What themes are popular?"];
-
 /** Cards that have already played their collapse, so returning to Home doesn't replay it. */
 const collapsedCards = new Set<string>();
 
 function HomeSetup({
   state,
   nav,
-  onRecents,
   onCard,
   onDismiss,
 }: {
   state: PrototypeState;
   nav: Nav;
-  onRecents: () => void;
   onCard: (id: string) => void;
   onDismiss: (id: string) => void;
 }) {
   const hidden = new Set([...state.cardsDone, ...state.cardsDismissed]);
-  const sidekick = state.agents.find((item) => item.id === "sidekick");
   return (
     <div className="flex flex-col gap-6 px-4 pb-10 pt-3">
       <div className="flex h-7 items-center justify-between text-[12px]">
@@ -279,20 +269,6 @@ function HomeSetup({
         <br />
         Now let’s design your store
       </h2>
-      {sidekick ? (
-        <Composer
-          state={state}
-          agent={sidekick}
-          suggestions={homePlaceholders}
-          rotating={homePlaceholders}
-          busy={false}
-          locked={false}
-          light
-          onSend={nav.ask}
-          onStop={() => undefined}
-          onRecents={onRecents}
-        />
-      ) : null}
       <ul aria-label="Home feed" className="flex flex-col">
         {setupCards.map((card) => (
           <CardSlot key={card.id} id={card.id} hidden={hidden.has(card.id)}>
