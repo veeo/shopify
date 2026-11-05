@@ -397,22 +397,26 @@ export function StoreMenu({
 export function AccountMenu({
   storeName,
   scenario,
+  arrival,
   menuStyle,
   className,
   onClose,
   onSettings,
   onLogout,
   onScenario,
+  onArrival,
   onMenuStyle,
 }: {
   storeName: string;
   scenario: "setup" | "active";
+  arrival: "tasks" | "sidekick";
   menuStyle: "push" | "drop";
   className: string;
   onClose: () => void;
   onSettings: () => void;
   onLogout: () => void;
   onScenario: (scenario: "setup" | "active") => void;
+  onArrival: (arrival: "tasks" | "sidekick") => void;
   onMenuStyle: (style: "push" | "drop") => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -468,6 +472,32 @@ export function AccountMenu({
           );
         })}
       </div>
+      {scenario === "setup" ? (
+        <div className="px-1 pb-1">
+          <p className="px-1 pb-1 text-[11px] text-[#616161]">New store</p>
+          <div role="group" aria-label="New store opening" className="grid grid-cols-2 gap-1">
+            {(
+              [
+                ["tasks", "Tasks"],
+                ["sidekick", "Sidekick"],
+              ] as const
+            ).map(([value, label]) => {
+              const on = arrival === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => onArrival(value)}
+                  className={`rounded-lg px-2 py-1.5 text-[12px] ${on ? "bg-[#303030] font-semibold text-white" : "text-[#303030] hover:bg-[#f1f1f1]"}`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
       <div className="px-1 pb-1">
         <p className="px-1 pb-1 text-[11px] text-[#616161]">Navigation</p>
         <div role="group" aria-label="Navigation" className="grid grid-cols-2 gap-1">

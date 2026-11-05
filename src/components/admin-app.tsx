@@ -87,7 +87,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
       pending.done = true;
       setLive(null);
       setState((current) => {
-        const script = scriptedTurn(pending.agentId, pending.text, current.storeName);
+        const script = scriptedTurn(pending.agentId, pending.text, current.storeName, current.arrival);
         const withText = reducer(current, { type: "commit", agentId: pending.agentId, text: script.text });
         return reducer(withText, { type: "effects", effects: script.effects });
       });
@@ -108,7 +108,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     let answer = text;
     setState((current) => {
       if (!text) {
-        const script = scriptedTurn(pending.agentId, pending.text, current.storeName);
+        const script = scriptedTurn(pending.agentId, pending.text, current.storeName, current.arrival);
         answer = script.text;
         const withScript = reducer(current, { type: "commit", agentId: pending.agentId, text: script.text });
         return reducer(withScript, { type: "effects", effects: script.effects });
@@ -170,7 +170,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
 
   function logout() {
     setSidebarOpen(true);
-    enter((current) => ({ ...setupState(current.storeName), motion: current.motion, signedIn: true }));
+    enter((current) => ({ ...setupState(current.storeName, current.arrival), motion: current.motion, signedIn: true }));
   }
 
   function stop() {
@@ -205,6 +205,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onSearch={() => dispatch({ type: "toggle-search" })}
           onQuery={(query) => dispatch({ type: "search", query })}
           onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
+          onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
           onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
         />
         <div className="my-3 w-px shrink-0 bg-white/10" />
@@ -346,6 +347,7 @@ function mapTool(name: string, input: unknown): Effect | null {
       title: value.title,
       price: typeof value.price === "string" ? value.price : "0.00",
       description: typeof value.description === "string" ? value.description : undefined,
+      wide: value.wide === true,
     };
   }
   if (name === "addSidekick" && typeof value.id === "string") return { type: "add-sidekick", id: value.id };

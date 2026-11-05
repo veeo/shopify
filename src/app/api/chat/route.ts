@@ -8,7 +8,7 @@ import {
   type UIMessage,
 } from "ai";
 import { z } from "zod";
-import { businessTypes, personaFor, previewPages, scriptedTurn } from "@/lib/prototype";
+import { businessTypes, personaFor, previewPages, scriptedTurn, type Arrival } from "@/lib/prototype";
 import { chatModel } from "@/lib/model";
 import { readHelpArticle, searchDevDocs, searchHelpCenter } from "@/lib/shopify-help";
 
@@ -39,7 +39,8 @@ const tools = {
     execute: async ({ query }) => searchDevDocs(query),
   }),
   navigatePreview: tool({
-    description: "Open a page in the live Shopify admin preview. Set wide when the merchant needs the payments form.",
+    description:
+      "Open a page in the live Shopify admin preview. wide true grows the panel so that page takes attention. wide false shrinks it so the conversation stays in front. Grow it when they should look at or finish the page. Shrink it when you are still deciding together.",
     inputSchema: z.object({
       page: previewSchema,
       wide: z.boolean().optional(),
@@ -57,11 +58,12 @@ const tools = {
     execute: async (input) => input,
   }),
   addProduct: tool({
-    description: "Add a draft product and open it in the preview.",
+    description: "Add a draft product and open it in the preview. Set wide true when the merchant should fill the draft in now.",
     inputSchema: z.object({
       title: z.string().min(1),
       price: z.string(),
       description: z.string().optional(),
+      wide: z.boolean().optional(),
     }),
     execute: async (input) => input,
   }),
@@ -87,8 +89,8 @@ function textOf(message: UIMessage | undefined) {
     .trim();
 }
 
-function scriptedResponse(agentId: string, text: string, storeName: string) {
-  const turn = scriptedTurn(agentId, text, storeName);
+function scriptedResponse(agentId: string, text: string, storeName: string, arrival: Arrival) {
+  const turn = scriptedTurn(agentId, text, storeName, arrival);
   const stream = createUIMessageStream({
     async execute({ writer }) {
       writer.write({ type: "data-effects", data: { effects: turn.effects } });
@@ -114,6 +116,7 @@ type PrototypeContext = {
   preview?: string;
   scenario?: string;
   products?: string[];
+  arrival?: Arrival;
 };
 
 function systemPrompt(context: PrototypeContext | undefined, persona: string, storeName: string) {
@@ -138,7 +141,7 @@ function systemPrompt(context: PrototypeContext | undefined, persona: string, st
     "",
     "This admin:",
     "- It's a prototype with sample data. Use the admin tools to change the preview, payments form, catalog, and sidekick list when the merchant asks you to do something. Never claim you changed something unless you called the tool.",
-    `- Scenario: ${context?.scenario ?? "setup"}. Page open in the preview: ${context?.preview ?? "home-setup"}.`,
+    `- Scenario: ${context?.scenario ?? "setup"}. Page open in the preview: ${context?.preview ?? "home-setup"}.${context?.arrival === "sidekick" ? " This is the Sidekick opening: find the next step. Grow the admin when a page should take their attention, and shrink it when you are still deciding." : ""}`,
     context?.products?.length ? `- Catalog: ${context.products.slice(0, 30).join(", ")}.` : "",
   ]
     .filter((line) => line !== "")
@@ -159,13 +162,14 @@ export async function POST(request: Request) {
 
   const agentId = body.prototype?.agentId || "sidekick";
   const storeName = body.prototype?.storeName || "My Store";
+  const arrival: Arrival = body.prototype?.arrival === "sidekick" ? "sidekick" : "tasks";
   const hookMessages = Array.isArray(body.messages) ? body.messages : [];
   const lastUser = [...hookMessages].reverse().find((message) => message.role === "user");
   const asked = textOf(lastUser);
   if (!asked) return Response.json({ error: "Send a message." }, { status: 400 });
 
   const model = chatModel(request);
-  if (!model) return scriptedResponse(agentId, asked, storeName);
+  if (!model) return scriptedResponse(agentId, asked, storeName, arrival);
   const persona = body.prototype?.persona?.trim().slice(0, 4000) || personaFor(agentId);
 
   const prior: UIMessage[] = (body.transcript ?? []).slice(-12).map((message, index) => ({
@@ -191,6 +195,6 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("chat request failed", error);
-    return scriptedResponse(agentId, asked, storeName);
+    return scriptedResponse(agentId, asked, storeName, arrival);
   }
 }

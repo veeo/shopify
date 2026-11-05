@@ -163,7 +163,7 @@ export function ChatColumn({
                       key={block.id}
                       text={block.text}
                       instant={!state.motion}
-                      delay={block.id === "hello" ? 1200 : 750}
+                      delay={block.id === "hello" || block.id === "arrive" ? 1200 : 750}
                       onDone={() => markTyped(block.id)}
                     />
                   ) : (
@@ -490,6 +490,10 @@ const pageSuggestions: Record<string, string[]> = {
 
 export function suggestionsFor(state: PrototypeState) {
   if (state.mode === "add") return ["Tell me more about creating a sidekick", "Which sidekick should I add first?", "Create my own sidekick", "What can sidekicks do?"];
+  if (state.arrival === "sidekick" && state.scenario === "setup" && state.selectedAgentId === "sidekick") {
+    const asked = (state.threads.sidekick ?? []).some((block) => block.type === "text" && block.role === "user");
+    if (!asked) return ["Start something new", "I already sell somewhere", "Show me around"];
+  }
   if (state.selectedAgentId !== "sidekick") {
     const asks = (state.threads[state.selectedAgentId] ?? [])
       .flatMap((block) => (block.type === "chips" ? block.chips.filter((chip) => chip.send).map((chip) => chip.label) : []))
