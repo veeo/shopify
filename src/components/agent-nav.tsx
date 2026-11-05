@@ -103,12 +103,12 @@ export function AgentNav({
   return (
     <aside
       ref={navRef}
-      className={`flex h-full shrink-0 flex-col px-3 pb-3 pt-7 motion-reduce:transition-none ${
-        collapsed ? "w-[76px]" : "w-[248px] gap-4"
+      className={`flex h-full shrink-0 flex-col pb-3 pt-7 motion-reduce:transition-none ${
+        collapsed ? "w-[64px]" : "w-[248px] gap-4 px-3"
       }`}
       style={{ transition: `width ${move}` }}
     >
-      <div className={`relative z-0 flex bg-transparent pl-2 ${collapsed ? "flex-col items-start gap-4" : "items-center gap-1.5 pb-4"}`}>
+      <div className={`relative z-0 flex bg-transparent ${collapsed ? "flex-col items-center gap-4" : "items-center gap-1.5 pb-4 pl-2"}`}>
         <Tip label={navOpen ? "Collapse navigation" : "Expand navigation"} keys={["Ctrl", "B"]} side="right">
           <button
             type="button"
@@ -117,7 +117,7 @@ export function AgentNav({
             aria-expanded={navOpen}
             aria-keyshortcuts="Control+B Meta+B"
             onClick={onToggleNav}
-            className="group/logo press relative grid size-8 shrink-0 place-items-center rounded-lg transition-colors hover:bg-white/[0.08]"
+            className={`group/logo press relative grid size-8 shrink-0 place-items-center rounded-lg transition-colors hover:bg-white/[0.08] ${collapsed ? "mb-2" : ""}`}
           >
             <span className="transition-opacity duration-150 group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0">
               <ShopifyMark />
@@ -139,7 +139,7 @@ export function AgentNav({
         </span>
       </div>
 
-      {collapsed ? <div className="mt-8 h-px bg-white/15" aria-hidden /> : null}
+      {collapsed ? <div className="mx-auto mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
 
       {state.searchOpen && !collapsed ? (
         <div className="rise -mt-4 px-1">
@@ -154,27 +154,24 @@ export function AgentNav({
       ) : null}
 
       <div
-        className={`scroll-thin relative z-10 flex min-h-0 flex-1 flex-col ${collapsed ? "pt-8" : "gap-4"} ${
-          sliding ? "overflow-visible" : "overflow-x-hidden overflow-y-auto"
-        }`}
+        className={`scroll-thin relative z-10 flex min-h-0 flex-1 flex-col ${
+          collapsed ? "pt-6 [scrollbar-gutter:stable_both-edges]" : "gap-4"
+        } ${sliding ? "overflow-visible" : "overflow-x-hidden overflow-y-auto"}`}
       >
         {visibleGroups.map((group, index) => (
-          <div
-            key={group.id}
-            className={collapsed ? (index > 0 ? "mt-8 border-t border-white/15 pt-8" : "") : "flex min-w-0 flex-col gap-2"}
-          >
+          <div key={group.id} className={collapsed ? "" : "flex min-w-0 flex-col gap-2"}>
+            {collapsed && index > 0 ? <div className="mx-auto mb-6 mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
             {!collapsed && group.label ? (
               <div className="flex h-8 items-center gap-1.5 px-2.5">
                 <span className="shrink-0 whitespace-nowrap text-[13px] leading-4 tracking-[-0.13px] text-[#7d7f7c]">{group.label}</span>
                 <span className="h-px min-w-2 flex-1 bg-white/10" />
               </div>
             ) : null}
-            <div className={collapsed ? "flex flex-col gap-4 pl-2" : "flex flex-col gap-2"}>
+            <div className={collapsed ? "flex flex-col items-center gap-4" : "flex flex-col gap-2"}>
               {group.items.map((item) => {
                 const selected = item.id === state.selectedAgentId && state.mode === "thread";
-                return (
+                const button = (
                   <button
-                    key={item.id}
                     type="button"
                     data-flip={`agent-${item.id}`}
                     aria-current={selected ? "page" : undefined}
@@ -215,6 +212,15 @@ export function AgentNav({
                     ) : null}
                   </button>
                 );
+                return collapsed ? (
+                  <Tip key={item.id} label={item.name} side="right" fixed>
+                    {button}
+                  </Tip>
+                ) : (
+                  <span key={item.id} className="contents">
+                    {button}
+                  </span>
+                );
               })}
               {group.id === "hidden" && group.items.length === 0 && !collapsed ? (
                 <p className="px-2.5 text-[12px] text-[#737572]">Nothing hidden</p>
@@ -224,7 +230,8 @@ export function AgentNav({
         ))}
       </div>
 
-      <div className={`flex pl-2 ${collapsed ? "mt-8 flex-col items-start border-t border-white/15 pt-8" : "h-12 items-center"}`}>
+      {collapsed ? <div className="mx-auto mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
+      <div className={`flex ${collapsed ? "mt-6 flex-col items-center" : "h-12 items-center pl-2"}`}>
         <span className={`group/ids relative flex ${collapsed ? "flex-col items-center" : "items-center"}`} data-open={menu ? "" : undefined}>
           <span className="relative z-10" data-flip="account">
             <button

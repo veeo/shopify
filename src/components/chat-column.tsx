@@ -227,8 +227,25 @@ export function ChatColumn({
   );
 }
 
-/** Dark label pill above the trigger, shown after the admin's ~0.5s hover delay. */
+/** Dark label pill, shown after the admin's ~0.5s hover delay. `fixed` escapes overflow clipping. */
 export function Tip({
+  label,
+  children,
+  side = "top",
+  keys,
+  fixed = false,
+}: {
+  label: string;
+  children: React.ReactNode;
+  side?: "top" | "top-start" | "bottom" | "right" | "left";
+  keys?: string[];
+  fixed?: boolean;
+}) {
+  if (fixed) return <FixedTip label={label} side={side} keys={keys}>{children}</FixedTip>;
+  return <HoverTip label={label} side={side} keys={keys}>{children}</HoverTip>;
+}
+
+function HoverTip({
   label,
   children,
   side = "top",
@@ -260,6 +277,98 @@ export function Tip({
           </kbd>
         ))}
       </span>
+    </span>
+  );
+}
+
+function FixedTip({
+  label,
+  children,
+  side = "right",
+  keys,
+}: {
+  label: string;
+  children: React.ReactNode;
+  side?: "top" | "top-start" | "bottom" | "right" | "left";
+  keys?: string[];
+}) {
+  const anchor = useRef<HTMLSpanElement>(null);
+  const timer = useRef(0);
+  const [box, setBox] = useState<{ top: number; left: number } | null>(null);
+
+  function place() {
+    const rect = anchor.current?.getBoundingClientRect();
+    if (!rect) return;
+    const next =
+      side === "right"
+        ? { top: rect.top + rect.height / 2, left: rect.right + 8 }
+        : side === "left"
+          ? { top: rect.top + rect.height / 2, left: rect.left - 8 }
+          : side === "bottom"
+            ? { top: rect.bottom + 6, left: rect.left + rect.width / 2 }
+            : side === "top-start"
+              ? { top: rect.top - 6, left: rect.left }
+              : { top: rect.top - 6, left: rect.left + rect.width / 2 };
+    setBox((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+  }
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  useEffect(() => {
+    if (!box) return;
+    const sync = () => place();
+    window.addEventListener("scroll", sync, true);
+    window.addEventListener("resize", sync);
+    return () => {
+      window.removeEventListener("scroll", sync, true);
+      window.removeEventListener("resize", sync);
+    };
+    // place reads the latest anchor and side; resubscribe only when the tip opens or the side changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [box, side]);
+
+  function show(delay: number) {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(place, delay);
+  }
+
+  function hide() {
+    window.clearTimeout(timer.current);
+    setBox(null);
+  }
+
+  const shift = {
+    top: "-translate-x-1/2 -translate-y-full",
+    "top-start": "-translate-y-full",
+    bottom: "-translate-x-1/2",
+    right: "-translate-y-1/2",
+    left: "-translate-x-full -translate-y-1/2",
+  }[side];
+
+  return (
+    <span
+      ref={anchor}
+      className="relative inline-flex"
+      onMouseEnter={() => show(500)}
+      onMouseLeave={hide}
+      onFocus={() => show(0)}
+      onBlur={hide}
+    >
+      {children}
+      {box ? (
+        <span
+          role="tooltip"
+          style={{ top: box.top, left: box.left }}
+          className={`fade-in pointer-events-none fixed z-50 flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-[#1a1a1a] px-2 py-1 text-[12px] font-medium leading-4 text-white shadow-[0_4px_12px_rgba(0,0,0,0.4)] ${shift}`}
+        >
+          {label}
+          {keys?.map((key) => (
+            <kbd key={key} className="rounded bg-white/15 px-1 font-sans text-[10px] font-semibold uppercase leading-4 tracking-wide text-white/80">
+              {key}
+            </kbd>
+          ))}
+        </span>
+      ) : null}
     </span>
   );
 }
