@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
+import { AdminRail } from "@/components/admin-rail";
 import { Badge, Body, Btn, Card as AdminCard, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import type { BusinessType, PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
@@ -26,6 +27,7 @@ export function PreviewColumn({
   onUpdateProduct,
   onAddProduct,
   onRail,
+  onSearch,
 }: {
   state: PrototypeState;
   onPreview: (page: PreviewId, wide?: boolean) => void;
@@ -40,18 +42,46 @@ export function PreviewColumn({
   onUpdateProduct: (id: string, patch: Partial<Product>) => void;
   onAddProduct: () => void;
   onRail: (id: string) => void;
+  onSearch: (scope?: string) => void;
 }) {
   const wide = state.previewWide || state.preview === "payments-setup";
-  const nav: Nav = { onPreview, onRail, onChip, go: (page) => onPreview(page), rail: onRail, chip: onChip, ask: onAsk };
+  const [menu, setMenu] = useState(false);
+  const nav: Nav = {
+    onPreview,
+    onRail,
+    onChip,
+    go: (page) => {
+      setMenu(false);
+      onPreview(page);
+    },
+    rail: (id) => {
+      setMenu(false);
+      onRail(id);
+    },
+    chip: onChip,
+    ask: onAsk,
+  };
   const grey = state.preview === "product";
+  useEffect(() => {
+    if (!menu) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenu(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menu]);
   return (
     <aside
-      className={`p-partial-theme-admin-next-light h-full shrink-0 overflow-hidden rounded-[20px] text-[#303030] ${grey ? "bg-[#f7f7f7]" : "bg-white"} ${
+      className={`p-partial-theme-admin-next-light relative h-full shrink-0 overflow-hidden rounded-[20px] text-[#303030] ${grey ? "bg-[#f7f7f7]" : "bg-white"} ${
         state.motion ? "transition-[width] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
       }`}
       style={{ width: wide ? 584 : 393 }}
     >
-      <div key={state.preview} className={`${state.motion ? "page-in" : ""} h-full overflow-y-auto [scrollbar-width:none]`}>
+      <div
+        key={state.preview}
+        inert={menu ? true : undefined}
+        className={`${state.motion ? "page-in" : ""} h-full overflow-y-auto [scrollbar-width:none]`}
+      >
         <Screen
           state={state}
           nav={nav}
@@ -64,6 +94,53 @@ export function PreviewColumn({
           onUpdateProduct={onUpdateProduct}
           onAddProduct={onAddProduct}
         />
+      </div>
+      <button
+        type="button"
+        aria-label={menu ? "Close admin menu" : "Open admin menu"}
+        aria-expanded={menu}
+        aria-controls="admin-menu"
+        onClick={() => setMenu((open) => !open)}
+        className="press absolute right-6 top-7 z-40 grid size-8 place-items-center rounded-full bg-[#f1f1f1] text-[#303030] transition-colors hover:bg-[#e7e7e7]"
+      >
+        <span className="relative grid size-5 place-items-center">
+          <span className={`absolute transition-all duration-200 ${menu ? "scale-75 rotate-90 opacity-0" : "opacity-100"}`}>
+            <PIcon name="Menu" size={18} />
+          </span>
+          <span className={`absolute transition-all duration-200 ${menu ? "opacity-100" : "-rotate-90 scale-75 opacity-0"}`}>
+            <PIcon name="X" size={18} />
+          </span>
+        </span>
+      </button>
+      <div className={`absolute inset-0 z-30 ${menu ? "" : "pointer-events-none"}`} inert={menu ? undefined : true}>
+        <button
+          type="button"
+          aria-label="Close admin menu"
+          tabIndex={menu ? 0 : -1}
+          onClick={() => setMenu(false)}
+          className={`absolute inset-0 bg-[#0c0d0c]/30 transition-opacity duration-300 motion-reduce:transition-none ${menu ? "opacity-100" : "opacity-0"}`}
+        />
+        <div
+          id="admin-menu"
+          role="dialog"
+          aria-label="Admin menu"
+          className={`p-partial-theme-admin-next-dark absolute inset-y-0 right-0 flex w-[260px] max-w-[calc(100%-48px)] rounded-l-2xl bg-[#0c0d0c] text-white shadow-[-16px_0_40px_rgba(0,0,0,0.22)] transition-[translate] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+            menu ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <AdminRail
+            embedded
+            revealed={menu}
+            expanded
+            preview={state.preview}
+            onOpen={(id) => nav.rail(id)}
+            onGo={(page) => nav.go(page)}
+            onSearch={(scope) => {
+              setMenu(false);
+              onSearch(scope);
+            }}
+          />
+        </div>
       </div>
     </aside>
   );
@@ -111,8 +188,8 @@ function Screen(props: {
 
 /* Shared pieces for the Figma-designed screens (active home, payments setup) */
 
-function Page({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
-  return <div className={`flex flex-col gap-6 pb-[86px] pt-7 ${wide ? "px-8" : "px-6"}`}>{children}</div>;
+function Page({ children }: { children: ReactNode; wide?: boolean }) {
+  return <div className="flex flex-col gap-6 px-6 pb-[86px] pt-7">{children}</div>;
 }
 
 function H1({ children }: { children: ReactNode }) {
@@ -247,8 +324,8 @@ function HomeSetup({
 }) {
   const hidden = new Set([...state.cardsDone, ...state.cardsDismissed]);
   return (
-    <div className="flex flex-col gap-6 px-4 pb-10 pt-3">
-      <div className="flex h-7 items-center justify-between text-[12px]">
+    <div className="flex flex-col gap-6 px-6 pb-10 pt-7">
+      <div className="flex h-8 items-center justify-between pr-12 text-[12px]">
         <ReadyToSell onLaunch={() => nav.go("online-store-preferences")} />
         <span className="text-[#616161]">
           Questions?{" "}
@@ -476,9 +553,9 @@ function HomeActive({ nav }: { nav: Nav }) {
   const next: Record<RangeId, RangeId> = { today: "week", week: "month", month: "today" };
   const analytics = () => nav.onRail("analytics");
   return (
-    <div className="flex flex-col gap-6 px-8 pb-[86px] pt-7">
+    <div className="flex flex-col gap-6 px-6 pb-[86px] pt-7">
       <div className="flex flex-col gap-6">
-        <div className="flex h-8 items-center justify-between">
+        <div className="flex h-8 items-center justify-between pr-12">
           <H1>Home</H1>
           <button type="button" onClick={analytics} className="press group flex items-center gap-1.5 text-[12px] leading-[1.45] tracking-[-0.12px] text-[#737572] hover:text-[#171817]">
             82 visitors right now
@@ -492,7 +569,7 @@ function HomeActive({ nav }: { nav: Nav }) {
             </span>
           </button>
         </div>
-        <div className="-mr-8 flex gap-2 overflow-x-auto pr-8 [scrollbar-width:none]">
+        <div className="-mr-6 flex gap-2 overflow-x-auto pr-6 [scrollbar-width:none]">
           <Pill tone="ink" onClick={() => setRange(next[range])} className="pl-3 pr-[13px]">
             <PIcon name="Calendar" size={20} />
             {data.label}
@@ -841,7 +918,7 @@ function Payments({ nav }: { nav: Nav }) {
     <>
       <TopBar back="Settings" onBack={() => nav.go("settings")} title="Settings" />
       <Body>
-        <h2 className="px-1 pt-2 text-[20px] font-bold leading-7 tracking-[-0.3px]">Payments</h2>
+        <h2 className="pt-2 text-[20px] font-bold leading-7 tracking-[-0.3px]">Payments</h2>
         <Section
           title="Shopify Payments"
           aside={
@@ -1039,7 +1116,7 @@ function ProductEdit({
     <>
       <TopBar back="Products" onBack={onBack} title="Products" actions={[{ label: fresh ? "Save" : "Save", tone: "primary", onClick: onBack }]} />
       <Body>
-        <h2 className="px-1 pt-1 text-[20px] font-bold leading-7 tracking-[-0.3px]">{fresh ? "Add product" : product.title || "Untitled product"}</h2>
+        <h2 className="pt-1 text-[20px] font-bold leading-7 tracking-[-0.3px]">{fresh ? "Add product" : product.title || "Untitled product"}</h2>
         <AdminCard className="flex flex-col gap-3">
           <label className="flex flex-col gap-1">
             <Label>Title</Label>

@@ -15,13 +15,19 @@ export function AdminRail({
   onGo,
   onSearch,
   onToggle,
+  embedded = false,
+  revealed = false,
 }: {
   expanded: boolean;
   preview: PreviewId;
   onOpen: (id: string) => void;
   onGo: (page: PreviewId) => void;
   onSearch: (scope?: string) => void;
-  onToggle: () => void;
+  onToggle?: () => void;
+  /** Drawn inside the admin panel instead of the far-right rail. */
+  embedded?: boolean;
+  /** The sheet is open, so the groups can ease in. */
+  revealed?: boolean;
 }) {
   const { id: active, child } = navFor(preview);
   const [alerts, setAlerts] = useState(false);
@@ -30,9 +36,9 @@ export function AdminRail({
   const shared = { expanded, active, child, onOpen, onGo };
   return (
     <nav
-      className={`relative flex h-full shrink-0 flex-col pb-3 pt-8 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
-        expanded ? "w-[220px] px-2" : "w-[52px] px-[10px]"
-      }`}
+      className={`relative flex h-full shrink-0 flex-col pb-3 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
+        embedded ? "w-full px-2 pt-[72px]" : expanded ? "w-[220px] px-2 pt-8" : "w-[52px] px-[10px] pt-8"
+      } ${embedded && revealed ? "menu-stagger" : ""}`}
       aria-label="Shopify admin"
     >
       {expanded ? (
@@ -86,12 +92,14 @@ export function AdminRail({
         <RailButton label="Apps" icon="Apps" onClick={() => onSearch("Apps")} />
       )}
       <div className="mt-auto flex flex-col gap-1">
-        <RailButton
-          label={expanded ? "Collapse admin menu" : "Expand admin menu"}
-          icon="LayoutSidebarRight"
-          onClick={onToggle}
-          text={expanded ? "Collapse" : undefined}
-        />
+        {onToggle ? (
+          <RailButton
+            label={expanded ? "Collapse admin menu" : "Expand admin menu"}
+            icon="LayoutSidebarRight"
+            onClick={onToggle}
+            text={expanded ? "Collapse" : undefined}
+          />
+        ) : null}
         <RailItem item={{ id: "settings", label: "Settings", icon: "Settings", page: "settings" }} {...shared} />
         <span className="relative flex flex-col">
           <RailButton
@@ -105,7 +113,9 @@ export function AdminRail({
           {read ? null : (
             <span className="pointer-events-none absolute left-[22px] -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">1</span>
           )}
-          {alerts ? <Alerts read={read} onRead={() => setRead(true)} onClose={() => setAlerts(false)} onOpen={() => onOpen("pos")} /> : null}
+          {alerts ? (
+            <Alerts embedded={embedded} read={read} onRead={() => setRead(true)} onClose={() => setAlerts(false)} onOpen={() => onOpen("pos")} />
+          ) : null}
         </span>
       </div>
     </nav>
@@ -289,14 +299,28 @@ function RailButton({
   );
 }
 
-function Alerts({ read, onRead, onClose, onOpen }: { read: boolean; onRead: () => void; onClose: () => void; onOpen: () => void }) {
+function Alerts({
+  read,
+  onRead,
+  onClose,
+  onOpen,
+  embedded = false,
+}: {
+  read: boolean;
+  onRead: () => void;
+  onClose: () => void;
+  onOpen: () => void;
+  embedded?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(true, ref, onClose);
   return (
     <div
       ref={ref}
       id="alerts-menu"
-      className="pop-in absolute bottom-0 right-[calc(100%+8px)] z-50 w-[300px] origin-bottom-right rounded-2xl bg-white text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)]"
+      className={`pop-in absolute z-50 origin-bottom-right rounded-2xl bg-white text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)] ${
+        embedded ? "bottom-full left-0 right-0 mb-1" : "bottom-0 right-[calc(100%+8px)] w-[300px]"
+      }`}
     >
       <div className="flex items-center gap-1 px-3 pb-1.5 pt-3">
         <span className="flex-1 text-[13px] font-semibold">Alerts</span>

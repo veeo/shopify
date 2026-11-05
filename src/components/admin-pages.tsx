@@ -73,7 +73,7 @@ function Shell({
 
 function H1({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-2 px-1 pt-2">
+    <div className="flex items-center justify-between gap-2 pt-2">
       <h2 className="flex items-center gap-2 text-[20px] font-bold leading-7 tracking-[-0.3px] text-[#303030]">{children}</h2>
       {aside}
     </div>
@@ -378,7 +378,7 @@ function Attribution({ state, nav }: Props) {
         </Chip>
       }
     >
-      <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 [scrollbar-width:none]">
+      <div className="-mx-6 flex gap-1.5 overflow-x-auto px-6 [scrollbar-width:none]">
         <Chip icon="Calendar" caret>
           Last 30 days
         </Chip>

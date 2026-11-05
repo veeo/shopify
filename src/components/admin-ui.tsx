@@ -25,7 +25,7 @@ export function TopBar({
   aside?: ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 bg-white/95 px-4 backdrop-blur-sm">
+    <header className="sticky top-0 z-20 flex shrink-0 items-center gap-2 bg-white/95 pb-3 pl-6 pr-[72px] pt-7 backdrop-blur-sm">
       {back ? (
         <button
           type="button"
@@ -118,7 +118,7 @@ export function useDismiss(open: boolean, ref: React.RefObject<HTMLElement | nul
 }
 
 export function Body({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`flex flex-col gap-4 px-3 pb-10 pt-1 ${className}`}>{children}</div>;
+  return <div className={`flex flex-col gap-4 px-6 pb-10 pt-1 ${className}`}>{children}</div>;
 }
 
 /* Buttons. Primary, gray, and critical come from Polaris (s-button); the admin's white bordered header buttons don't exist there. */

@@ -268,7 +268,7 @@ function HoverTip({
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none absolute z-50 flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-[#1a1a1a] px-2 py-1 text-[12px] font-medium leading-4 text-white opacity-0 shadow-[0_4px_12px_rgba(0,0,0,0.4)] transition-opacity duration-100 group-hover/tip:opacity-100 group-hover/tip:delay-500 group-has-[:focus-visible]/tip:opacity-100 ${place}`}
+        className={`pointer-events-none absolute z-[200] flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-[#1a1a1a] px-2 py-1 text-[12px] font-medium leading-4 text-white opacity-0 shadow-[0_4px_12px_rgba(0,0,0,0.4)] transition-opacity duration-100 group-hover/tip:opacity-100 group-hover/tip:delay-500 group-has-[:focus-visible]/tip:opacity-100 ${place}`}
       >
         {label}
         {keys?.map((key) => (
@@ -359,7 +359,7 @@ function FixedTip({
         <span
           role="tooltip"
           style={{ top: box.top, left: box.left }}
-          className={`fade-in pointer-events-none fixed z-50 flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-[#1a1a1a] px-2 py-1 text-[12px] font-medium leading-4 text-white shadow-[0_4px_12px_rgba(0,0,0,0.4)] ${shift}`}
+          className={`fade-in pointer-events-none fixed z-[200] flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-[#1a1a1a] px-2 py-1 text-[12px] font-medium leading-4 text-white shadow-[0_4px_12px_rgba(0,0,0,0.4)] ${shift}`}
         >
           {label}
           {keys?.map((key) => (

@@ -7,7 +7,6 @@ import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
 import { Orb } from "@/components/marks";
 import { PreviewColumn } from "@/components/preview-column";
-import { AdminRail } from "@/components/admin-rail";
 import { SearchPalette } from "@/components/search-palette";
 import {
   activeState,
@@ -35,7 +34,6 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   );
   const [booting, setBooting] = useState(true);
   const [offline, setOffline] = useState(false);
-  const [navOpen, setNavOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [palette, setPalette] = useState<{ open: boolean; scope?: string }>({ open: false });
   // The turn being streamed. Cleared in the same update that commits its reply, so the live view and
@@ -171,7 +169,6 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   }
 
   function logout() {
-    setNavOpen(false);
     setSidebarOpen(true);
     enter((current) => ({ ...setupState(current.storeName), motion: current.motion, signedIn: true }));
   }
@@ -252,17 +249,8 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         onUpdateProduct={(id, patch) => dispatch({ type: "update-product", id, patch })}
         onAddProduct={() => dispatch({ type: "add-blank-product" })}
         onRail={(id) => dispatch({ type: "rail", id })}
+        onSearch={(scope) => setPalette({ open: true, scope })}
       />
-      <div className="p-partial-theme-admin-next-dark flex">
-        <AdminRail
-          expanded={navOpen}
-          preview={state.preview}
-          onOpen={(id) => dispatch({ type: "rail", id })}
-          onGo={(page) => dispatch({ type: "preview", page })}
-          onSearch={(scope) => setPalette({ open: true, scope })}
-          onToggle={() => setNavOpen((open) => !open)}
-        />
-      </div>
       {palette.open ? (
         <SearchPalette
           state={state}

@@ -113,6 +113,35 @@ body {
   animation: page-in 320ms var(--ease-emphasized);
 }
 
+@keyframes menu-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.menu-stagger > * {
+  animation: menu-rise 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.menu-stagger > *:nth-child(1) { animation-delay: 60ms; }
+.menu-stagger > *:nth-child(2) { animation-delay: 100ms; }
+.menu-stagger > *:nth-child(3) { animation-delay: 140ms; }
+.menu-stagger > *:nth-child(4) { animation-delay: 180ms; }
+.menu-stagger > *:nth-child(5) { animation-delay: 220ms; }
+.menu-stagger > *:nth-child(6) { animation-delay: 260ms; }
+.menu-stagger > *:nth-child(7) { animation-delay: 300ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-stagger > * {
+    animation: none;
+  }
+}
+
 @keyframes pop-in {
   from {
     opacity: 0;

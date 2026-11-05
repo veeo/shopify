@@ -109,7 +109,7 @@ export function AgentNav({
       style={{ transition: `width ${move}` }}
     >
       <div className={`relative z-0 flex bg-transparent ${collapsed ? "flex-col items-center gap-4" : "items-center gap-1.5 pb-4 pl-2"}`}>
-        <Tip label={navOpen ? "Collapse navigation" : "Expand navigation"} keys={["Ctrl", "B"]} side="right">
+        <Tip label={navOpen ? "Collapse navigation" : "Expand navigation"} keys={["Ctrl", "B"]} side="right" fixed>
           <button
             type="button"
             data-flip="logo"
@@ -117,7 +117,7 @@ export function AgentNav({
             aria-expanded={navOpen}
             aria-keyshortcuts="Control+B Meta+B"
             onClick={onToggleNav}
-            className={`group/logo press relative grid size-8 shrink-0 place-items-center rounded-lg transition-colors hover:bg-white/[0.08] ${collapsed ? "mb-2" : ""}`}
+            className={`group/logo press relative grid size-8 shrink-0 place-items-center rounded-full transition-colors hover:bg-white/[0.08] ${collapsed ? "mb-2" : ""}`}
           >
             <span className="transition-opacity duration-150 group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0">
               <ShopifyMark />
