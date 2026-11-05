@@ -44,6 +44,13 @@ export function AgentNav({
   const [menu, setMenu] = useState<"account" | "store" | null>(null);
   const collapsed = !navOpen;
   const showHidden = state.scenario === "active" || state.agents.some((item) => item.installed && item.group === "hidden");
+  const visibleGroups = groups
+    .map((group) => ({ ...group, items: agents.filter((item) => item.group === group.id) }))
+    .filter((group) => {
+      if (group.id !== "hidden") return group.items.length > 0;
+      if (collapsed && group.items.length === 0) return false;
+      return showHidden;
+    });
   const navRef = useRef<HTMLElement>(null);
   const placed = useRef(new Map<string, { left: number; top: number }>());
   const skipSlide = useRef(true);
@@ -96,12 +103,12 @@ export function AgentNav({
   return (
     <aside
       ref={navRef}
-      className={`flex h-full shrink-0 flex-col gap-4 px-3 pb-3 pt-7 motion-reduce:transition-none ${
-        collapsed ? "w-[76px]" : "w-[248px]"
+      className={`flex h-full shrink-0 flex-col px-3 pb-3 pt-7 motion-reduce:transition-none ${
+        collapsed ? "w-[76px]" : "w-[248px] gap-4"
       }`}
       style={{ transition: `width ${move}` }}
     >
-      <div className={`relative z-0 flex bg-transparent gap-1.5 pb-4 pl-2 ${collapsed ? "flex-col items-start" : "items-center"}`}>
+      <div className={`relative z-0 flex bg-transparent pl-2 ${collapsed ? "flex-col items-start gap-4" : "items-center gap-1.5 pb-4"}`}>
         <Tip label={navOpen ? "Collapse navigation" : "Expand navigation"} keys={["Ctrl", "B"]} side="right">
           <button
             type="button"
@@ -132,6 +139,8 @@ export function AgentNav({
         </span>
       </div>
 
+      {collapsed ? <div className="mt-8 h-px bg-white/15" aria-hidden /> : null}
+
       {state.searchOpen && !collapsed ? (
         <div className="rise -mt-4 px-1">
           <s-search-field
@@ -145,80 +154,77 @@ export function AgentNav({
       ) : null}
 
       <div
-        className={`scroll-thin relative z-10 flex min-h-0 flex-1 flex-col gap-4 ${
+        className={`scroll-thin relative z-10 flex min-h-0 flex-1 flex-col ${collapsed ? "pt-8" : "gap-4"} ${
           sliding ? "overflow-visible" : "overflow-x-hidden overflow-y-auto"
         }`}
       >
-        {groups.map((group) => {
-          if (group.id === "hidden" && !showHidden) return null;
-          const items = agents.filter((item) => item.group === group.id);
-          if (group.id !== "hidden" && items.length === 0) return null;
-          return (
-            <div key={group.id} className="flex min-w-0 flex-col gap-2">
-              {group.label ? (
-                <div className="flex h-8 items-center gap-1.5 px-2.5">
-                  <span
-                    className={`whitespace-nowrap text-[13px] leading-4 tracking-[-0.13px] text-[#7d7f7c] transition-opacity duration-300 ${
-                      collapsed ? "w-0 overflow-hidden opacity-0" : "shrink-0"
-                    }`}
+        {visibleGroups.map((group, index) => (
+          <div
+            key={group.id}
+            className={collapsed ? (index > 0 ? "mt-8 border-t border-white/15 pt-8" : "") : "flex min-w-0 flex-col gap-2"}
+          >
+            {!collapsed && group.label ? (
+              <div className="flex h-8 items-center gap-1.5 px-2.5">
+                <span className="shrink-0 whitespace-nowrap text-[13px] leading-4 tracking-[-0.13px] text-[#7d7f7c]">{group.label}</span>
+                <span className="h-px min-w-2 flex-1 bg-white/10" />
+              </div>
+            ) : null}
+            <div className={collapsed ? "flex flex-col gap-4 pl-2" : "flex flex-col gap-2"}>
+              {group.items.map((item) => {
+                const selected = item.id === state.selectedAgentId && state.mode === "thread";
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    data-flip={`agent-${item.id}`}
+                    aria-current={selected ? "page" : undefined}
+                    aria-label={collapsed ? item.name : undefined}
+                    onClick={() => onSelect(item.id)}
+                    className={
+                      collapsed
+                        ? `press relative grid size-[31px] place-items-center rounded-full ${
+                            selected
+                              ? "shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]"
+                              : "hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a] active:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#bdbdbd]"
+                          }`
+                        : `press press-row relative flex h-12 w-full min-w-0 items-center gap-2 rounded-full py-2 pl-2 pr-2 text-left transition-[background-color,box-shadow] duration-300 ${
+                            selected ? "btn-dark pr-4" : "hover:bg-white/[0.06] active:bg-white/10"
+                          }`
+                    }
                   >
-                    {group.label}
-                  </span>
-                  <span className="h-px min-w-2 flex-1 bg-white/10" />
-                </div>
-              ) : null}
-              <div className="flex flex-col gap-2">
-                {items.map((item) => {
-                  const selected = item.id === state.selectedAgentId && state.mode === "thread";
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      data-flip={`agent-${item.id}`}
-                      aria-current={selected ? "page" : undefined}
-                      aria-label={collapsed ? item.name : undefined}
-                      onClick={() => onSelect(item.id)}
-                      className={`press press-row relative flex h-12 w-full min-w-0 items-center gap-2 rounded-full py-2 pl-2 pr-2 text-left ${
-                        collapsed ? "transition-none" : "transition-[background-color,box-shadow] duration-300"
-                      } ${selected && !collapsed ? "btn-dark pr-4" : "hover:bg-white/[0.06] active:bg-white/10"}`}
-                      style={collapsed ? { transition: "none" } : undefined}
-                    >
-                      <span
-                        className={`grid size-[31px] shrink-0 place-items-center rounded-full transition-shadow duration-300 ${
-                          collapsed && selected ? "shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]" : ""
-                        }`}
-                      >
-                        <Orb id={item.orb} size={31} />
-                        {collapsed && item.unread > 0 ? (
-                          <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-[#5631f4] text-[10px] font-medium text-white ring-2 ring-[#0c0d0c]">
-                            {item.unread}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className={`min-w-0 flex-1 overflow-hidden transition-opacity duration-300 ${collapsed ? "opacity-0" : "opacity-100"}`}>
+                    <span className="relative grid size-[31px] shrink-0 place-items-center rounded-full">
+                      <Orb id={item.orb} size={31} />
+                      {collapsed && item.unread > 0 ? (
+                        <span className="absolute -right-1.5 -top-1.5 z-10 grid size-4 place-items-center rounded-full bg-[#5631f4] text-[10px] font-medium text-white ring-2 ring-[#0c0d0c]">
+                          {item.unread}
+                        </span>
+                      ) : null}
+                    </span>
+                    {collapsed ? null : (
+                      <span className="min-w-0 flex-1 overflow-hidden">
                         <span className="block truncate whitespace-nowrap text-[13px] font-semibold leading-[1.3] tracking-[-0.13px] text-white">
                           {item.name}
                         </span>
                         <span className="block truncate whitespace-nowrap text-[12px] leading-4 text-[#8e8f8b]">{item.preview}</span>
                       </span>
-                      {!collapsed && item.unread > 0 ? (
-                        <span className="grid size-[18px] shrink-0 place-items-center rounded-full bg-[#5631f4] text-[11px] font-medium text-white">
-                          {item.unread}
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
-                {group.id === "hidden" && items.length === 0 && !collapsed ? (
-                  <p className="px-2.5 text-[12px] text-[#737572]">Nothing hidden</p>
-                ) : null}
-              </div>
+                    )}
+                    {!collapsed && item.unread > 0 ? (
+                      <span className="grid size-[18px] shrink-0 place-items-center rounded-full bg-[#5631f4] text-[11px] font-medium text-white">
+                        {item.unread}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+              {group.id === "hidden" && group.items.length === 0 && !collapsed ? (
+                <p className="px-2.5 text-[12px] text-[#737572]">Nothing hidden</p>
+              ) : null}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
-      <div className={`flex pl-2 ${collapsed ? "flex-col items-start gap-2" : "h-12 items-center"}`}>
+      <div className={`flex pl-2 ${collapsed ? "mt-8 flex-col items-start border-t border-white/15 pt-8" : "h-12 items-center"}`}>
         <span className={`group/ids relative flex ${collapsed ? "flex-col items-center" : "items-center"}`} data-open={menu ? "" : undefined}>
           <span className="relative z-10" data-flip="account">
             <button
