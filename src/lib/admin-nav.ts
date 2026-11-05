@@ -286,6 +286,11 @@ export function findNav(id: string) {
   return allNav.find((item) => item.id === id) ?? null;
 }
 
+/** A settings section such as General or Payments, one level in from the settings list. */
+export function isSettingsPage(page: PreviewId) {
+  return page === "settings-general" || settingsNav.some((row) => row.page === page);
+}
+
 /** Pages you can switch between from the large title on this page. */
 export function sectionChoices(page: PreviewId): { label: string; page: PreviewId }[] | null {
   if (page === "product" || page === "payments-setup" || page === "home-setup" || page === "home-active" || page === "settings") {

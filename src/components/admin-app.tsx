@@ -246,6 +246,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         onBusiness={(value) => dispatch({ type: "business-type", value })}
         onIdentity={(patch) => dispatch({ type: "identity", patch })}
         onPaymentsNext={() => dispatch({ type: "payments-next" })}
+        onPaymentsBack={() => dispatch({ type: "payments-back" })}
         onProduct={(id) => dispatch({ type: "product", id })}
         onUpdateProduct={(id, patch) => dispatch({ type: "update-product", id, patch })}
         onAddProduct={() => dispatch({ type: "add-blank-product" })}

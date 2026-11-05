@@ -103,7 +103,7 @@ export type PrototypeState = {
   purposes: string[];
   chiefPhase: "absent" | "purpose" | "working";
   businessType: BusinessType;
-  paymentsStep: "type" | "identity" | "done";
+  paymentsStep: "type" | "identity" | "security" | "payout" | "done";
   completedSteps: number[];
   identity: { first: string; last: string };
   products: Product[];
@@ -1219,6 +1219,7 @@ export type Action =
   | { type: "business-type"; value: BusinessType }
   | { type: "identity"; patch: Partial<PrototypeState["identity"]> }
   | { type: "payments-next" }
+  | { type: "payments-back" }
   | { type: "toggle-purpose"; id: string }
   | { type: "add-catalog"; id: string }
   | { type: "create-agent"; name: string; purpose: string }
@@ -1373,29 +1374,43 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       next.identity = { ...next.identity, ...action.patch };
       return next;
     case "payments-next": {
+      const label =
+        next.businessType === "individual" ? "an individual" : next.businessType === "business" ? "a registered business" : "a non-profit";
       if (next.paymentsStep === "type") {
         next.paymentsStep = "identity";
         if (!next.completedSteps.includes(1)) next.completedSteps.push(1);
-        const label =
-          next.businessType === "individual"
-            ? "an individual"
-            : next.businessType === "business"
-              ? "a registered business"
-              : "a non-profit";
         push(next, "sidekick", {
           id: id(next),
           type: "text",
           role: "assistant",
           text: `Saved. You’re running the store as ${label}. Next is identity verification — about 4 minutes. I left the form in the preview.`,
         });
-      } else {
-        next.paymentsStep = "done";
+      } else if (next.paymentsStep === "identity") {
+        next.paymentsStep = "security";
         if (!next.completedSteps.includes(2)) next.completedSteps.push(2);
         push(next, "sidekick", {
           id: id(next),
           type: "text",
           role: "assistant",
-          text: "Identity details are saved on this prototype. Account security is next: turn on two-step authentication before you connect a payout account.",
+          text: "Identity is saved. Next is account security: turn on two-step authentication before you connect a payout account.",
+        });
+      } else if (next.paymentsStep === "security") {
+        next.paymentsStep = "payout";
+        if (!next.completedSteps.includes(3)) next.completedSteps.push(3);
+        push(next, "sidekick", {
+          id: id(next),
+          type: "text",
+          role: "assistant",
+          text: "Account security is noted. The last step is the bank account where payouts should land.",
+        });
+      } else if (next.paymentsStep === "payout") {
+        next.paymentsStep = "done";
+        if (!next.completedSteps.includes(4)) next.completedSteps.push(4);
+        push(next, "sidekick", {
+          id: id(next),
+          type: "text",
+          role: "assistant",
+          text: "Payout details are saved on this prototype. Shopify Payments setup is complete.",
         });
         push(next, "sidekick", {
           id: id(next),
@@ -1407,6 +1422,13 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
         });
       }
       next.selectedAgentId = "sidekick";
+      return next;
+    }
+    case "payments-back": {
+      if (next.paymentsStep === "identity") next.paymentsStep = "type";
+      else if (next.paymentsStep === "security") next.paymentsStep = "identity";
+      else if (next.paymentsStep === "payout") next.paymentsStep = "security";
+      else if (next.paymentsStep === "done") next.paymentsStep = "payout";
       return next;
     }
     case "toggle-purpose": {

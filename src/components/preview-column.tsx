@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
 import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
 import { Badge, Body, Btn, Card as AdminCard, circleButton, HeaderExtras, HeaderSlotProvider, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
-import { sectionChoices } from "@/lib/admin-nav";
+import { isSettingsPage, sectionChoices } from "@/lib/admin-nav";
 import type { BusinessType, PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
 
 type Nav = PageNav & {
@@ -24,6 +24,7 @@ export function PreviewColumn({
   onBusiness,
   onIdentity,
   onPaymentsNext,
+  onPaymentsBack,
   onProduct,
   onUpdateProduct,
   onAddProduct,
@@ -39,6 +40,7 @@ export function PreviewColumn({
   onBusiness: (value: PrototypeState["businessType"]) => void;
   onIdentity: (patch: Partial<PrototypeState["identity"]>) => void;
   onPaymentsNext: () => void;
+  onPaymentsBack: () => void;
   onProduct: (id: string) => void;
   onUpdateProduct: (id: string, patch: Partial<Product>) => void;
   onAddProduct: () => void;
@@ -87,23 +89,75 @@ export function PreviewColumn({
     chip: onChip,
     ask: onAsk,
   };
-  const grey = state.preview === "product";
-  const detailBack =
-    state.preview === "product" ? "Back to products" : state.preview === "payments-setup" ? "Back to payments" : null;
-  if (detailBack && menu) setMenu(false);
+  const kind = state.preview === "product" ? "product" : state.preview === "payments-setup" ? "payments" : null;
+  const [closing, setClosing] = useState(false);
+  const closeTo = useRef<PreviewId>("products");
+  const closeTimer = useRef<number | null>(null);
+  const closed = useRef(false);
+  const sheetScroll = useRef<HTMLDivElement>(null);
+  const settingsBack = useRef<PreviewId>("settings");
+  const settingsRoot = useRef<PreviewId>("home-setup");
+  const seenPreview = useRef(state.preview);
+  if (kind && menu) setMenu(false);
+  const underlayPage: PreviewId = kind === "product" ? "products" : kind === "payments" ? "payments" : state.preview;
+  const settingsLevel = underlayPage === "settings" || isSettingsPage(underlayPage);
   const headerRef = useRef<HTMLElement>(null);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   const [menuTop, setMenuTop] = useState(84);
   useLayoutEffect(() => {
     if (!headerRef.current) return;
     setMenuTop(headerRef.current.offsetHeight + 24);
-  }, [state.preview, menu]);
+  }, [underlayPage, menu]);
   useEffect(() => {
+    const prev = seenPreview.current;
+    const previewChanged = prev !== state.preview;
+    seenPreview.current = state.preview;
+    if (previewChanged && prev !== "product" && prev !== "payments-setup") {
+      const fromOutside = prev !== "settings" && !isSettingsPage(prev);
+      if (state.preview === "settings" && fromOutside) settingsRoot.current = prev;
+      if (isSettingsPage(state.preview) && !isSettingsPage(prev)) settingsBack.current = prev;
+    }
+    if (state.preview === "product" || state.preview === "payments-setup") {
+      closed.current = false;
+      menuRef.current = false;
+      if (sheetScroll.current) sheetScroll.current.scrollTop = 0;
+      return;
+    }
+    if (!previewChanged) return;
+    const returning = (prev === "product" && state.preview === "products") || (prev === "payments-setup" && state.preview === "payments");
+    if (returning) return;
     const el = scrollRef.current;
     if (el) el.scrollTop = 0;
     savedScroll.current = 0;
-    if (state.preview === "product" || state.preview === "payments-setup") menuRef.current = false;
-  }, [state.preview, state.selectedProductId]);
+  }, [state.preview, state.selectedProductId, state.paymentsStep]);
+  function finishClose() {
+    if (closed.current) return;
+    closed.current = true;
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    setClosing(false);
+    onPreview(closeTo.current);
+  }
+  function requestClose(page: PreviewId) {
+    if (closing) return;
+    menuRef.current = false;
+    setMenu(false);
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !state.motion) {
+      onPreview(page);
+      return;
+    }
+    closeTo.current = page;
+    setClosing(true);
+    closeTimer.current = window.setTimeout(finishClose, 520);
+  }
+  function onSheetAnimationEnd(event: AnimationEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget || event.animationName !== "sheet-leave" || !closing) return;
+    finishClose();
+  }
+  function retreatPayments() {
+    if (state.paymentsStep === "type") requestClose("payments");
+    else onPaymentsBack();
+  }
   useEffect(() => {
     if (!menu) return;
     function onKey(event: KeyboardEvent) {
@@ -123,25 +177,30 @@ export function PreviewColumn({
   };
   return (
     <aside
-      className={`p-partial-theme-admin-next-light relative flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${grey ? "bg-[#f7f7f7]" : "bg-white"} ${
-        state.motion ? "transition-[width] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
+      className={`p-partial-theme-admin-next-light relative flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : "bg-white"} ${
+        state.motion ? "transition-[width,background-color] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
       }`}
       style={{ width: wide ? 584 : 393 }}
     >
       <HeaderSlotProvider slot={slot}>
+        <div
+          inert={kind || closing ? true : undefined}
+          className={`relative flex min-h-0 flex-1 flex-col ${closing ? "sheet-restore" : kind ? "sheet-recede" : ""}`}
+        >
+          <div className="sheet-scrim pointer-events-none absolute inset-0 z-40 bg-black/25" />
         <header ref={headerRef} className="relative z-30 flex shrink-0 items-center justify-between gap-3 px-6 pb-1 pt-7">
-          {detailBack ? (
+          {settingsLevel ? (
             <button
               type="button"
-              aria-label={detailBack}
+              aria-label="Back"
               onClick={() => {
                 menuRef.current = false;
                 setMenu(false);
-                onPreview(state.preview === "product" ? "products" : "payments");
+                onPreview(underlayPage === "settings" ? settingsRoot.current : settingsBack.current);
               }}
               className={circleButton}
             >
-              <PIcon name="ArrowLeft" size={20} />
+              <PIcon name="ChevronLeft" size={20} />
             </button>
           ) : (
             <button
@@ -179,7 +238,7 @@ export function PreviewColumn({
             </div>
           ) : null}
           <div
-            key={state.preview}
+            key={underlayPage}
             className={`${state.motion ? "page-in" : ""} ${menu && state.menuStyle === "push" ? "opacity-40 transition-opacity duration-300" : "opacity-100 transition-opacity duration-300"}`}
             onPointerDownCapture={(event) => {
               if (!menu || state.menuStyle !== "push") return;
@@ -196,6 +255,7 @@ export function PreviewColumn({
             }}
           >
             <Screen
+              page={underlayPage}
               state={state}
               nav={nav}
               onCard={onCard}
@@ -203,6 +263,7 @@ export function PreviewColumn({
               onBusiness={onBusiness}
               onIdentity={onIdentity}
               onPaymentsNext={onPaymentsNext}
+              onPaymentsBack={onPaymentsBack}
               onProduct={(id) => {
                 menuRef.current = false;
                 setMenu(false);
@@ -227,12 +288,55 @@ export function PreviewColumn({
             </div>
           </>
         ) : null}
+        </div>
+        {kind ? (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={kind === "payments" ? "Set up Shopify Payments" : "Edit product"}
+            onAnimationEnd={onSheetAnimationEnd}
+            className={`absolute inset-x-0 bottom-0 top-[72px] z-50 flex flex-col overflow-hidden rounded-t-[22px] shadow-[0_-16px_40px_rgba(0,0,0,0.18)] ${
+              closing ? "sheet-leave" : "sheet-enter"
+            } ${kind === "product" ? "bg-[#f7f7f7]" : "bg-white"}`}
+          >
+            <header className="flex shrink-0 items-center justify-between gap-3 px-6 pb-1 pt-7">
+              <button
+                type="button"
+                aria-label={kind === "product" ? "Back to products" : state.paymentsStep === "type" ? "Back to payments" : "Back"}
+                onClick={() => (kind === "product" ? requestClose("products") : retreatPayments())}
+                className={circleButton}
+              >
+                <PIcon name="ChevronLeft" size={20} />
+              </button>
+            </header>
+            <div ref={sheetScroll} className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none]">
+              {kind === "payments" ? (
+                <PaymentsSetup
+                  state={state}
+                  onBusiness={onBusiness}
+                  onIdentity={onIdentity}
+                  onNext={onPaymentsNext}
+                  onBack={onPaymentsBack}
+                  onClose={() => requestClose("payments")}
+                />
+              ) : (
+                <ProductEdit
+                  state={state}
+                  onBack={() => requestClose("products")}
+                  onProduct={onProduct}
+                  onUpdate={onUpdateProduct}
+                />
+              )}
+            </div>
+          </div>
+        ) : null}
       </HeaderSlotProvider>
     </aside>
   );
 }
 
 function Screen(props: {
+  page: PreviewId;
   state: PrototypeState;
   nav: Nav;
   onCard: (id: string) => void;
@@ -240,12 +344,13 @@ function Screen(props: {
   onBusiness: (value: PrototypeState["businessType"]) => void;
   onIdentity: (patch: Partial<PrototypeState["identity"]>) => void;
   onPaymentsNext: () => void;
+  onPaymentsBack: () => void;
   onProduct: (id: string) => void;
   onUpdateProduct: (id: string, patch: Partial<Product>) => void;
   onAddProduct: () => void;
 }) {
-  const { state, nav } = props;
-  switch (state.preview) {
+  const { state, nav, page } = props;
+  switch (page) {
     case "home-setup":
       return <HomeSetup state={state} nav={nav} onCard={props.onCard} onDismiss={props.onDismissCard} />;
     case "home-active":
@@ -259,7 +364,8 @@ function Screen(props: {
           onBusiness={props.onBusiness}
           onIdentity={props.onIdentity}
           onNext={props.onPaymentsNext}
-          onBack={() => nav.onPreview("payments")}
+          onBack={props.onPaymentsBack}
+          onClose={() => nav.onPreview("payments")}
         />
       );
     case "products":
@@ -267,7 +373,7 @@ function Screen(props: {
     case "product":
       return <ProductEdit state={state} onBack={() => nav.onPreview("products")} onProduct={props.onProduct} onUpdate={props.onUpdateProduct} />;
     default:
-      return <AdminPage page={state.preview} state={state} nav={nav} />;
+      return <AdminPage page={page} state={state} nav={nav} />;
   }
 }
 
@@ -879,24 +985,81 @@ function PaymentsSetup({
   onIdentity,
   onNext,
   onBack,
+  onClose,
 }: {
   state: PrototypeState;
   onBusiness: (value: PrototypeState["businessType"]) => void;
   onIdentity: (patch: Partial<PrototypeState["identity"]>) => void;
   onNext: () => void;
   onBack: () => void;
+  onClose: () => void;
 }) {
-  const identity = state.paymentsStep === "identity" || state.paymentsStep === "done";
+  const step = state.paymentsStep;
+  const [twoStep, setTwoStep] = useState(true);
+  const [holder, setHolder] = useState("");
+  const [routing, setRouting] = useState("");
+  const [account, setAccount] = useState("");
+  const title =
+    step === "identity"
+      ? "Identity verification"
+      : step === "security"
+        ? "Account security"
+        : step === "payout"
+          ? "Payout account"
+          : step === "done"
+            ? "Shopify Payments"
+            : "Set up Shopify Payments";
+  const subtitle =
+    step === "identity"
+      ? "Add the name on your government ID"
+      : step === "security"
+        ? "Protect the account that receives payouts"
+        : step === "payout"
+          ? "Choose where Shopify should send your money"
+          : step === "done"
+            ? "This store can start accepting payments"
+            : "Tell us about your store to start accepting payments";
   return (
     <>
-      <TopBar title="Set up Shopify Payments" />
+      <TopBar title={title} />
       <div className="flex flex-col gap-6 px-6 pb-[86px]">
-      <p className="text-[13px] leading-[1.4] tracking-[-0.13px] text-[#4a4a4a]">Tell us about your store to start accepting payments</p>
-      <div key={identity ? "identity" : "type"} className="rise">
-        <Card className="p-2">
-          <p className="p-4 text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">{identity ? "What’s your legal name?" : "I am running my store as:"}</p>
-          {identity ? (
-            <div className="flex flex-col gap-3 px-4 pb-4">
+        <p className="text-[13px] leading-[1.4] tracking-[-0.13px] text-[#4a4a4a]">{subtitle}</p>
+        <div key={step} className="rise">
+          {step === "type" ? (
+            <Card className="p-2">
+              <p className="p-4 text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">I am running my store as:</p>
+              <div role="radiogroup" aria-label="Business type" className="flex flex-col gap-1">
+                {(Object.keys(businessCopy) as BusinessType[]).map((key) => {
+                  const selected = state.businessType === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => onBusiness(key)}
+                      className={`press press-row flex gap-3 rounded-2xl p-3 text-left transition-colors ${selected ? "bg-[#f7f7f7]" : "hover:bg-[#fafafa]"}`}
+                    >
+                      <span
+                        className={`mt-1 grid size-4 shrink-0 place-items-center rounded-full transition-colors ${
+                          selected ? "bg-[#171717]" : "border border-[#ccc] bg-white"
+                        }`}
+                      >
+                        <span className={`rounded-full bg-white transition-transform ${selected ? "size-2 scale-100" : "size-2 scale-0"}`} />
+                      </span>
+                      <span className="flex flex-col">
+                        <span className="text-[15px] font-medium leading-6 tracking-[-0.15px]">{businessCopy[key].title}</span>
+                        <span className="text-[13px] leading-[1.4] tracking-[-0.13px] text-[#4a4a4a]">{businessCopy[key].body}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+          ) : null}
+          {step === "identity" ? (
+            <Card className="gap-3 p-4">
+              <p className="text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">What’s your legal name?</p>
               <s-text-field
                 label="First name"
                 name="first-name"
@@ -911,48 +1074,43 @@ function PaymentsSetup({
                 value={state.identity.last}
                 onInput={(event) => onIdentity({ last: event.currentTarget.value })}
               />
-            </div>
-          ) : (
-            <div role="radiogroup" aria-label="Business type" className="flex flex-col gap-1">
-              {(Object.keys(businessCopy) as BusinessType[]).map((key) => {
-                const selected = state.businessType === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => onBusiness(key)}
-                    className={`press press-row flex gap-3 rounded-2xl p-3 text-left transition-colors ${selected ? "bg-[#f7f7f7]" : "hover:bg-[#fafafa]"}`}
-                  >
-                    <span
-                      className={`mt-1 grid size-4 shrink-0 place-items-center rounded-full transition-colors ${
-                        selected ? "bg-[#171717]" : "border border-[#ccc] bg-white"
-                      }`}
-                    >
-                      <span className={`rounded-full bg-white transition-transform ${selected ? "size-2 scale-100" : "size-2 scale-0"}`} />
-                    </span>
-                    <span className="flex flex-col">
-                      <span className="text-[15px] font-medium leading-6 tracking-[-0.15px]">{businessCopy[key].title}</span>
-                      <span className="text-[13px] leading-[1.4] tracking-[-0.13px] text-[#4a4a4a]">{businessCopy[key].body}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            </Card>
+          ) : null}
+          {step === "security" ? (
+            <Card className="gap-3 p-4">
+              <p className="text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">Turn on two-step authentication</p>
+              <p className="text-[13px] leading-[1.4] text-[#4a4a4a]">A code is required when you sign in from a new browser. You can change this later in Settings.</p>
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f7f7] px-3 py-2.5">
+                <span className="text-[13px] font-medium">Two-step authentication</span>
+                <Toggle on={twoStep} onChange={setTwoStep} label="Two-step authentication" />
+              </div>
+            </Card>
+          ) : null}
+          {step === "payout" ? (
+            <Card className="gap-3 p-4">
+              <p className="text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">Bank account for payouts</p>
+              <s-text-field label="Account holder" name="account-holder" value={holder} onInput={(event) => setHolder(event.currentTarget.value)} />
+              <s-text-field label="Routing number" name="routing-number" value={routing} onInput={(event) => setRouting(event.currentTarget.value)} />
+              <s-text-field label="Account number" name="account-number" value={account} onInput={(event) => setAccount(event.currentTarget.value)} />
+            </Card>
+          ) : null}
+          {step === "done" ? (
+            <Card className="items-start gap-2 p-4">
+              <p className="text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">You’re ready to get paid</p>
+              <p className="text-[13px] leading-[1.4] text-[#4a4a4a]">Business details, identity, account security, and a payout account are saved on this prototype.</p>
+            </Card>
+          ) : null}
+        </div>
+        <div className="flex justify-end gap-2">
+          {step === "type" ? null : (
+            <Pill tone="fill" onClick={onBack}>
+              Back
+            </Pill>
           )}
-        </Card>
-      </div>
-      <div className="flex justify-end gap-2">
-        {identity ? (
-          <Pill tone="fill" onClick={onBack}>
-            Back
+          <Pill tone="dark" onClick={step === "done" ? onClose : onNext}>
+            {step === "type" ? "Next" : step === "done" ? "Done" : "Continue"}
           </Pill>
-        ) : null}
-        <Pill tone="dark" onClick={onNext}>
-          {identity ? "Continue" : "Next"}
-        </Pill>
-      </div>
+        </div>
       </div>
     </>
   );
