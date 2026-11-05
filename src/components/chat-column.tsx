@@ -42,6 +42,8 @@ export function ChatColumn({
   onOpenConversation,
   onDeleteConversation,
   onRate,
+  onSwitch,
+  onAddAgent,
 }: {
   state: PrototypeState;
   liveSegments: LiveSegment[] | null;
@@ -64,6 +66,8 @@ export function ChatColumn({
   onOpenConversation: (id: string) => void;
   onDeleteConversation: (id: string) => void;
   onRate: (id: string, value: "up" | "down") => void;
+  onSwitch: (id: string) => void;
+  onAddAgent: () => void;
 }) {
   const agent = selectedAgent(state);
   const purpose = state.selectedAgentId === "chief" && state.chiefPhase === "purpose" && state.mode === "thread";
@@ -77,6 +81,7 @@ export function ChatColumn({
     setTypedDone(new Set(typedOnce));
   }, []);
   const thread = state.threads[agent.id] ?? [];
+  const typedSettled = settled(thread, typedDone);
   const scroller = useRef<HTMLDivElement>(null);
   const liveLength = liveSegments?.reduce((sum, segment) => sum + (segment.type === "text" ? segment.text.length : 1), 0) ?? 0;
 
@@ -175,8 +180,8 @@ export function ChatColumn({
               <Purpose state={state} onPurpose={onPurpose} onStart={onStart} onChip={onChip} />
             ) : (
               <div className="flex max-w-[640px] flex-col gap-2">
-                {visibleBlocks(thread, typedDone).map((block, index, list) =>
-                  block.type === "text" && block.typed && !typedDone.has(block.id) ? (
+                {visibleBlocks(thread, typedSettled).map((block, index, list) =>
+                  block.type === "text" && block.typed && !typedSettled.has(block.id) ? (
                     <TypeOut
                       key={block.id}
                       text={block.text}
@@ -221,6 +226,8 @@ export function ChatColumn({
         locked={locked}
         onSend={onSend}
         onStop={onStop}
+        onSwitch={onSwitch}
+        onAddAgent={onAddAgent}
       />
 
       {state.experimentsOpen ? (
@@ -473,6 +480,8 @@ export function Composer({
   light = false,
   rotating,
   onRecents,
+  onSwitch,
+  onAddAgent,
 }: {
   state: PrototypeState;
   agent: Agent;
@@ -484,10 +493,13 @@ export function Composer({
   light?: boolean;
   rotating?: string[];
   onRecents?: () => void;
+  onSwitch?: (id: string) => void;
+  onAddAgent?: () => void;
 }) {
   const [draft, setDraft] = useState("");
   const [focused, setFocused] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
+  const [switchOpen, setSwitchOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [files, setFiles] = useState<string[]>([]);
@@ -497,7 +509,8 @@ export function Composer({
   const fileInput = useRef<HTMLInputElement>(null);
   const recognition = useRef<SpeechRecognitionLike | null>(null);
   const base = useRef("");
-  const showSuggestions = focused && !draft.trim() && !busy && !plusOpen;
+  const showSuggestions = focused && !draft.trim() && !busy && !plusOpen && !switchOpen;
+  const canSend = Boolean(draft.trim()) && !busy;
   const rolling = Boolean(rotating?.length) && !focused && !draft;
   const placeholder = state.mode === "add" && !light ? "Ask Sidekick…" : focused || light ? `Work with ${agent.name}` : agent.placeholder;
 
@@ -573,7 +586,8 @@ export function Composer({
         send: "grid size-7 place-items-center rounded-lg bg-[#303030] text-white hover:bg-black",
         notice: "bg-[#fee9e8] text-[#8e1f0b]",
         noticeIcon: "text-[#c70a24]",
-        suggestion: "text-[12px] text-[#303030] hover:bg-[#f7f7f7]",
+        suggestion: "text-[12px] text-[#303030] hover:bg-[#f1f1f1]",
+        suggestions: "w-full p-1.5",
         suggestionIcon: "text-[#616161]",
         chip: "bg-[#f1f1f1] text-[#303030]",
       }
@@ -585,7 +599,8 @@ export function Composer({
         send: "grid size-8 place-items-center rounded-full bg-white text-black shadow-[0_1px_2px_rgba(0,0,0,0.3)] hover:bg-[#eee]",
         notice: "bg-[#2a1716] text-[#ffd2cc]",
         noticeIcon: "text-[#ff6d5e]",
-        suggestion: "text-[13px] text-[#c4c4c4] hover:bg-white/[0.05] hover:text-white",
+        suggestion: "text-[13px] text-[#c4c4c4] hover:bg-white/[0.07] hover:text-white",
+        suggestions: "w-full p-1.5",
         suggestionIcon: "text-[#8e8f8b]",
         chip: "bg-white/[0.08] text-white/90",
       };
@@ -648,7 +663,27 @@ export function Composer({
           ) : null}
         </span>
         <div className={`flex items-center gap-1 ${light ? "px-2 pb-2" : "gap-1.5 px-2.5 pb-2.5"}`}>
-          <Orb id={state.mode === "add" && !light ? "sidekick" : agent.orb} size={light ? 20 : 24} />
+          {onSwitch ? (
+            <Tip label="Switch sidekick" side="top-start">
+              <button
+                type="button"
+                aria-label={`Switch sidekick, current: ${agent.name}`}
+                aria-expanded={switchOpen}
+                aria-controls="sidekick-switcher"
+                onClick={() => {
+                  setPlusOpen(false);
+                  setSwitchOpen((open) => !open);
+                }}
+                className={`press grid size-8 place-items-center rounded-full transition-[box-shadow] duration-150 hover:shadow-[0_0_0_3px_rgba(255,255,255,0.1)] ${
+                  switchOpen ? "shadow-[0_0_0_3px_rgba(255,255,255,0.16)]" : ""
+                }`}
+              >
+                <Orb id={state.mode === "add" ? "sidekick" : agent.orb} size={32} />
+              </button>
+            </Tip>
+          ) : (
+            <Orb id={agent.orb} size={light ? 20 : 32} />
+          )}
           {listening ? (
             <span className={`ml-1 flex items-center gap-1.5 text-[12px] ${light ? "text-[#616161]" : "text-[#8e8f8b]"}`}>
               <span className="size-1.5 animate-pulse rounded-full bg-[#ff6d5e]" />
@@ -671,7 +706,10 @@ export function Composer({
                 aria-label="Add files and more"
                 aria-expanded={plusOpen}
                 aria-controls="plus-menu"
-                onClick={() => setPlusOpen((open) => !open)}
+                onClick={() => {
+                  setSwitchOpen(false);
+                  setPlusOpen((open) => !open);
+                }}
                 className={`press ${tone.icon}`}
               >
                 <span className={`transition-transform duration-200 ${plusOpen ? "rotate-45" : ""}`}>
@@ -686,17 +724,35 @@ export function Composer({
                 </button>
               </Tip>
             ) : (
-              <Tip label={listening ? "Stop dictating" : "Dictate"}>
-                <button type="button" aria-label="Dictate" aria-pressed={listening} onClick={dictate} className={`press ${tone.icon} ${listening ? tone.on : ""}`}>
-                  <PIcon name="Microphone" size={iconSize} />
-                </button>
-              </Tip>
+              <>
+                <Tip label={listening ? "Stop dictating" : "Dictate"}>
+                  <button type="button" aria-label="Dictate" aria-pressed={listening} onClick={dictate} className={`press ${tone.icon} ${listening ? tone.on : ""}`}>
+                    <PIcon name="Microphone" size={iconSize} />
+                  </button>
+                </Tip>
+                <Tip label="Voice mode">
+                  <button type="button" aria-label="Voice mode" onClick={() => {}} className={`press ${tone.icon}`}>
+                    <PIcon name="Sound" size={iconSize} />
+                  </button>
+                </Tip>
+              </>
             )}
-            {draft.trim() && !busy ? (
-              <button type="submit" aria-label="Send" disabled={locked} className={`press fade-in disabled:opacity-40 ${tone.send}`}>
+            <span
+              className={`grid transition-[width,margin,opacity] duration-200 ease-out ${
+                canSend ? `opacity-100 ${light ? "w-7" : "w-8"}` : `w-0 opacity-0 ${light ? "-ml-0.5" : "-ml-1.5"}`
+              }`}
+            >
+              <button
+                type="submit"
+                aria-label="Send"
+                aria-hidden={!canSend}
+                tabIndex={canSend ? 0 : -1}
+                disabled={locked || !canSend}
+                className={`press transition-transform duration-200 ease-out disabled:cursor-default ${canSend ? "scale-100" : "scale-50"} ${locked && canSend ? "opacity-40" : ""} ${tone.send}`}
+              >
                 <PIcon name="ArrowUp" size={iconSize} />
               </button>
-            ) : null}
+            </span>
           </span>
         </div>
         <input
@@ -713,7 +769,15 @@ export function Composer({
       </form>
 
       {showSuggestions ? (
-        <ul role="listbox" aria-label="Suggestions" className={`rise mt-2 flex flex-col ${light ? "px-1" : ""}`}>
+        <ul
+          role="listbox"
+          aria-label="Suggestions"
+          className={`pop-in absolute bottom-[calc(100%+8px)] left-0 z-30 flex origin-bottom flex-col rounded-2xl ${tone.suggestions} ${
+            light
+              ? "bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.14)]"
+              : "border border-white/10 bg-[#1a1a1a] shadow-[0_16px_40px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)]"
+          }`}
+        >
           {suggestions.map((text) => (
             <li key={text} role="option" aria-selected={false}>
               <button
@@ -730,6 +794,26 @@ export function Composer({
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {switchOpen && onSwitch ? (
+        <SidekickSwitcher
+          state={state}
+          current={state.mode === "add" ? null : agent.id}
+          onDismiss={() => setSwitchOpen(false)}
+          onPick={(id) => {
+            setSwitchOpen(false);
+            onSwitch(id);
+          }}
+          onAdd={
+            onAddAgent
+              ? () => {
+                  setSwitchOpen(false);
+                  onAddAgent();
+                }
+              : undefined
+          }
+        />
       ) : null}
 
       {plusOpen ? (
@@ -766,6 +850,57 @@ function Attachment({ icon, label, className, onRemove }: { icon: PolarisIconNam
         <PIcon name="X" size={14} />
       </button>
     </span>
+  );
+}
+
+function SidekickSwitcher({
+  state,
+  current,
+  onDismiss,
+  onPick,
+  onAdd,
+}: {
+  state: PrototypeState;
+  current: string | null;
+  onDismiss: () => void;
+  onPick: (id: string) => void;
+  onAdd?: () => void;
+}) {
+  const agents = state.agents.filter((item) => item.installed);
+  return (
+    <Popover id="sidekick-switcher" onDismiss={onDismiss} className="bottom-[calc(100%+8px)] left-0 w-64 origin-bottom-left p-1.5">
+      <p className="px-2 pb-1 pt-1.5 text-[12px] text-[#8e8f8b]">Switch sidekick</p>
+      <div className="scroll-thin flex max-h-72 flex-col overflow-y-auto">
+        {agents.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-current={item.id === current ? "true" : undefined}
+            onClick={() => onPick(item.id)}
+            className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] hover:bg-white/[0.07]"
+          >
+            <Orb id={item.orb} size={24} />
+            <span className="min-w-0 flex-1 truncate">{item.name}</span>
+            {item.id === current ? <PIcon name="Check" size={16} /> : null}
+          </button>
+        ))}
+      </div>
+      {onAdd ? (
+        <>
+          <div className="my-1 h-px bg-white/10" />
+          <button
+            type="button"
+            onClick={onAdd}
+            className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] text-[#c4c4c4] hover:bg-white/[0.07] hover:text-white"
+          >
+            <span className="grid size-6 place-items-center rounded-full border border-dashed border-white/20">
+              <PIcon name="Plus" size={16} />
+            </span>
+            Add a sidekick
+          </button>
+        </>
+      ) : null}
+    </Popover>
   );
 }
 
@@ -908,59 +1043,41 @@ function Spinner() {
   );
 }
 
-function ToolRow({ label, running }: { label: string; running?: boolean }) {
+function ToolRow({ label, running, enter = true }: { label: string; running?: boolean; enter?: boolean }) {
   return (
-    <p className="rise flex items-center gap-1.5 py-1 text-[13px] text-[#8e8f8b]">
+    <p className={`${enter ? "rise " : ""}flex items-center gap-1.5 py-1 text-[13px] text-[#8e8f8b]`}>
       {running ? <Spinner /> : <PIcon name="Check" size={16} />}
       <span className={running ? "shimmer-text" : ""}>{label}</span>
     </p>
   );
 }
 
-/** Streaming text: each newly arrived word mounts with a short fade, so the last few words trail in. */
-function StreamText({ text }: { text: string }) {
-  const lines = text.replace(/\*\*/g, "").split("\n");
-  let word = 0;
-  return (
-    <div className="max-w-[560px] py-1 text-[15px] leading-[1.4] tracking-[-0.15px]">
-      {lines.map((line, index) => {
-        if (!line.trim()) return <span key={index} className="block h-3" />;
-        const bullet = /^\s*([-*•]|\d+\.)\s+/.exec(line);
-        const body = bullet ? line.slice(bullet[0].length) : line;
-        const words = body.split(/(\s+)/).map((token, at) =>
-          /^\s+$/.test(token) ? (
-            token
-          ) : (
-            <span key={`${index}-${at}`} className="word-in" data-word={word++}>
-              {token}
-            </span>
-          ),
-        );
-        return bullet ? (
-          <span key={index} className="flex gap-2 pl-1">
-            <span className="text-[#8e8f8b]">{/\d/.test(bullet[1]) ? bullet[1] : "•"}</span>
-            <span>{words}</span>
-          </span>
-        ) : (
-          <span key={index} className="block">
-            {words}
-          </span>
-        );
-      })}
-    </div>
+/**
+ * Tool rows and text for one reply. The live turn and the committed message render through this same
+ * tree, so when streaming finishes the text keeps its exact layout instead of reflowing.
+ */
+function ReplySegments({ segments, live, enter }: { segments: LiveSegment[]; live: boolean; enter: boolean }) {
+  return segments.map((segment, index) =>
+    segment.type === "tool" ? (
+      <ToolRow key={index} label={segment.label} running={segment.running} enter={enter} />
+    ) : (
+      <div key={index} className="py-0.5">
+        <Markdown text={segment.text} streaming={live} />
+      </div>
+    ),
   );
 }
+
+const replyClass = "max-w-[560px] py-2 text-[15px] leading-[1.4] tracking-[-0.15px]";
 
 function LiveTurn({ segments }: { segments: LiveSegment[] }) {
   const last = segments.at(-1);
   const waiting = segments.length === 0 || (last?.type === "tool" && !last.running);
   return (
-    <div className="flex flex-col" aria-live="polite">
-      {segments.map((segment, index) =>
-        segment.type === "tool" ? <ToolRow key={index} label={segment.label} running={segment.running} /> : <StreamText key={index} text={segment.text} />,
-      )}
+    <div className={replyClass} aria-live="polite">
+      <ReplySegments segments={segments} live enter />
       {waiting ? (
-        <p className="rise flex items-center gap-2 py-1.5 text-[13px] text-[#8e8f8b]">
+        <p className="rise flex items-center gap-2 py-1 text-[13px] text-[#8e8f8b]">
           <Spinner />
           <span className="shimmer-text">Working on it</span>
         </p>
@@ -1049,18 +1166,14 @@ function AssistantText({
 }) {
   const segments: Segment[] = block.segments ?? [{ type: "text", text: block.text }];
   return (
-    <div className="rise max-w-[560px] py-2 text-[15px] leading-[1.4] tracking-[-0.15px]">
-      {segments.map((segment, index) =>
-        segment.type === "tool" ? (
-          <ToolRow key={index} label={segment.label} />
-        ) : (
-          <div key={index} className="py-0.5">
-            <Markdown text={segment.text} />
-          </div>
-        ),
-      )}
-      {block.sources?.length ? <SourceChips sources={block.sources} /> : null}
-      {answer ? <ActionRow text={block.text} rating={rating} onRate={onRate} /> : null}
+    <div className={`${block.streamed ? "" : "rise "}${replyClass}`}>
+      <ReplySegments segments={segments} live={false} enter={!block.streamed} />
+      {block.sources?.length ? <div className="fade-in"><SourceChips sources={block.sources} /></div> : null}
+      {answer ? (
+        <div className={block.streamed ? "fade-in" : ""}>
+          <ActionRow text={block.text} rating={rating} onRate={onRate} />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1350,6 +1463,15 @@ function Purpose({
 }
 
 const typedOnce = new Set<string>();
+
+/** Typed blocks finish instantly once the merchant has replied after them, so their message never waits behind an animation. */
+function settled(thread: Block[], typed: Set<string>) {
+  const lastUser = thread.findLastIndex((block) => block.type === "text" && block.role === "user");
+  if (lastUser === -1) return typed;
+  const done = new Set(typed);
+  thread.slice(0, lastUser).forEach((block) => done.add(block.id));
+  return done;
+}
 
 function visibleBlocks(thread: Block[], done: Set<string>) {
   const pending = thread.findIndex((block) => block.type === "text" && block.typed && !done.has(block.id));

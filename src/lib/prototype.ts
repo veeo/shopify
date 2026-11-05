@@ -40,7 +40,7 @@ export type Segment = { type: "text"; text: string } | { type: "tool"; label: st
 export type Source = { title: string; url: string };
 
 export type Block =
-  | { id: string; type: "text"; role: "user" | "assistant"; text: string; typed?: boolean; segments?: Segment[]; sources?: Source[] }
+  | { id: string; type: "text"; role: "user" | "assistant"; text: string; typed?: boolean; segments?: Segment[]; sources?: Source[]; streamed?: boolean }
   | { id: string; type: "steps" }
   | { id: string; type: "sellers" }
   | { id: string; type: "chips"; chips: Chip[] }
@@ -1142,7 +1142,7 @@ export type Action =
   | { type: "reset" }
   | { type: "chip"; label: string }
   | { type: "user"; agentId: string; text: string }
-  | { type: "commit"; agentId: string; text: string; segments?: Segment[]; sources?: Source[] }
+  | { type: "commit"; agentId: string; text: string; segments?: Segment[]; sources?: Source[]; streamed?: boolean }
   | { type: "effects"; effects: Effect[] }
   | { type: "business-type"; value: BusinessType }
   | { type: "identity"; patch: Partial<PrototypeState["identity"]> }
@@ -1290,7 +1290,7 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       const thread = next.threads[action.agentId] ?? [];
       const last = thread[thread.length - 1];
       if (last?.type === "text" && last.role === "assistant" && last.text === text) return state;
-      push(next, action.agentId, { id: id(next), type: "text", role: "assistant", text, segments: action.segments, sources: action.sources });
+      push(next, action.agentId, { id: id(next), type: "text", role: "assistant", text, segments: action.segments, sources: action.sources, streamed: action.streamed });
       patchAgent(next, action.agentId, { preview: text.replace(/\s+/g, " ").slice(0, 72) });
       return next;
     }

@@ -1,3 +1,4 @@
+import { Children, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 
 const components: Components = {
@@ -22,6 +23,47 @@ const components: Components = {
   h3: ({ children }) => <p className="mt-3 font-semibold">{children}</p>,
 };
 
-export function Markdown({ text }: { text: string }) {
-  return <ReactMarkdown components={components}>{text}</ReactMarkdown>;
+/** Splits plain-text children into word spans that fade in as they arrive. Keys are positional, so words already shown keep their element and don't replay the fade. */
+function words(children: ReactNode) {
+  return Children.map(children, (child) =>
+    typeof child === "string"
+      ? child.split(/(\s+)/).map((token, index) =>
+          /^\s*$/.test(token) ? (
+            token
+          ) : (
+            <span key={index} className="word-in">
+              {token}
+            </span>
+          ),
+        )
+      : child,
+  );
+}
+
+const streamingComponents: Components = Object.fromEntries(
+  (["p", "li", "strong", "em", "a", "h1", "h2", "h3"] as const).map((tag) => {
+    const Base = components[tag] as (props: Record<string, unknown>) => ReactNode;
+    const Element = tag;
+    return [
+      tag,
+      (props: { children?: ReactNode }) =>
+        Base ? <Base {...props}>{words(props.children)}</Base> : <Element>{words(props.children)}</Element>,
+    ];
+  }),
+);
+
+/** While streaming, an unclosed `**` would show literally and then snap to bold; hold it back until it closes. */
+function balance(text: string) {
+  const marks = text.split("**").length - 1;
+  if (marks % 2 === 0) return text;
+  const at = text.lastIndexOf("**");
+  return text.slice(0, at) + text.slice(at + 2);
+}
+
+export function Markdown({ text, streaming = false }: { text: string; streaming?: boolean }) {
+  return streaming ? (
+    <ReactMarkdown components={{ ...components, ...streamingComponents }}>{balance(text)}</ReactMarkdown>
+  ) : (
+    <ReactMarkdown components={components}>{text}</ReactMarkdown>
+  );
 }
