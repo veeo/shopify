@@ -91,7 +91,7 @@ export function AgentNav({
         </div>
       ) : null}
 
-      <div className={`scroll-thin flex min-h-0 flex-1 flex-col overflow-y-auto ${collapsed ? "-mx-2 gap-2 px-2 py-1" : "gap-4"}`}>
+      <div className={`scroll-thin flex min-h-0 flex-1 flex-col overflow-y-auto ${collapsed ? "-mx-2 gap-3 px-2 py-1" : "gap-4"}`}>
         {groups.map((group) => {
           if (group.id === "hidden" && !showHidden) return null;
           const items = agents.filter((item) => item.group === group.id);
@@ -105,7 +105,7 @@ export function AgentNav({
                   <span className="h-px flex-1 bg-white/10" />
                 </div>
               ) : null}
-              <div className={`flex flex-col ${collapsed ? "items-center gap-1.5" : "gap-2"}`}>
+              <div className={`flex flex-col ${collapsed ? "items-center gap-3" : "gap-2"}`}>
                 {items.map((item) => {
                   const selected = item.id === state.selectedAgentId && state.mode === "thread";
                   if (collapsed) {
