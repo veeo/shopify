@@ -35,6 +35,10 @@ export function TopBar({
   sections,
   current,
   onSection,
+  choices,
+  choice,
+  onChoice,
+  pager,
 }: {
   icon?: PolarisIconName;
   title: ReactNode;
@@ -46,11 +50,22 @@ export function TopBar({
   sections?: { label: string; page: PreviewId }[];
   current?: PreviewId;
   onSection?: (page: PreviewId) => void;
+  /** A detail view's siblings, such as the other products. */
+  choices?: { id: string; label: string }[];
+  choice?: string;
+  onChoice?: (id: string) => void;
+  pager?: { onPrev: () => void; onNext: () => void; prevDisabled?: boolean; nextDisabled?: boolean };
 }) {
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLSpanElement>(null);
   useDismiss(open, menu, () => setOpen(false));
   const hasActions = actions.length > 0 || more.length > 0;
+  const menuItems = choices ?? sections?.map((item) => ({ id: item.page, label: item.label }));
+  const menuValue = choice ?? current;
+  function pick(id: string) {
+    if (choices) onChoice?.(id);
+    else onSection?.(id as PreviewId);
+  }
   const companions = hasActions ? (
     <>
       {actions.map((action) => (
@@ -63,7 +78,7 @@ export function TopBar({
   ) : null;
   return (
     <header className="px-6 pb-6 pt-5">
-      <div className="flex min-h-8 items-center gap-2">
+      <div className="flex min-h-8 items-center gap-1">
         {back ? (
           <button
             type="button"
@@ -73,7 +88,7 @@ export function TopBar({
             <PIcon name="ChevronLeft" size={20} />
             <span className="truncate">{back}</span>
           </button>
-        ) : sections && sections.length > 0 ? (
+        ) : menuItems && menuItems.length > 0 ? (
           <span ref={menu} className="relative min-w-0">
             <button
               type="button"
@@ -92,17 +107,17 @@ export function TopBar({
                 role="menu"
                 className="pop-in absolute left-0 top-full z-30 mt-1 flex max-h-64 w-56 flex-col overflow-y-auto rounded-xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.14)]"
               >
-                {sections.map((item) => {
-                  const on = item.page === current;
+                {menuItems.map((item) => {
+                  const on = item.id === menuValue;
                   return (
                     <button
-                      key={item.page}
+                      key={item.id}
                       type="button"
                       role="menuitem"
                       aria-current={on ? "page" : undefined}
                       onClick={() => {
                         setOpen(false);
-                        onSection?.(item.page);
+                        pick(item.id);
                       }}
                       className={`press rounded-lg px-2.5 py-1.5 text-left text-[13px] ${on ? "bg-[#f1f1f1] font-medium text-[#171817]" : "text-[#303030] hover:bg-[#f6f6f6]"}`}
                     >
@@ -116,6 +131,8 @@ export function TopBar({
         ) : (
           <h2 className="min-w-0 truncate text-[22px] font-medium leading-8 tracking-[-0.44px] text-[#171817]">{title}</h2>
         )}
+        {pager ? <PagerButton label="Previous product" disabled={pager.prevDisabled} onClick={pager.onPrev} icon="ChevronLeft" /> : null}
+        {pager ? <PagerButton label="Next product" disabled={pager.nextDisabled} onClick={pager.onNext} icon="ChevronRight" /> : null}
         {aside || companions ? (
           <span className="ml-auto flex shrink-0 items-center gap-1.5">
             {aside}
@@ -124,6 +141,20 @@ export function TopBar({
         ) : null}
       </div>
     </header>
+  );
+}
+
+function PagerButton({ label, icon, disabled, onClick }: { label: string; icon: PolarisIconName; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="press grid size-7 shrink-0 place-items-center rounded-lg text-[#303030] hover:bg-[#f6f6f6] disabled:text-[#c9c9c9]"
+    >
+      <PIcon name={icon} size={20} />
+    </button>
   );
 }
 

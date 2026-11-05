@@ -88,6 +88,9 @@ export function PreviewColumn({
     ask: onAsk,
   };
   const grey = state.preview === "product";
+  const detailBack =
+    state.preview === "product" ? "Back to products" : state.preview === "payments-setup" ? "Back to payments" : null;
+  if (detailBack && menu) setMenu(false);
   const headerRef = useRef<HTMLElement>(null);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   const [menuTop, setMenuTop] = useState(84);
@@ -99,7 +102,8 @@ export function PreviewColumn({
     const el = scrollRef.current;
     if (el) el.scrollTop = 0;
     savedScroll.current = 0;
-  }, [state.preview]);
+    if (state.preview === "product" || state.preview === "payments-setup") menuRef.current = false;
+  }, [state.preview, state.selectedProductId]);
   useEffect(() => {
     if (!menu) return;
     function onKey(event: KeyboardEvent) {
@@ -126,23 +130,38 @@ export function PreviewColumn({
     >
       <HeaderSlotProvider slot={slot}>
         <header ref={headerRef} className="relative z-30 flex shrink-0 items-center justify-between gap-3 px-6 pb-1 pt-7">
-          <button
-            type="button"
-            aria-label={menu ? "Close admin menu" : "Open admin menu"}
-            aria-expanded={menu}
-            aria-controls="admin-menu"
-            onClick={() => setMenuOpen(!menu, true)}
-            className={circleButton}
-          >
-            <span className="relative grid size-5 place-items-center">
-              <span className={`absolute transition-all duration-200 ${menu ? "scale-75 rotate-90 opacity-0" : "opacity-100"}`}>
-                <PIcon name="Menu" size={20} />
+          {detailBack ? (
+            <button
+              type="button"
+              aria-label={detailBack}
+              onClick={() => {
+                menuRef.current = false;
+                setMenu(false);
+                onPreview(state.preview === "product" ? "products" : "payments");
+              }}
+              className={circleButton}
+            >
+              <PIcon name="ArrowLeft" size={20} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              aria-label={menu ? "Close admin menu" : "Open admin menu"}
+              aria-expanded={menu}
+              aria-controls="admin-menu"
+              onClick={() => setMenuOpen(!menu, true)}
+              className={circleButton}
+            >
+              <span className="relative grid size-5 place-items-center">
+                <span className={`absolute transition-all duration-200 ${menu ? "scale-75 rotate-90 opacity-0" : "opacity-100"}`}>
+                  <PIcon name="Menu" size={20} />
+                </span>
+                <span className={`absolute transition-all duration-200 ${menu ? "opacity-100" : "-rotate-90 scale-75 opacity-0"}`}>
+                  <PIcon name="X" size={20} />
+                </span>
               </span>
-              <span className={`absolute transition-all duration-200 ${menu ? "opacity-100" : "-rotate-90 scale-75 opacity-0"}`}>
-                <PIcon name="X" size={20} />
-              </span>
-            </span>
-          </button>
+            </button>
+          )}
           <div ref={setSlot} className="flex min-w-0 items-center justify-end gap-1.5" />
         </header>
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none]">
@@ -184,7 +203,11 @@ export function PreviewColumn({
               onBusiness={onBusiness}
               onIdentity={onIdentity}
               onPaymentsNext={onPaymentsNext}
-              onProduct={onProduct}
+              onProduct={(id) => {
+                menuRef.current = false;
+                setMenu(false);
+                onProduct(id);
+              }}
               onUpdateProduct={onUpdateProduct}
               onAddProduct={onAddProduct}
             />
@@ -237,23 +260,18 @@ function Screen(props: {
           onIdentity={props.onIdentity}
           onNext={props.onPaymentsNext}
           onBack={() => nav.onPreview("payments")}
-          onHome={() => nav.onRail("home")}
         />
       );
     case "products":
       return <Products state={state} onProduct={props.onProduct} onAdd={props.onAddProduct} nav={nav} />;
     case "product":
-      return <ProductEdit state={state} onBack={() => nav.onPreview("products")} onUpdate={props.onUpdateProduct} />;
+      return <ProductEdit state={state} onBack={() => nav.onPreview("products")} onProduct={props.onProduct} onUpdate={props.onUpdateProduct} />;
     default:
       return <AdminPage page={state.preview} state={state} nav={nav} />;
   }
 }
 
 /* Shared pieces for the Figma-designed screens (active home, payments setup) */
-
-function Page({ children }: { children: ReactNode; wide?: boolean }) {
-  return <div className="flex flex-col gap-6 px-6 pb-[86px] pt-5">{children}</div>;
-}
 
 function H1({ children }: { children: ReactNode }) {
   return <h2 className="text-[25px] font-medium leading-8 tracking-[-0.75px] text-[#171817]">{children}</h2>;
@@ -291,21 +309,6 @@ function Pill({
     >
       {children}
     </button>
-  );
-}
-
-function BackPill({ onBack, onHome, icon = "Home" }: { onBack: () => void; onHome?: () => void; icon?: PolarisIconName }) {
-  return (
-    <div className="flex">
-      <span className="inline-flex h-8 items-center overflow-hidden rounded-full border border-[#e3e3e3] bg-white shadow-[0_3px_15px_rgba(0,0,0,0.03)]">
-        <button type="button" aria-label="Back" onClick={onBack} className="press grid h-full place-items-center pl-2 pr-0.5 hover:bg-[#f7f7f7]">
-          <PIcon name="ChevronLeft" size={20} />
-        </button>
-        <button type="button" aria-label="Home" onClick={onHome ?? onBack} className="press grid h-full place-items-center pl-1 pr-3 hover:bg-[#f7f7f7]">
-          <PIcon name={icon} size={20} />
-        </button>
-      </span>
-    </div>
   );
 }
 
@@ -876,23 +879,19 @@ function PaymentsSetup({
   onIdentity,
   onNext,
   onBack,
-  onHome,
 }: {
   state: PrototypeState;
   onBusiness: (value: PrototypeState["businessType"]) => void;
   onIdentity: (patch: Partial<PrototypeState["identity"]>) => void;
   onNext: () => void;
   onBack: () => void;
-  onHome: () => void;
 }) {
   const identity = state.paymentsStep === "identity" || state.paymentsStep === "done";
   return (
-    <Page wide>
-      <BackPill onBack={onBack} onHome={onHome} />
-      <div className="flex flex-col gap-1">
-        <H1>Set up Shopify Payments</H1>
-        <p className="text-[13px] leading-[1.4] tracking-[-0.13px] text-[#4a4a4a]">Tell us about your store to start accepting payments</p>
-      </div>
+    <>
+      <TopBar title="Set up Shopify Payments" />
+      <div className="flex flex-col gap-6 px-6 pb-[86px]">
+      <p className="text-[13px] leading-[1.4] tracking-[-0.13px] text-[#4a4a4a]">Tell us about your store to start accepting payments</p>
       <div key={identity ? "identity" : "type"} className="rise">
         <Card className="p-2">
           <p className="p-4 text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">{identity ? "What’s your legal name?" : "I am running my store as:"}</p>
@@ -954,7 +953,8 @@ function PaymentsSetup({
           {identity ? "Continue" : "Next"}
         </Pill>
       </div>
-    </Page>
+      </div>
+    </>
   );
 }
 
@@ -1162,10 +1162,12 @@ function Label({ children }: { children: ReactNode }) {
 function ProductEdit({
   state,
   onBack,
+  onProduct,
   onUpdate,
 }: {
   state: PrototypeState;
   onBack: () => void;
+  onProduct: (id: string) => void;
   onUpdate: (id: string, patch: Partial<Product>) => void;
 }) {
   const [taxed, setTaxed] = useState(true);
@@ -1173,11 +1175,24 @@ function ProductEdit({
   const product = state.products.find((item) => item.id === state.selectedProductId) ?? state.products[0];
   if (!product) return null;
   const fresh = !product.title && !product.description;
+  const index = state.products.findIndex((item) => item.id === product.id);
+  const title = product.title.trim() || (fresh ? "Add product" : "Untitled product");
   return (
     <>
-      <TopBar back="Products" onBack={onBack} title="Products" actions={[{ label: fresh ? "Save" : "Save", tone: "primary", onClick: onBack }]} />
+      <TopBar
+        title={title}
+        choices={state.products.map((item) => ({ id: item.id, label: item.title.trim() || "Untitled product" }))}
+        choice={product.id}
+        onChoice={onProduct}
+        pager={{
+          onPrev: () => onProduct(state.products[index - 1].id),
+          onNext: () => onProduct(state.products[index + 1].id),
+          prevDisabled: index <= 0,
+          nextDisabled: index < 0 || index >= state.products.length - 1,
+        }}
+        actions={[{ label: "Save", tone: "primary", onClick: onBack }]}
+      />
       <Body>
-        <h2 className="pt-1 text-[20px] font-bold leading-7 tracking-[-0.3px]">{fresh ? "Add product" : product.title || "Untitled product"}</h2>
         <AdminCard className="flex flex-col gap-3">
           <label className="flex flex-col gap-1">
             <Label>Title</Label>
