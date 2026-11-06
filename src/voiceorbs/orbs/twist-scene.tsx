@@ -191,7 +191,7 @@ function TwistMesh({
   });
 
   return (
-    <mesh>
+    <mesh scale={1.66}>
       <icosahedronGeometry args={[1, 64]} />
       <shaderMaterial
         ref={matRef}

@@ -135,7 +135,8 @@ float noise(vec2 p) {
 }
 
 void main() {
-  vec2 p = (gl_FragCoord.xy * 2.0 - uRes) / uRes;
+  // Draw the ring at the same diameter as the filled spheres in an avatar slot.
+  vec2 p = (gl_FragCoord.xy * 2.0 - uRes) / uRes * 0.64;
   float r = length(p);
   float edge = 1.0 - smoothstep(0.8, 1.0, r);
   if (edge <= 0.0) {

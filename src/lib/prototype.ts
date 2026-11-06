@@ -60,7 +60,7 @@ export const orbColorPresets: { name: string; from: string; to: string }[] = [
 export const exemptAvatarAgents = new Set(["slack", "grok", "muse"]);
 
 const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
-  sidekick: "plasma",
+  sidekick: "twist",
   chief: "twist",
   ideas: "nebula",
   trends: "mercury",
@@ -77,6 +77,7 @@ const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
 
 /** Reused styles get a different gradient so two sidekicks don't look identical. */
 const reuseTint: Record<string, { from: string; to: string }> = {
+  chief: { from: "#f0abfc", to: "#818cf8" },
   agentic: { from: "#f43f5e", to: "#fb923c" },
   customers: { from: "#f472b6", to: "#d946ef" },
   orders: { from: "#22d3ee", to: "#2563eb" },
