@@ -310,7 +310,20 @@ body {
 }
 
 .welcome-leave {
-  animation: welcome-leave 880ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: welcome-leave 720ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes title-arrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.title-arrive {
+  animation: title-arrive 720ms ease both;
 }
 
 @keyframes stage-in {
@@ -434,6 +447,7 @@ body {
   .word-in,
   .welcome-word,
   .welcome-leave,
+  .title-arrive,
   .stage-in,
   .choice-in,
   .shimmer-text {

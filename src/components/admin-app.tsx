@@ -60,8 +60,16 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   const applied = useRef(new Set<string>());
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
   const dispatch = (action: Action) => setState((current) => reducer(current, action));
-  const stage = sidekickStage(state);
-  const panels = sidekickPanels(state);
+  const opening = sidekickStage(state);
+  const [room, setRoom] = useState(false);
+  const [seenOpening, setSeenOpening] = useState(opening);
+  if (opening !== seenOpening) {
+    setSeenOpening(opening);
+    if (opening) setRoom(false);
+  }
+  // The title introduces Sidekick alone. When that settles, both sidebars come in, and the next step is written after them.
+  const stage = opening && !room;
+  const panels = sidekickPanels(state, room);
   const panelsRef = useRef(panels);
   useEffect(() => {
     panelsRef.current = { nav: panels.nav, preview: panels.preview };
@@ -73,8 +81,8 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
-  // While the conversation is alone it is already the width it will have once both sidebars are in,
-  // so the choice reveals the room around it instead of squeezing the words.
+  // While the title is introducing Sidekick, the conversation is already the width it will have
+  // once both sidebars are in, so the room opens around it instead of squeezing the words.
   const conversationWidth = Math.max(360, viewport - (8 + 12 + 1 + 248 + 584));
   const [seenStage, setSeenStage] = useState(stage);
   const [settling, setSettling] = useState(false);
@@ -287,6 +295,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onOpenConversation={(id) => dispatch({ type: "open-conversation", id })}
           onDeleteConversation={(id) => dispatch({ type: "delete-conversation", id })}
           onRate={(id, value) => dispatch({ type: "rate", id, value })}
+          onIntroduced={() => setRoom(true)}
         />
         </div>
       <PreviewColumn

@@ -141,7 +141,7 @@ function systemPrompt(context: PrototypeContext | undefined, persona: string, st
     "",
     "This admin:",
     "- It's a prototype with sample data. Use the admin tools to change the preview, payments form, catalog, and sidekick list when the merchant asks you to do something. Never claim you changed something unless you called the tool.",
-    `- Scenario: ${context?.scenario ?? "setup"}. Page open in the preview: ${context?.preview ?? "home-setup"}.${context?.arrival === "sidekick" ? " This is the Sidekick opening. The conversation is alone until they choose, then the agent list and the admin come in together. Drive toward one outcome. Help me start opens three store designs. Grow the admin when a page should take their attention, and shrink it when you are still deciding." : ""}`,
+    `- Scenario: ${context?.scenario ?? "setup"}. Page open in the preview: ${context?.preview ?? "home-setup"}.${context?.arrival === "sidekick" ? " This is the Sidekick opening. The title introduces Sidekick, then the agent list and the admin come in, and then Sidekick asks where to start. Drive toward one outcome. Help me start opens three store designs. Grow the admin when a page should take their attention, and shrink it when you are still deciding." : ""}`,
     context?.products?.length ? `- Catalog: ${context.products.slice(0, 30).join(", ")}.` : "",
   ]
     .filter((line) => line !== "")

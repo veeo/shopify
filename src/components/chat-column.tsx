@@ -47,6 +47,7 @@ export function ChatColumn({
   onRate,
   onSwitch,
   onAddAgent,
+  onIntroduced,
 }: {
   state: PrototypeState;
   liveSegments: LiveSegment[] | null;
@@ -68,6 +69,7 @@ export function ChatColumn({
   onRate: (id: string, value: "up" | "down") => void;
   onSwitch: (id: string) => void;
   onAddAgent: () => void;
+  onIntroduced?: () => void;
 }) {
   const agent = selectedAgent(state);
   const purpose = state.selectedAgentId === "chief" && state.chiefPhase === "purpose" && state.mode === "thread";
@@ -75,17 +77,29 @@ export function ChatColumn({
   const title = state.mode === "add" ? "Add a sidekick" : purpose ? "Chief of staff" : agent.name;
   const topic = state.mode === "add" ? null : purpose ? "Set purpose" : agent.topic;
   const [editing, setEditing] = useState(false);
+  const [typedDone, setTypedDone] = useState(() => new Set(typedOnce));
   const stage = sidekickStage(state);
-  const [phase, setPhase] = useState<"welcome" | "handoff" | "ready">("welcome");
+  const [beat, setBeat] = useState<"title" | "settle" | "message">("title");
   const [seenStage, setSeenStage] = useState(stage);
   if (seenStage !== stage) {
     setSeenStage(stage);
-    if (stage) setPhase("welcome");
+    if (stage) {
+      typedOnce.delete("arrive");
+      setTypedDone(new Set(typedOnce));
+      setBeat("title");
+    }
   }
-  const showWelcome = stage && phase !== "ready";
-  const showConversation = !showWelcome || phase === "handoff";
-  const arrive = stage && phase !== "welcome";
-  const [typedDone, setTypedDone] = useState(() => new Set(typedOnce));
+  const writing = stage && beat === "title";
+  const showThread = !stage || beat === "message";
+  const introduced = useRef(onIntroduced);
+  useEffect(() => {
+    introduced.current = onIntroduced;
+  });
+  useEffect(() => {
+    if (beat !== "settle") return;
+    const timer = window.setTimeout(() => setBeat("message"), 740);
+    return () => window.clearTimeout(timer);
+  }, [beat]);
   const markTyped = useCallback((id: string) => {
     typedOnce.add(id);
     setTypedDone(new Set(typedOnce));
@@ -104,12 +118,20 @@ export function ChatColumn({
   }, [thread.length, liveLength, busy]);
 
   return (
-    <section data-opening={stage ? phase : "workspace"} className="relative flex min-h-0 min-w-0 flex-1 flex-col px-8 pb-3 pt-7">
-      {showConversation ? (
-      <div className={`flex min-h-0 flex-1 flex-col ${arrive ? "stage-in" : ""}`}>
+    <section data-opening={stage ? beat : "workspace"} className="relative flex min-h-0 min-w-0 flex-1 flex-col px-8 pb-3 pt-7">
+      <div className="flex min-h-0 flex-1 flex-col">
           <header className="relative mb-6 flex items-start justify-between gap-4">
             <h1 className="min-w-0 flex-1 text-[25px] font-medium leading-8 tracking-[-0.75px]">
-              {state.mode === "thread" && !purpose ? (
+              {writing ? (
+                <TitleIntro
+                  motion={state.motion}
+                  onDone={() => {
+                    introduced.current?.();
+                    const quiet = !state.motion || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                    setBeat(quiet ? "message" : "settle");
+                  }}
+                />
+              ) : state.mode === "thread" && !purpose ? (
                 <button
                   type="button"
                   onClick={() => onConversations(!listing)}
@@ -158,6 +180,7 @@ export function ChatColumn({
             />
           ) : null}
 
+          {showThread ? (
           <div
             ref={scroller}
             key={state.mode === "thread" ? `thread-${agent.id}` : `thread-${state.mode}`}
@@ -175,7 +198,8 @@ export function ChatColumn({
                       key={block.id}
                       text={block.text}
                       instant={!state.motion}
-                      delay={block.id === "hello" || block.id === "arrive" ? 1200 : 750}
+                      delay={block.id === "arrive" ? 160 : block.id === "hello" ? 1200 : 750}
+                      status={block.id !== "arrive"}
                       onDone={() => markTyped(block.id)}
                     />
                   ) : (
@@ -198,6 +222,9 @@ export function ChatColumn({
               </div>
             )}
           </div>
+          ) : (
+            <div className="min-h-0 flex-1" />
+          )}
 
       {offline && state.mode === "thread" ? (
         <p className="mb-1 mt-2 px-4 text-[12px] text-[#8e8f8b]">
@@ -218,93 +245,61 @@ export function ChatColumn({
         lastReply={lastReply}
       />
       </div>
-      ) : null}
-      {showWelcome ? (
-        <Opening
-          storeName={state.storeName}
-          motion={state.motion}
-          onHandoff={() => setPhase((current) => (current === "welcome" ? "handoff" : current))}
-          onDone={() => setPhase("ready")}
-        />
-      ) : null}
     </section>
   );
 }
 
-function Opening({
-  storeName,
-  motion,
-  onHandoff,
-  onDone,
-}: {
-  storeName: string;
-  motion: boolean;
-  onHandoff: () => void;
-  onDone: () => void;
-}) {
-  const [firstCount, setFirstCount] = useState(0);
-  const [secondCount, setSecondCount] = useState(0);
+const sidekickIntro = "Welcome to Shopify. I'm Sidekick, here to help you get set up, running, and growing.";
+
+function TitleIntro({ motion, onDone }: { motion: boolean; onDone: () => void }) {
+  const [count, setCount] = useState(0);
   const [leaving, setLeaving] = useState(false);
-  const handoff = useRef(onHandoff);
   const done = useRef(onDone);
   useEffect(() => {
-    handoff.current = onHandoff;
     done.current = onDone;
   });
   useEffect(() => {
-    const first = `Welcome to ${storeName}.`.split(" ");
-    const second = "I'm Sidekick.".split(" ");
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!motion || reduce) {
-      handoff.current();
       done.current();
       return;
     }
+    const words = sidekickIntro.split(" ");
     const timers: number[] = [];
     const later = (ms: number, run: () => void) => {
       timers.push(window.setTimeout(run, ms));
     };
     const step = 150;
-    const start = 380;
-    first.forEach((_, index) => later(start + index * step, () => setFirstCount(index + 1)));
-    const secondAt = start + first.length * step + 280;
-    second.forEach((_, index) => later(secondAt + index * step, () => setSecondCount(index + 1)));
-    const hold = secondAt + second.length * step + 900;
-    later(hold, () => {
-      setLeaving(true);
-      handoff.current();
-    });
-    later(hold + 880, () => done.current());
+    const start = 420;
+    words.forEach((_, index) => later(start + index * step, () => setCount(index + 1)));
+    const hold = start + words.length * step + 1200;
+    later(hold, () => setLeaving(true));
+    later(hold + 720, () => done.current());
     return () => {
       for (const timer of timers) window.clearTimeout(timer);
     };
-  }, [storeName, motion]);
-  const first = `Welcome to ${storeName}.`;
-  const second = "I'm Sidekick.";
+  }, [motion]);
   return (
-    <>
-      <p className="sr-only">
-        Welcome to {storeName}. I&apos;m Sidekick.
+    <div className="relative -mx-2 px-2">
+      <p className="sr-only">{sidekickIntro}</p>
+      <p aria-hidden className={`${leaving ? "welcome-leave pointer-events-none absolute inset-x-2 top-0" : "min-h-8"}`}>
+        <WelcomeWords text={sidekickIntro} count={count} />
       </p>
-      <div aria-hidden className={`absolute inset-0 z-10 grid place-items-center bg-[#0c0d0c] px-8 ${leaving ? "welcome-leave pointer-events-none" : ""}`}>
-        <div className="max-w-[16em] text-balance text-center">
-          <p className="text-[25px] font-medium leading-8 tracking-[-0.75px]">
-            <WelcomeWords text={first} count={firstCount} />
-          </p>
-          <p className="mt-3 text-[25px] font-medium leading-8 tracking-[-0.75px] text-white/80">
-            <WelcomeWords text={second} count={secondCount} />
-          </p>
-        </div>
-      </div>
-    </>
+      <p aria-hidden={!leaving} className={`${leaving ? "title-arrive" : "invisible h-0 overflow-hidden"} flex items-center gap-1.5`}>
+        <span>Sidekick</span>
+        <span className="grid shrink-0 place-items-center text-[#8e8f8b]">
+          <PIcon name="ChevronDown" size={20} />
+        </span>
+      </p>
+    </div>
   );
 }
 
 function WelcomeWords({ text, count }: { text: string; count: number }) {
-  const words = text.split(" ");
+  const words = text.split(" ").slice(0, count);
   return words.map((word, index) => (
     <span key={`${word}-${index}`}>
-      <span className={index < count ? "welcome-word" : "inline-block opacity-0"}>{word}</span>
+      <span className="welcome-word">{word}</span>
       {index < words.length - 1 ? " " : ""}
     </span>
   ));
@@ -1772,8 +1767,8 @@ function visibleBlocks(thread: Block[], done: Set<string>) {
 }
 
 /** Plays a scripted reply back like a live one: "Working on it" for a beat, then the words stream in. */
-function SimulatedTurn({ text, instant, delay, onDone }: { text: string; instant: boolean; delay: number; onDone: () => void }) {
-  const [shown, setShown] = useState<string | null>(null);
+function SimulatedTurn({ text, instant, delay, onDone, status = true }: { text: string; instant: boolean; delay: number; onDone: () => void; status?: boolean }) {
+  const [shown, setShown] = useState<string | null>(status ? null : "");
   const done = useRef(onDone);
   useEffect(() => {
     done.current = onDone;
