@@ -2,8 +2,10 @@
 
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Orb } from "@/components/marks";
+import { useOrbAudioPublish } from "@/components/orb-audio";
 import { PIcon } from "@/components/polaris-icon";
-import type { Agent } from "@/lib/prototype";
+import { exemptAvatarAgents, type Agent } from "@/lib/prototype";
+import type { OrbState } from "@/voiceorbs/lib/orb-state";
 import { speak, speakable, startRecording, transcribeAudio, type Playback, type Recording } from "@/lib/voice";
 
 type Phase = "starting" | "listening" | "transcribing" | "thinking" | "speaking" | "unavailable";
@@ -127,7 +129,7 @@ export function VoiceMode({
     const tick = () => {
       const now = performance.now();
       const level = recording.current?.level() ?? playback.current?.level() ?? 0;
-      orb.current?.style.setProperty("scale", (1 + Math.min(level, 1) * 0.28).toFixed(3));
+      if (exemptAvatarAgents.has(agent.id)) orb.current?.style.setProperty("scale", (1 + Math.min(level, 1) * 0.28).toFixed(3));
       if (recording.current) {
         if (level > 0.12) {
           spoke = true;
@@ -143,7 +145,7 @@ export function VoiceMode({
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [agent.id]);
 
   useEffect(() => {
     if (phase !== "thinking" || busy || !lastReply || lastReply.id === waitingAfter.current) return;
@@ -166,6 +168,23 @@ export function VoiceMode({
     }
   }
 
+  const exempt = exemptAvatarAgents.has(agent.id);
+  const orbState: OrbState | null =
+    phase === "starting"
+      ? "connecting"
+      : phase === "listening"
+        ? "listening"
+        : phase === "transcribing" || phase === "thinking"
+          ? "thinking"
+          : phase === "speaking"
+            ? "speaking"
+            : null;
+  useOrbAudioPublish(agent.id, exempt ? null : orbState, () => {
+    if (phase === "listening") return recording.current?.level() ?? 0;
+    if (phase === "speaking") return playback.current?.level() ?? 0;
+    return 0;
+  });
+
   const hint =
     phase === "listening" ? "Talk, then pause. Tap to send now." : phase === "speaking" ? "Tap to interrupt." : phase === "unavailable" ? "Tap to try again." : "";
 
@@ -179,7 +198,7 @@ export function VoiceMode({
       >
         {phase === "listening" ? <span className="absolute inset-0 animate-ping rounded-full bg-white/[0.06]" /> : null}
         <span ref={orb} className="grid place-items-center transition-[scale] duration-100 ease-out">
-          <Orb id={agent.orb} size={48} />
+          <Orb id={agent.orb} agentId={agent.id} size={48} />
         </span>
       </button>
       <div className="min-w-0 flex-1" aria-live="polite">

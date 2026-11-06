@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
 import { Orb } from "@/components/marks";
+import { OrbAudioProvider } from "@/components/orb-audio";
 import { PreviewColumn } from "@/components/preview-column";
 import { SearchPalette } from "@/components/search-palette";
 import {
@@ -243,6 +244,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   }
 
   return (
+    <OrbAudioProvider>
     <div
       data-shell={stage ? "conversation" : settling ? "reveal" : "workspace"}
       className="fade-in p-partial-theme-admin-next-dark relative flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white"
@@ -330,6 +332,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
       ) : null}
       <span className="sr-only">{agent.name}</span>
     </div>
+    </OrbAudioProvider>
   );
 }
 
