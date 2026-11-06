@@ -16,6 +16,7 @@ import {
   reducer,
   scriptedTurn,
   selectedAgent,
+  sidekickPanels,
   sidekickStage,
   setupState,
   type Action,
@@ -60,8 +61,11 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
   const dispatch = (action: Action) => setState((current) => reducer(current, action));
   const stage = sidekickStage(state);
-  const stageRef = useRef(stage);
-  stageRef.current = stage;
+  const panels = sidekickPanels(state);
+  const panelsRef = useRef(panels);
+  useEffect(() => {
+    panelsRef.current = panels;
+  }, [panels]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -69,11 +73,11 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
       const key = event.key.toLowerCase();
       if (key === "b") {
         event.preventDefault();
-        if (stageRef.current) return;
+        if (!panelsRef.current.nav) return;
         setSidebarOpen((open) => !open);
       } else if (key === "k") {
         event.preventDefault();
-        if (stageRef.current) return;
+        if (!panelsRef.current.nav) return;
         setPalette((current) => ({ open: !current.open }));
       }
     }
@@ -199,12 +203,12 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
 
   return (
     <div
-      data-shell={stage ? "conversation" : "workspace"}
-      className={`fade-in relative flex h-dvh gap-1 bg-[#0c0d0c] p-1 text-white ${stage ? "min-w-0" : "min-w-[1180px]"}`}
+      data-shell={stage ? "conversation" : panels.nav ? "workspace" : "task"}
+      className={`fade-in relative flex h-dvh gap-1 bg-[#0c0d0c] p-1 text-white ${panels.nav ? "min-w-[1180px]" : "min-w-0"}`}
     >
       <div className="p-partial-theme-admin-next-dark flex min-w-0 flex-1 gap-1 bg-[#0c0d0c] text-white">
         <AgentNav
-          present={!stage}
+          present={panels.nav}
           state={state}
           navOpen={sidebarOpen}
           onToggleNav={() => setSidebarOpen((open) => !open)}
@@ -221,7 +225,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         <div
           aria-hidden
           className="rail-reveal my-3 shrink-0 bg-white/10"
-          style={{ width: stage ? 0 : 1, opacity: stage ? 0 : 1 }}
+          style={{ width: panels.nav ? 1 : 0, opacity: panels.nav ? 1 : 0 }}
         />
         <ChatColumn
           state={state}
@@ -247,7 +251,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         />
       </div>
       <PreviewColumn
-        present={!stage}
+        present={panels.preview}
         state={state}
         onPreview={(page, wide) => dispatch({ type: "preview", page, wide })}
         onChip={(label) => dispatch({ type: "chip", label })}

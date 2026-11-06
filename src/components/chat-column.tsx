@@ -591,6 +591,8 @@ const pageSuggestions: Record<string, string[]> = {
 export function suggestionsFor(state: PrototypeState) {
   if (state.mode === "add") return ["Tell me more about creating a sidekick", "Which sidekick should I add first?", "Create my own sidekick", "What can sidekicks do?"];
   if (sidekickStage(state)) return [];
+  if (state.lookbook && !state.theme) return [];
+  if (state.theme) return ["I have something to sell", "Write a headline for the homepage", "Change the colors", "What should we do next?"];
   if (state.selectedAgentId !== "sidekick") {
     const asks = (state.threads[state.selectedAgentId] ?? [])
       .flatMap((block) => (block.type === "chips" ? block.chips.filter((chip) => chip.send).map((chip) => chip.label) : []))

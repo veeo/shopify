@@ -90,7 +90,9 @@ export type Effect =
   | { type: "add-sidekick"; id: string }
   | { type: "artifact"; name: "payments-plan" | "best-sellers" }
   | { type: "purpose-mode" }
-  | { type: "chips"; chips: Chip[] };
+  | { type: "chips"; chips: Chip[] }
+  | { type: "lookbook" }
+  | { type: "choose-theme"; name: string };
 
 export type MenuStyle = "push" | "drop";
 
@@ -123,6 +125,10 @@ export type PrototypeState = {
   ratings: Record<string, "up" | "down">;
   cardsDone: string[];
   cardsDismissed: string[];
+  /** The Sidekick opening is showing store designs instead of the setup list. */
+  lookbook: boolean;
+  /** The design the merchant chose, once they have. */
+  theme: string | null;
 };
 
 export type Conversation = { id: string; title: string; at: number; blocks: Block[] };
@@ -204,28 +210,43 @@ export const sidekickMakeYourOwn =
   "You can also build your own sidekicks — agents with a job of their own. A chief of staff that keeps your week on track, a product scout that watches trends, or anything you can describe. Each one gets its own place on the left and its own conversations.";
 
 export function sidekickArrival(storeName: string) {
-  return `One step is enough to make ${storeName} feel like yours.\n\nWhat do you want to do first?`;
+  return `Let's get one real thing in place for ${storeName}.\n\nWhere should we start?`;
 }
 
 export const arrivalChips: Chip[] = [
   { label: "I have something to sell", tone: "primary" },
   { label: "I already sell somewhere", tone: "secondary" },
-  { label: "Show me the store", tone: "secondary" },
+  { label: "Help me start", tone: "secondary" },
 ];
 
-/** Sidekick's first moment, before a choice. The nav and the admin stay offstage until then. */
-export function sidekickStage(state: PrototypeState) {
-  if (state.arrival !== "sidekick" || state.scenario !== "setup" || state.mode !== "thread") return false;
-  if (state.selectedAgentId !== "sidekick") return false;
-  return !(state.threads.sidekick ?? []).some((block) => block.type === "text" && block.role === "user");
+function sidekickOpening(state: PrototypeState) {
+  return state.arrival === "sidekick" && state.scenario === "setup" && state.mode === "thread" && state.selectedAgentId === "sidekick";
 }
 
-const sidekickArrivalPersona = `You are Sidekick, and this is the merchant's first moment in a brand-new Shopify store. They just chose how to start. The navigation and the admin were hidden until that choice, and they are opening now. Do the one thing they picked.
+function sidekickTurns(state: PrototypeState) {
+  return (state.threads.sidekick ?? []).filter((block) => block.type === "text" && block.role === "user").length;
+}
+
+/** Sidekick's first moment, before a choice. The conversation is the only thing on stage. */
+export function sidekickStage(state: PrototypeState) {
+  return sidekickOpening(state) && sidekickTurns(state) === 0;
+}
+
+/** The conversation is alone until the first choice. That choice brings the admin in from the right. The next step brings the agents in from the left. */
+export function sidekickPanels(state: PrototypeState): { nav: boolean; preview: boolean } {
+  if (!sidekickOpening(state)) return { nav: true, preview: true };
+  const turns = sidekickTurns(state);
+  if (turns === 0) return { nav: false, preview: false };
+  if (turns === 1) return { nav: false, preview: true };
+  return { nav: true, preview: true };
+}
+
+const sidekickArrivalPersona = `You are Sidekick, and this is the merchant's first moment in a brand-new Shopify store. Drive toward one concrete outcome. They just chose how to start. The admin on the right is opening with that choice. The agent list on the left stays hidden until they take the next step. Do the one thing they picked.
 
 How this conversation works:
 - "I have something to sell" or "start something new": they have a product. Products is open wide. Ask what it is. When they name it, call addProduct with wide true.
 - "I already sell somewhere": Products is open wide. Ask where the catalog lives today.
-- "Show me the store" or "show me around": Home is open at its quiet width. Offer a product, getting paid, and shipping. Don't recite the rest of setup.
+- "Help me start", "help me", or "show me a route": three store designs are open wide on the right (Horizon, Tinker, Dwell). Ask them to pick the one that feels like the store. When they choose, say that design is the one and ask for the first thing they sell. Don't recite a setup list.
 - If they ask what you are: this conversation is how they set up and run the store. Other sidekicks can take a specific job later. Don't offer a catalog of sidekicks unless they ask.
 - One next step. Don't recite the whole setup list.
 
@@ -751,6 +772,8 @@ export function setupState(storeName = "My Store", arrival: Arrival = "tasks"): 
     ratings: {},
     cardsDone: [],
     cardsDismissed: [],
+    lookbook: false,
+    theme: null,
   };
 }
 
@@ -972,6 +995,15 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
       state.previewWide = false;
     } else if (effect.type === "chips") {
       push(state, "sidekick", { id: id(state), type: "chips", chips: effect.chips });
+    } else if (effect.type === "lookbook") {
+      state.lookbook = true;
+    } else if (effect.type === "choose-theme") {
+      state.theme = effect.name;
+      state.lookbook = true;
+      state.preview = "online-store";
+      state.previewWide = true;
+      if (!state.cardsDone.includes("theme")) state.cardsDone.push("theme");
+      patchAgent(state, "sidekick", { topic: effect.name, preview: `${effect.name} is the design.` });
     }
   }
 }
@@ -983,8 +1015,23 @@ function learnMore() {
 const workPages = new Set<PreviewId>(["products", "product", "payments-setup", "shipping", "domain", "address", "online-store", "pos", "orders"]);
 
 /** The Sidekick opening. Exact phrases from the first chips, plus the same words typed. */
+const themeChoice: Record<string, string> = {
+  Horizon: "Horizon it is. Clear, and ready for a catalog. Tell me the first thing you sell and I'll put it on this page.",
+  Tinker: "Tinker it is. Made for objects, with some air around them. Tell me the first thing you sell and I'll put it on this page.",
+  Dwell: "Dwell it is. Quiet, and right for a home store. Tell me the first thing you sell and I'll put it on this page.",
+};
+
 function arrivalIntent(text: string, storeName: string): { text: string; effects: Effect[]; follow?: Chip[]; topic?: string } | null {
   const q = text.trim().toLowerCase().replace(/[.!?]+$/, "");
+  const chosen = q.match(/^let's go with (horizon|tinker|dwell)$/);
+  if (chosen) {
+    const name = chosen[1].charAt(0).toUpperCase() + chosen[1].slice(1);
+    return {
+      topic: name,
+      text: themeChoice[name],
+      effects: [{ type: "choose-theme", name }],
+    };
+  }
   if (q === "i have something to sell" || q === "start something new" || q === "start a new store") {
     return {
       topic: "First product",
@@ -999,16 +1046,23 @@ function arrivalIntent(text: string, storeName: string): { text: string; effects
       effects: [{ type: "navigate", page: "products", wide: true }],
     };
   }
-  if (q === "show me the store" || q === "show me around" || q === "look around" || q === "just show me around") {
+  if (
+    q === "help me start" ||
+    q === "help me" ||
+    q === "help me find a way in" ||
+    q === "show me a route" ||
+    q === "show me the store" ||
+    q === "show me around" ||
+    q === "look around" ||
+    q === "just show me around"
+  ) {
     return {
-      topic: "Your store",
-      text: `This is ${storeName}, before anything is for sale. When you're ready to sell, start with one of these.`,
-      follow: [
-        { label: "Add a product", tone: "primary" },
-        { label: "Get paid", tone: "secondary" },
-        { label: "Set up shipping", tone: "secondary" },
+      topic: "A design",
+      text: `Three designs for ${storeName} are on the right. Pick the one that feels like the store.`,
+      effects: [
+        { type: "navigate", page: "online-store", wide: true },
+        { type: "lookbook" },
       ],
-      effects: [{ type: "navigate", page: "home-setup", wide: false }],
     };
   }
   if (q === "add a product") {
