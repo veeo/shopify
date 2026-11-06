@@ -232,7 +232,7 @@ export function sidekickStage(state: PrototypeState) {
   return sidekickOpening(state) && sidekickTurns(state) === 0;
 }
 
-/** The conversation stays alone while the title introduces Sidekick. Once that introduction settles, both sidebars come in, and then the next step is written. */
+/** The title introduces Sidekick in the place it keeps. Once that introduction settles, both sidebars come in around it, and then the next step is written. */
 export function sidekickPanels(state: PrototypeState, revealed = false): { nav: boolean; preview: boolean } {
   if (!sidekickOpening(state)) return { nav: true, preview: true };
   if (sidekickTurns(state) === 0 && !revealed) return { nav: false, preview: false };

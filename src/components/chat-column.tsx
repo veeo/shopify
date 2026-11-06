@@ -249,10 +249,10 @@ export function ChatColumn({
   );
 }
 
-const sidekickIntro = "Welcome to Shopify. I'm Sidekick, here to help you get set up, running, and growing.";
+const sidekickIntro = "Welcome to Shopify. I'm Sidekick. I'll help you get this store set up, and I'll be here for the work of running and growing it.";
 
 function TitleIntro({ motion, onDone }: { motion: boolean; onDone: () => void }) {
-  const [count, setCount] = useState(0);
+  const [shown, setShown] = useState("");
   const [leaving, setLeaving] = useState(false);
   const done = useRef(onDone);
   useEffect(() => {
@@ -264,17 +264,23 @@ function TitleIntro({ motion, onDone }: { motion: boolean; onDone: () => void })
       done.current();
       return;
     }
-    const words = sidekickIntro.split(" ");
+    const tokens = sidekickIntro.split(/(\s+)/);
     const timers: number[] = [];
     const later = (ms: number, run: () => void) => {
       timers.push(window.setTimeout(run, ms));
     };
-    const step = 150;
-    const start = 420;
-    words.forEach((_, index) => later(start + index * step, () => setCount(index + 1)));
-    const hold = start + words.length * step + 1200;
-    later(hold, () => setLeaving(true));
-    later(hold + 720, () => done.current());
+    let at = 0;
+    const tick = () => {
+      at = Math.min(tokens.length, at + 2);
+      setShown(tokens.slice(0, at).join(""));
+      if (at >= tokens.length) {
+        later(2200, () => setLeaving(true));
+        later(2200 + 720, () => done.current());
+        return;
+      }
+      later(/[.!?]$/.test(tokens[at - 2] ?? "") ? 160 : 45, tick);
+    };
+    later(160, tick);
     return () => {
       for (const timer of timers) window.clearTimeout(timer);
     };
@@ -283,7 +289,15 @@ function TitleIntro({ motion, onDone }: { motion: boolean; onDone: () => void })
     <div className="relative -mx-2 px-2">
       <p className="sr-only">{sidekickIntro}</p>
       <p aria-hidden className={`${leaving ? "welcome-leave pointer-events-none absolute inset-x-2 top-0" : "min-h-8"}`}>
-        <WelcomeWords text={sidekickIntro} count={count} />
+        {shown.split(/(\s+)/).map((token, index) =>
+          /^\s*$/.test(token) ? (
+            token
+          ) : (
+            <span key={index} className="word-in">
+              {token}
+            </span>
+          ),
+        )}
       </p>
       <p aria-hidden={!leaving} className={`${leaving ? "title-arrive" : "invisible h-0 overflow-hidden"} flex items-center gap-1.5`}>
         <span>Sidekick</span>
@@ -293,16 +307,6 @@ function TitleIntro({ motion, onDone }: { motion: boolean; onDone: () => void })
       </p>
     </div>
   );
-}
-
-function WelcomeWords({ text, count }: { text: string; count: number }) {
-  const words = text.split(" ").slice(0, count);
-  return words.map((word, index) => (
-    <span key={`${word}-${index}`}>
-      <span className="welcome-word">{word}</span>
-      {index < words.length - 1 ? " " : ""}
-    </span>
-  ));
 }
 
 /** Dark label pill, shown after the admin's ~0.5s hover delay. `fixed` escapes overflow clipping. */

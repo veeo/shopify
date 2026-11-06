@@ -192,16 +192,15 @@ export function PreviewColumn({
   };
   return (
     <aside
-      inert={!present ? true : undefined}
-      aria-hidden={!present || undefined}
-      className={`flex h-full shrink-0 justify-end overflow-hidden ${curtain ? "panel-reveal" : "panel-settle"} ${!present ? "pointer-events-none" : ""}`}
-      style={{ width: present ? panelWidth : 0, opacity: present ? 1 : 0 }}
+      className="panel-settle flex h-full shrink-0 justify-end overflow-hidden"
+      style={{ width: panelWidth }}
     >
       <div
-        className={`p-partial-theme-admin-next-light relative flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
+        inert={!present ? true : undefined}
+        aria-hidden={!present || undefined}
+        className={`p-partial-theme-admin-next-light relative flex h-full w-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
           state.motion ? "transition-[background-color] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
-        } ${curtain ? "" : "w-full"}`}
-        style={curtain ? { width: panelWidth } : undefined}
+        } ${!present ? "pointer-events-none translate-x-full opacity-0" : ""} ${present && curtain ? "panel-reveal" : ""}`}
       >
       <HeaderSlotProvider slot={slot}>
         <div

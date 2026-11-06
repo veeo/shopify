@@ -81,9 +81,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
-  // While the title is introducing Sidekick, the conversation is already the width it will have
-  // once both sidebars are in, so the room opens around it instead of squeezing the words.
-  const conversationWidth = Math.max(360, viewport - (8 + 12 + 1 + 248 + 584));
+  // The title is introduced where it will sit once both sidebars are in, so the room opens around it and the words never move.
   const [seenStage, setSeenStage] = useState(stage);
   const [settling, setSettling] = useState(false);
   if (stage !== seenStage) {
@@ -247,7 +245,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   return (
     <div
       data-shell={stage ? "conversation" : settling ? "reveal" : "workspace"}
-      className={`fade-in p-partial-theme-admin-next-dark relative flex h-dvh bg-[#0c0d0c] p-1 text-white ${stage ? "justify-center gap-0" : "min-w-[1180px] gap-1"}`}
+      className="fade-in p-partial-theme-admin-next-dark relative flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white"
     >
         <AgentNav
           present={panels.nav}
@@ -267,13 +265,9 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         <div
           aria-hidden
           className="rail-reveal my-3 shrink-0 bg-white/10"
-          style={{ width: panels.nav ? 1 : 0, opacity: panels.nav ? 1 : 0 }}
+          style={{ width: 1, opacity: panels.nav ? 1 : 0 }}
         />
-        <div
-          ref={chatRef}
-          className={`flex min-h-0 min-w-0 flex-col ${stage ? "shrink-0" : "flex-1"}`}
-          style={stage ? { width: conversationWidth } : undefined}
-        >
+        <div ref={chatRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
         <ChatColumn
           state={state}
           liveSegments={liveAgentId === agent.id ? liveSegments : null}
