@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChipButton, Orb } from "@/components/marks";
 import { Markdown } from "@/components/markdown";
@@ -249,12 +249,16 @@ export function ChatColumn({
   );
 }
 
-const sidekickIntro = "Welcome to Shopify. I'm Sidekick. I'll help you get this store set up, and I'll be here for the work of running and growing it.";
+const sidekickIntro = "Welcome to Shopify. I'm Sidekick. I'll help you get set up, running, and growing.";
+const introTokens = sidekickIntro.split(/(Sidekick|\s+)/).filter((token) => token.length > 0);
 
 function TitleIntro({ motion, onDone }: { motion: boolean; onDone: () => void }) {
-  const [shown, setShown] = useState("");
+  const [count, setCount] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const done = useRef(onDone);
+  const wordRef = useRef<HTMLSpanElement>(null);
+  const placeRef = useRef<HTMLSpanElement>(null);
+  const shift = useRef({ x: 0, y: 0 });
   useEffect(() => {
     done.current = onDone;
   });
@@ -264,46 +268,69 @@ function TitleIntro({ motion, onDone }: { motion: boolean; onDone: () => void })
       done.current();
       return;
     }
-    const tokens = sidekickIntro.split(/(\s+)/);
     const timers: number[] = [];
     const later = (ms: number, run: () => void) => {
       timers.push(window.setTimeout(run, ms));
     };
     let at = 0;
     const tick = () => {
-      at = Math.min(tokens.length, at + 2);
-      setShown(tokens.slice(0, at).join(""));
-      if (at >= tokens.length) {
-        later(2200, () => setLeaving(true));
-        later(2200 + 720, () => done.current());
+      at = Math.min(introTokens.length, at + 2);
+      setCount(at);
+      if (at >= introTokens.length) {
+        later(2000, () => {
+          const from = wordRef.current?.getBoundingClientRect();
+          const to = placeRef.current?.getBoundingClientRect();
+          if (from && to) shift.current = { x: to.left - from.left, y: to.top - from.top };
+          setLeaving(true);
+        });
+        later(2000 + 700, () => done.current());
         return;
       }
-      later(/[.!?]$/.test(tokens[at - 2] ?? "") ? 160 : 45, tick);
+      const previous = introTokens[at - 2] ?? "";
+      later(/[.!?]$/.test(previous) ? 160 : 45, tick);
     };
     later(160, tick);
     return () => {
       for (const timer of timers) window.clearTimeout(timer);
     };
   }, [motion]);
+  useLayoutEffect(() => {
+    const el = wordRef.current;
+    if (!leaving || !el) return;
+    const { x, y } = shift.current;
+    if (Math.hypot(x, y) < 1) return;
+    const animation = el.animate([{ transform: "translate(0, 0)" }, { transform: `translate(${x}px, ${y}px)` }], {
+      duration: 680,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      fill: "forwards",
+    });
+    return () => animation.cancel();
+  }, [leaving]);
   return (
     <div className="relative -mx-2 px-2">
       <p className="sr-only">{sidekickIntro}</p>
-      <p aria-hidden className={`${leaving ? "welcome-leave pointer-events-none absolute inset-x-2 top-0" : "min-h-8"}`}>
-        {shown.split(/(\s+)/).map((token, index) =>
-          /^\s*$/.test(token) ? (
+      <p className={`flex items-center gap-1.5 ${leaving ? "relative z-20" : "pointer-events-none absolute left-2 top-0"}`}>
+        <span ref={placeRef} className="opacity-0">
+          Sidekick
+        </span>
+        <span className={`grid shrink-0 place-items-center text-[#8e8f8b] ${leaving ? "title-arrive" : "opacity-0"}`}>
+          <PIcon name="ChevronDown" size={20} />
+        </span>
+      </p>
+      <p aria-hidden className={leaving ? "pointer-events-none absolute inset-x-2 top-0" : "min-h-8"}>
+        {introTokens.slice(0, count).map((token, index) =>
+          /^\s+$/.test(token) ? (
             token
+          ) : token === "Sidekick" ? (
+            <span key={index} ref={wordRef} className="word-in relative z-10 inline-block">
+              {token}
+            </span>
           ) : (
-            <span key={index} className="word-in">
+            <span key={index} className={leaving ? "intro-rest" : "word-in"}>
               {token}
             </span>
           ),
         )}
-      </p>
-      <p aria-hidden={!leaving} className={`${leaving ? "title-arrive" : "invisible h-0 overflow-hidden"} flex items-center gap-1.5`}>
-        <span>Sidekick</span>
-        <span className="grid shrink-0 place-items-center text-[#8e8f8b]">
-          <PIcon name="ChevronDown" size={20} />
-        </span>
       </p>
     </div>
   );

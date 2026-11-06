@@ -323,7 +323,18 @@ body {
 }
 
 .title-arrive {
-  animation: title-arrive 720ms ease both;
+  animation: title-arrive 680ms ease both;
+}
+
+@keyframes intro-rest {
+  to {
+    opacity: 0;
+    filter: blur(1px);
+  }
+}
+
+.intro-rest {
+  animation: intro-rest 560ms ease forwards;
 }
 
 @keyframes stage-in {
@@ -448,6 +459,7 @@ body {
   .welcome-word,
   .welcome-leave,
   .title-arrive,
+  .intro-rest,
   .stage-in,
   .choice-in,
   .shimmer-text {
