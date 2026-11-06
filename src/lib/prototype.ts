@@ -7,7 +7,11 @@ export type BusinessType = (typeof businessTypes)[number];
 
 export type AgentGroup = "favorites" | "teams" | "channels" | "tools" | "hidden";
 
+export const voiceOrbIds = ["plasma", "particles", "nebula", "mercury", "dither", "grain", "gooey"] as const;
+export type VoiceOrbId = (typeof voiceOrbIds)[number];
+
 export type OrbId =
+  | VoiceOrbId
   | "sidekick"
   | "chief"
   | "ideas"
@@ -20,6 +24,41 @@ export type OrbId =
   | "customers"
   | "orders"
   | "custom";
+
+export const voiceOrbLabel: Record<VoiceOrbId, string> = {
+  plasma: "Plasma Orb",
+  particles: "Particles Orb",
+  nebula: "Nebula Orb",
+  mercury: "Mercury Orb",
+  dither: "Dither Orb",
+  grain: "Grain Orb",
+  gooey: "Gooey Orb",
+};
+
+/** Slackbot, Muse, and Grokbot keep their own artwork. */
+export const exemptAvatarAgents = new Set(["slack", "grok", "muse"]);
+
+const legacyVoiceOrb: Partial<Record<OrbId, VoiceOrbId>> = {
+  sidekick: "plasma",
+  chief: "particles",
+  ideas: "nebula",
+  trends: "mercury",
+  store: "dither",
+  agentic: "grain",
+  customers: "gooey",
+  orders: "plasma",
+  custom: "particles",
+};
+
+export function isVoiceOrb(orb: string): orb is VoiceOrbId {
+  return (voiceOrbIds as readonly string[]).includes(orb);
+}
+
+/** Stable avatar identity. Older generic sphere ids map onto a voice orb; branded ids stay put. */
+export function canonicalOrb(orb: OrbId): OrbId {
+  if (isVoiceOrb(orb) || orb === "grok" || orb === "slack" || orb === "muse") return orb;
+  return legacyVoiceOrb[orb] ?? "plasma";
+}
 
 export type Connection = { id: string; label: string; on: boolean };
 
@@ -403,6 +442,7 @@ function agent(
     purpose: purpose ?? purposeFor[partial.id] ?? partial.preview,
     connections: connections ?? connectionsFor(partial.id),
     ...rest,
+    orb: canonicalOrb(partial.orb),
   };
 }
 

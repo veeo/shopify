@@ -4,15 +4,20 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { createPortal } from "react-dom";
 import { ChipButton, Orb } from "@/components/marks";
 import { Markdown } from "@/components/markdown";
+import { useOrbAudioPublish } from "@/components/orb-audio";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { pageMeta } from "@/lib/admin-nav";
 import {
+  canonicalOrb,
   catalog,
+  exemptAvatarAgents,
   paymentSteps,
   purposes,
   sellers,
   selectedAgent,
   sidekickStage,
+  voiceOrbIds,
+  voiceOrbLabel,
   type Agent,
   type Block,
   type Connection,
@@ -163,6 +168,7 @@ export function ChatColumn({
           </header>
           {editing ? (
             <EditSidekick
+              key={agent.id}
               agent={agent}
               onClose={() => setEditing(false)}
               onSave={(patch) => {
@@ -698,6 +704,12 @@ export function Composer({
     [],
   );
 
+  const liveAgentId = state.mode === "add" ? "sidekick" : agent.id;
+  const reactive = !exemptAvatarAgents.has(liveAgentId);
+  useOrbAudioPublish(liveAgentId, reactive && (listening || transcribing) && !voiceOpen ? (listening ? "listening" : "thinking") : null, () =>
+    listening ? (recording.current?.level() ?? 0) : 0,
+  );
+
   useEffect(() => {
     if (!listening) return;
     let frame = 0;
@@ -889,11 +901,11 @@ export function Composer({
                   switchOpen ? "shadow-[0_0_0_3px_rgba(255,255,255,0.16)]" : ""
                 }`}
               >
-                <Orb id={state.mode === "add" ? "sidekick" : agent.orb} size={32} />
+                <Orb id={state.mode === "add" ? (state.agents.find((item) => item.id === "sidekick")?.orb ?? "sidekick") : agent.orb} agentId={liveAgentId} size={32} />
               </button>
             </Tip>
           ) : (
-            <Orb id={agent.orb} size={light ? 20 : 32} />
+            <Orb id={agent.orb} agentId={agent.id} size={light ? 20 : 32} />
           )}
           {listening ? (
             <span ref={meter} className="ml-1.5 flex h-5 items-center gap-[3px] text-[12px] text-[#8e8f8b]" style={{ "--level": 0 } as React.CSSProperties}>
@@ -955,6 +967,8 @@ export function Composer({
                     type="button"
                     aria-label="Voice mode"
                     onClick={() => {
+                      recognition.current?.stop();
+                      recognition.current = null;
                       recording.current?.cancel();
                       recording.current = null;
                       setListening(false);
@@ -1108,7 +1122,7 @@ function SidekickSwitcher({
             onClick={() => onPick(item.id)}
             className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] hover:bg-white/[0.07]"
           >
-            <Orb id={item.orb} size={24} />
+            <Orb id={item.orb} agentId={item.id} size={24} />
             <span className="min-w-0 flex-1 truncate">{item.name}</span>
             {item.id === current ? <PIcon name="Check" size={16} /> : null}
           </button>
@@ -1177,7 +1191,7 @@ function PlusMenu({
               onClick={() => onInsert(sub === "skills" ? `/${label.toLowerCase().replace(/\s+/g, "-")} ` : `@${label} `)}
               className={row}
             >
-              {sub === "mention" ? <Orb id={agents.find((item) => item.name === label)?.orb ?? "sidekick"} size={18} /> : null}
+              {sub === "mention" ? <Orb id={agents.find((item) => item.name === label)?.orb ?? "sidekick"} agentId={agents.find((item) => item.name === label)?.id} size={18} /> : null}
               <span className="truncate">{label}</span>
             </button>
           ))}
@@ -1459,7 +1473,10 @@ function Popover({
   );
 }
 
-const avatarChoices: OrbId[] = ["sidekick", "chief", "ideas", "trends", "grok", "muse", "slack", "store", "agentic", "customers", "orders"];
+function avatarChoices(agent: Agent): { id: OrbId; label: string }[] {
+  if (exemptAvatarAgents.has(agent.id)) return [{ id: agent.orb, label: agent.name }];
+  return voiceOrbIds.map((id) => ({ id, label: voiceOrbLabel[id] }));
+}
 
 function EditSidekick({
   agent,
@@ -1472,7 +1489,7 @@ function EditSidekick({
 }) {
   const [name, setName] = useState(agent.name);
   const [purpose, setPurpose] = useState(agent.purpose);
-  const [orb, setOrb] = useState(agent.orb);
+  const [orb, setOrb] = useState<OrbId>(canonicalOrb(agent.orb));
   const [connections, setConnections] = useState(agent.connections);
   const field = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white outline-none placeholder:text-[#8e8f8b] focus:border-white/30";
   return createPortal(
@@ -1498,16 +1515,16 @@ function EditSidekick({
         <fieldset>
           <legend className="mb-2 text-[12px] text-[#8e8f8b]">Avatar</legend>
           <div className="flex flex-wrap gap-2">
-            {avatarChoices.map((id) => (
+            {avatarChoices(agent).map((choice) => (
               <button
-                key={id}
+                key={choice.id}
                 type="button"
-                aria-label={id}
-                aria-pressed={orb === id}
-                onClick={() => setOrb(id)}
-                className={`press rounded-full ${orb === id ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-80 hover:opacity-100"}`}
+                aria-label={choice.label}
+                aria-pressed={orb === choice.id}
+                onClick={() => setOrb(choice.id)}
+                className={`press rounded-full ${orb === choice.id ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-80 hover:opacity-100"}`}
               >
-                <Orb id={id} size={36} />
+                <Orb id={choice.id} size={36} />
               </button>
             ))}
           </div>

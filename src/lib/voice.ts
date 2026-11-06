@@ -121,21 +121,15 @@ function speakWithBrowser(text: string): Playback {
   const synth = window.speechSynthesis;
   if (!synth) return { level: () => 0, done: Promise.resolve(), stop: () => undefined };
   const utterance = new SpeechSynthesisUtterance(text);
-  let speaking = true;
   const done = new Promise<void>((resolve) => {
-    utterance.onend = () => {
-      speaking = false;
-      resolve();
-    };
-    utterance.onerror = () => {
-      speaking = false;
-      resolve();
-    };
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
   });
   synth.cancel();
   synth.speak(utterance);
   return {
-    level: () => (speaking ? 0.25 + 0.2 * Math.abs(Math.sin(performance.now() / 120)) : 0),
+    // The browser speech engine does not expose samples, so this fallback cannot drive a real level.
+    level: () => 0,
     done,
     stop: () => synth.cancel(),
   };

@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
-import { PIcon } from "@/components/polaris-icon";
-import type { OrbId } from "@/lib/prototype";
+import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useOrbAudio } from "@/components/orb-audio";
+import { canonicalOrb, isVoiceOrb, type OrbId, type VoiceOrbId } from "@/lib/prototype";
+import { DitherOrb } from "@/voiceorbs/orbs/dither-orb";
+import { GooeyOrb } from "@/voiceorbs/orbs/gooey-orb";
+import { GrainOrb } from "@/voiceorbs/orbs/grain-orb";
+import { MercuryOrb } from "@/voiceorbs/orbs/mercury-orb";
+import { NebulaOrb } from "@/voiceorbs/orbs/nebula-orb";
+import { ParticlesOrb } from "@/voiceorbs/orbs/particles-orb";
+import { PlasmaOrb } from "@/voiceorbs/orbs/plasma-orb";
+import type { OrbState } from "@/voiceorbs/lib/orb-state";
 
 export function ShopifyMark({ className = "h-6 w-[22px]", tone = "light" }: { className?: string; tone?: "light" | "dark" }) {
   const bag = tone === "dark" ? "#101010" : "white";
@@ -21,53 +29,14 @@ export function ShopifyMark({ className = "h-6 w-[22px]", tone = "light" }: { cl
   );
 }
 
-export function Orb({ id, size = 32 }: { id: OrbId; size?: number }) {
+export function Orb({ id, size = 32, agentId }: { id: OrbId; size?: number; agentId?: string }) {
+  const resolved = canonicalOrb(id);
+  const audio = useOrbAudio(agentId);
   const style = { "--s": `${size}px` } as CSSProperties;
-  switch (id) {
-    case "sidekick":
-      return (
-        <span
-          className="orb grid place-items-center bg-[#5631f4] text-white shadow-[inset_0_0_2px_rgba(255,255,255,0.35)]"
-          style={style}
-        >
-          <PIcon name="Sidekick" size={Math.round(size * 0.62)} />
-        </span>
-      );
-    case "chief":
-      return (
-        <span className="orb orb-chief" style={style} aria-hidden>
-          <i className="ribbon" />
-          <i className="ribbon-2" />
-          <i className="gloss" />
-        </span>
-      );
-    case "ideas":
-      return (
-        <span className="orb orb-ideas" style={style} aria-hidden>
-          <i className="bubble b2" />
-          <i className="bubble b4" />
-          <i className="bubble b1" />
-          <i className="bubble b3" />
-          <i className="bubble b5" />
-          <i className="gloss" />
-        </span>
-      );
-    case "trends":
-      return (
-        <span className="orb orb-trends" style={style} aria-hidden>
-          <i className="sheen" />
-          <i className="glint" />
-          <i className="gloss" />
-        </span>
-      );
-    case "store":
-    case "agentic":
-      return (
-        <span className={`orb orb-${id}`} style={style} aria-hidden>
-          <i className="swirl" />
-          <i className="gloss" />
-        </span>
-      );
+  if (isVoiceOrb(resolved)) {
+    return <VoiceOrb id={resolved} size={size} state={audio.state} levelRef={audio.levelRef} />;
+  }
+  switch (resolved) {
     case "grok":
       return <ParticleOrb size={size} />;
     case "muse":
@@ -82,26 +51,52 @@ export function Orb({ id, size = 32 }: { id: OrbId; size?: number }) {
           <img alt="" src="/assets/orb-slack.png" className="scale-[1.12]" />
         </span>
       );
-    case "customers":
-      return (
-        <span className="orb grid place-items-center bg-[#2f2f2f] text-[#eee]" style={style}>
-          <PIcon name="Person" size={Math.round(size * 0.7)} />
-        </span>
-      );
-    case "orders":
-      return (
-        <span className="orb grid place-items-center bg-[#2f2f2f] text-[#eee]" style={style}>
-          <PIcon name="Order" size={Math.round(size * 0.7)} />
-        </span>
-      );
     default:
-      return (
-        <span className="orb orb-agentic" style={style} aria-hidden>
-          <i className="swirl" />
-          <i className="gloss" />
-        </span>
-      );
+      return <VoiceOrb id="plasma" size={size} state={audio.state} levelRef={audio.levelRef} />;
   }
+}
+
+function VoiceOrb({
+  id,
+  size,
+  state,
+  levelRef,
+}: {
+  id: VoiceOrbId;
+  size: number;
+  state?: OrbState;
+  levelRef?: RefObject<number>;
+}) {
+  const style = { "--s": `${size}px` } as CSSProperties;
+  const props = { size, state, levelRef, label: "", className: "voice-orb" };
+  let node: ReactNode;
+  switch (id) {
+    case "particles":
+      node = <ParticlesOrb {...props} />;
+      break;
+    case "nebula":
+      node = <NebulaOrb {...props} />;
+      break;
+    case "mercury":
+      node = <MercuryOrb {...props} />;
+      break;
+    case "dither":
+      node = <DitherOrb {...props} />;
+      break;
+    case "grain":
+      node = <GrainOrb {...props} />;
+      break;
+    case "gooey":
+      node = <GooeyOrb {...props} />;
+      break;
+    default:
+      node = <PlasmaOrb {...props} />;
+  }
+  return (
+    <span className="orb voice-slot" style={style} aria-hidden>
+      {node}
+    </span>
+  );
 }
 
 function ParticleOrb({ size }: { size: number }) {

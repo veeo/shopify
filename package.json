@@ -14,11 +14,14 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.0",
     "@ai-sdk/react": "^3.0.0",
+    "@paper-design/shaders-react": "^0.0.76",
+    "@react-three/fiber": "^9.8.2",
     "ai": "^6.0.0",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-markdown": "^10.1.0",
+    "three": "^0.185.1",
     "zod": "^4.1.0"
   },
   "devDependencies": {
@@ -28,6 +31,7 @@
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.185.4",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "preact": "^10.29.8",
