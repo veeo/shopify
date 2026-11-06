@@ -232,16 +232,14 @@ export function sidekickStage(state: PrototypeState) {
   return sidekickOpening(state) && sidekickTurns(state) === 0;
 }
 
-/** The conversation is alone until the first choice. That choice brings the admin in from the right. The next step brings the agents in from the left. */
+/** The conversation is alone, at the width it will keep, until the first choice. That choice brings the agents in from the left and the admin in from the right. */
 export function sidekickPanels(state: PrototypeState): { nav: boolean; preview: boolean } {
   if (!sidekickOpening(state)) return { nav: true, preview: true };
-  const turns = sidekickTurns(state);
-  if (turns === 0) return { nav: false, preview: false };
-  if (turns === 1) return { nav: false, preview: true };
+  if (sidekickTurns(state) === 0) return { nav: false, preview: false };
   return { nav: true, preview: true };
 }
 
-const sidekickArrivalPersona = `You are Sidekick, and this is the merchant's first moment in a brand-new Shopify store. Drive toward one concrete outcome. They just chose how to start. The admin on the right is opening with that choice. The agent list on the left stays hidden until they take the next step. Do the one thing they picked.
+const sidekickArrivalPersona = `You are Sidekick, and this is the merchant's first moment in a brand-new Shopify store. Drive toward one concrete outcome. They just chose how to start. The agent list on the left and the admin on the right are opening with that choice. Do the one thing they picked.
 
 How this conversation works:
 - "I have something to sell" or "start something new": they have a product. Products is open wide. Ask what it is. When they name it, call addProduct with wide true.

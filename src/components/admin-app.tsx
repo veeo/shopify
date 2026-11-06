@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
 import { Orb } from "@/components/marks";
@@ -32,7 +32,7 @@ type Turn = { agentId: string; text: string; done: boolean; first: boolean };
 
 export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "setup" | "active" }) {
   const [state, setState] = useState<PrototypeState>(() =>
-    initialScenario === "active" ? activeState() : { ...setupState(), signedIn: true },
+    initialScenario === "active" ? activeState() : { ...setupState("My Store", "sidekick"), signedIn: true },
   );
   const [booting, setBooting] = useState(true);
   const [offline, setOffline] = useState(false);
@@ -64,8 +64,43 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   const panels = sidekickPanels(state);
   const panelsRef = useRef(panels);
   useEffect(() => {
-    panelsRef.current = panels;
-  }, [panels]);
+    panelsRef.current = { nav: panels.nav, preview: panels.preview };
+  }, [panels.nav, panels.preview]);
+  const [viewport, setViewport] = useState(1440);
+  useEffect(() => {
+    const measure = () => setViewport(document.documentElement.clientWidth);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+  // While the conversation is alone it is already the width it will have once both sidebars are in,
+  // so the choice reveals the room around it instead of squeezing the words.
+  const conversationWidth = Math.max(360, viewport - (8 + 12 + 1 + 248 + 584));
+  const [seenStage, setSeenStage] = useState(stage);
+  const [settling, setSettling] = useState(false);
+  if (stage !== seenStage) {
+    setSeenStage(stage);
+    if (seenStage && !stage) setSettling(true);
+  }
+  useEffect(() => {
+    if (!settling) return;
+    const timer = window.setTimeout(() => setSettling(false), 720);
+    return () => window.clearTimeout(timer);
+  }, [settling]);
+  const chatRef = useRef<HTMLDivElement>(null);
+  const placed = useRef({ stage: true, left: 0 });
+  useLayoutEffect(() => {
+    const node = chatRef.current;
+    if (!node || booting) return;
+    const left = node.getBoundingClientRect().left;
+    if (placed.current.stage && !stage && state.motion && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      node.style.setProperty("--shift", `${placed.current.left - left}px`);
+      node.classList.remove("conversation-settle");
+      void node.offsetWidth;
+      node.classList.add("conversation-settle");
+    }
+    placed.current = { stage, left: stage ? left : placed.current.left };
+  }, [stage, viewport, state.motion, booting]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -203,10 +238,9 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
 
   return (
     <div
-      data-shell={stage ? "conversation" : panels.nav ? "workspace" : "task"}
-      className={`fade-in relative flex h-dvh gap-1 bg-[#0c0d0c] p-1 text-white ${panels.nav ? "min-w-[1180px]" : "min-w-0"}`}
+      data-shell={stage ? "conversation" : settling ? "reveal" : "workspace"}
+      className={`fade-in p-partial-theme-admin-next-dark relative flex h-dvh bg-[#0c0d0c] p-1 text-white ${stage ? "justify-center gap-0" : "min-w-[1180px] gap-1"}`}
     >
-      <div className="p-partial-theme-admin-next-dark flex min-w-0 flex-1 gap-1 bg-[#0c0d0c] text-white">
         <AgentNav
           present={panels.nav}
           state={state}
@@ -227,6 +261,11 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           className="rail-reveal my-3 shrink-0 bg-white/10"
           style={{ width: panels.nav ? 1 : 0, opacity: panels.nav ? 1 : 0 }}
         />
+        <div
+          ref={chatRef}
+          className={`flex min-h-0 min-w-0 flex-col ${stage ? "shrink-0" : "flex-1"}`}
+          style={stage ? { width: conversationWidth } : undefined}
+        >
         <ChatColumn
           state={state}
           liveSegments={liveAgentId === agent.id ? liveSegments : null}
@@ -249,7 +288,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onDeleteConversation={(id) => dispatch({ type: "delete-conversation", id })}
           onRate={(id, value) => dispatch({ type: "rate", id, value })}
         />
-      </div>
+        </div>
       <PreviewColumn
         present={panels.preview}
         state={state}
