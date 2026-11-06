@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AccountMenu, initials, StoreMenu } from "@/components/admin-rail";
 import { IconButton, Orb, ShopifyMark } from "@/components/marks";
 import { Tip } from "@/components/chat-column";
@@ -20,6 +20,7 @@ const move = "420ms cubic-bezier(0.22, 1, 0.36, 1)";
 export function AgentNav({
   state,
   navOpen,
+  present = true,
   onToggleNav,
   onSelect,
   onAdd,
@@ -33,6 +34,7 @@ export function AgentNav({
 }: {
   state: PrototypeState;
   navOpen: boolean;
+  present?: boolean;
   onToggleNav: () => void;
   onSettings: () => void;
   onLogout: () => void;
@@ -59,6 +61,18 @@ export function AgentNav({
   const placed = useRef(new Map<string, { left: number; top: number }>());
   const skipSlide = useRef(true);
   const [sliding, setSliding] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const [seenPresent, setSeenPresent] = useState(present);
+  if (seenPresent !== present) {
+    setSeenPresent(present);
+    setRevealing(present);
+  }
+  useEffect(() => {
+    if (!revealing) return;
+    const timer = window.setTimeout(() => setRevealing(false), 760);
+    return () => window.clearTimeout(timer);
+  }, [revealing]);
+  const curtain = !present || revealing;
 
   // Icons share one layout in both widths. When the column rearranges, each icon
   // slides from where it was instead of popping. The list can paint outside its
@@ -66,6 +80,10 @@ export function AgentNav({
   useLayoutEffect(() => {
     const root = navRef.current;
     if (!root) return;
+    if (root.getBoundingClientRect().width < 8) {
+      skipSlide.current = true;
+      return;
+    }
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let timer = 0;
     if (!skipSlide.current && !reduce) {
@@ -107,10 +125,16 @@ export function AgentNav({
   return (
     <aside
       ref={navRef}
-      className={`flex h-full shrink-0 flex-col pb-3 pt-7 motion-reduce:transition-none ${
-        collapsed ? "w-[64px]" : "w-[248px] gap-4 px-3"
+      inert={!present ? true : undefined}
+      aria-hidden={!present || undefined}
+      className={`flex h-full min-w-0 shrink-0 flex-col pb-3 pt-7 motion-reduce:transition-none ${curtain ? "nav-reveal overflow-hidden" : ""} ${!present ? "pointer-events-none" : ""} ${
+        present ? (collapsed ? "w-[64px]" : "w-[248px] gap-4 px-3") : ""
       }`}
-      style={{ transition: `width ${move}` }}
+      style={{
+        transition: curtain ? undefined : `width ${move}, opacity 200ms ease`,
+        width: present ? undefined : 0,
+        opacity: present ? 1 : 0,
+      }}
     >
       <div className={`relative z-0 flex bg-transparent ${collapsed ? "flex-col items-center gap-4" : "items-center gap-1.5 pb-4 pl-2"}`}>
         <button

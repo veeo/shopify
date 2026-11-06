@@ -16,6 +16,7 @@ type Nav = PageNav & {
 
 export function PreviewColumn({
   state,
+  present = true,
   onPreview,
   onChip,
   onAsk,
@@ -32,6 +33,7 @@ export function PreviewColumn({
   onSearch,
 }: {
   state: PrototypeState;
+  present?: boolean;
   onPreview: (page: PreviewId, wide?: boolean) => void;
   onChip: (label: string) => void;
   onAsk: (text: string) => void;
@@ -48,6 +50,19 @@ export function PreviewColumn({
   onSearch: (scope?: string) => void;
 }) {
   const wide = state.previewWide || state.preview === "payments-setup";
+  const panelWidth = wide ? 584 : 393;
+  const [entering, setEntering] = useState(false);
+  const [seenPresent, setSeenPresent] = useState(present);
+  if (seenPresent !== present) {
+    setSeenPresent(present);
+    setEntering(present);
+  }
+  useEffect(() => {
+    if (!entering) return;
+    const timer = window.setTimeout(() => setEntering(false), 760);
+    return () => window.clearTimeout(timer);
+  }, [entering]);
+  const curtain = !present || entering;
   const [menu, setMenu] = useState(false);
   const menuRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -177,11 +192,17 @@ export function PreviewColumn({
   };
   return (
     <aside
-      className={`p-partial-theme-admin-next-light relative flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
-        state.motion ? "transition-[width,background-color] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
-      }`}
-      style={{ width: wide ? 584 : 393 }}
+      inert={!present ? true : undefined}
+      aria-hidden={!present || undefined}
+      className={`flex h-full shrink-0 justify-end overflow-hidden ${curtain ? "panel-reveal" : "panel-settle"} ${!present ? "pointer-events-none" : ""}`}
+      style={{ width: present ? panelWidth : 0, opacity: present ? 1 : 0 }}
     >
+      <div
+        className={`p-partial-theme-admin-next-light relative flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
+          state.motion ? "transition-[background-color] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
+        } ${curtain ? "" : "w-full"}`}
+        style={curtain ? { width: panelWidth } : undefined}
+      >
       <HeaderSlotProvider slot={slot}>
         <div
           inert={kind || closing ? true : undefined}
@@ -284,6 +305,7 @@ export function PreviewColumn({
               }}
               onUpdateProduct={onUpdateProduct}
               onAddProduct={onAddProduct}
+              onUseTheme={(name) => onChip(`Let's go with ${name}`)}
             />
           </div>
         </div>
@@ -335,7 +357,53 @@ export function PreviewColumn({
           </div>
         ) : null}
       </HeaderSlotProvider>
+      </div>
     </aside>
+  );
+}
+
+const designs = [
+  { name: "Horizon", art: "/assets/admin/theme-horizon.png", line: "A fashion storefront, ready for a catalog." },
+  { name: "Tinker", art: "/assets/admin/theme-tinker.png", line: "Objects, with some air around them." },
+  { name: "Dwell", art: "/assets/admin/theme-dwell.png", line: "Quiet, for a home store." },
+];
+
+function ThemeBoard({ state, onUse }: { state: PrototypeState; onUse: (name: string) => void }) {
+  return (
+    <div className="flex flex-col gap-4 px-6 pb-8 pt-1">
+      <div>
+        <h2 className="text-[25px] font-medium leading-8 tracking-[-0.75px] text-[#171817]">Pick a design</h2>
+        <p className="mt-1 max-w-[36ch] text-[14px] leading-5 text-[#616161]">Three ways {state.storeName} could look. Choose the one that feels like the store.</p>
+      </div>
+      <div className="flex flex-col gap-4">
+        {designs.map((theme, index) => {
+          const chosen = state.theme === theme.name;
+          return (
+            <button
+              key={theme.name}
+              type="button"
+              onClick={() => onUse(theme.name)}
+              className={`press relative aspect-[4/3] w-full overflow-hidden rounded-[20px] text-left shadow-[0_0_0_1px_rgba(0,0,0,0.08)] ${
+                chosen ? "shadow-[0_0_0_2px_#171817]" : "hover:shadow-[0_0_0_1px_rgba(0,0,0,0.16),0_16px_40px_rgba(0,0,0,0.08)]"
+              }`}
+              style={state.motion ? { animation: "choice-in 640ms cubic-bezier(0.22, 1, 0.36, 1) both", animationDelay: `${80 + index * 90}ms` } : undefined}
+            >
+              <img src={theme.art} alt="" className="absolute inset-0 size-full object-cover object-top" />
+              <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+              <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 text-white">
+                <span className="min-w-0">
+                  <span className="block text-[18px] font-semibold leading-6 tracking-[-0.2px]">{theme.name}</span>
+                  <span className="mt-0.5 block text-[13px] leading-5 text-white/80">{theme.line}</span>
+                </span>
+                <span className={`inline-flex h-8 shrink-0 items-center rounded-full px-3 text-[13px] font-medium ${chosen ? "bg-white text-[#171817]" : "bg-white/90 text-[#171817]"}`}>
+                  {chosen ? "This one" : "Use this"}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -352,6 +420,7 @@ function Screen(props: {
   onProduct: (id: string) => void;
   onUpdateProduct: (id: string, patch: Partial<Product>) => void;
   onAddProduct: () => void;
+  onUseTheme: (name: string) => void;
 }) {
   const { state, nav, page } = props;
   switch (page) {
@@ -376,6 +445,9 @@ function Screen(props: {
       return <Products state={state} onProduct={props.onProduct} onAdd={props.onAddProduct} nav={nav} />;
     case "product":
       return <ProductEdit state={state} onBack={() => nav.onPreview("products")} onProduct={props.onProduct} onUpdate={props.onUpdateProduct} />;
+    case "online-store":
+      if (state.lookbook) return <ThemeBoard state={state} onUse={props.onUseTheme} />;
+      return <AdminPage page={page} state={state} nav={nav} />;
     default:
       return <AdminPage page={page} state={state} nav={nav} />;
   }
