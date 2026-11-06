@@ -67,7 +67,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     setSeenOpening(opening);
     if (opening) setRoom(false);
   }
-  // The title introduces Sidekick alone. When that settles, both sidebars come in, and the next step is written after them.
+  // The title introduces Sidekick alone. The word Sidekick then slides into place as both sidebars come in, and the next step is written after that.
   const stage = opening && !room;
   const panels = sidekickPanels(state, room);
   const panelsRef = useRef(panels);

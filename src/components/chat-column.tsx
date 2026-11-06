@@ -79,7 +79,7 @@ export function ChatColumn({
   const [editing, setEditing] = useState(false);
   const [typedDone, setTypedDone] = useState(() => new Set(typedOnce));
   const stage = sidekickStage(state);
-  const [beat, setBeat] = useState<"title" | "settle" | "message">("title");
+  const [beat, setBeat] = useState<"title" | "message">("title");
   const [seenStage, setSeenStage] = useState(stage);
   if (seenStage !== stage) {
     setSeenStage(stage);
@@ -95,11 +95,6 @@ export function ChatColumn({
   useEffect(() => {
     introduced.current = onIntroduced;
   });
-  useEffect(() => {
-    if (beat !== "settle") return;
-    const timer = window.setTimeout(() => setBeat("message"), 740);
-    return () => window.clearTimeout(timer);
-  }, [beat]);
   const markTyped = useCallback((id: string) => {
     typedOnce.add(id);
     setTypedDone(new Set(typedOnce));
@@ -125,11 +120,8 @@ export function ChatColumn({
               {writing ? (
                 <TitleIntro
                   motion={state.motion}
-                  onDone={() => {
-                    introduced.current?.();
-                    const quiet = !state.motion || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-                    setBeat(quiet ? "message" : "settle");
-                  }}
+                  onReveal={() => introduced.current?.()}
+                  onDone={() => setBeat("message")}
                 />
               ) : state.mode === "thread" && !purpose ? (
                 <button
@@ -252,19 +244,22 @@ export function ChatColumn({
 const sidekickIntro = "Welcome to Shopify. I'm Sidekick. I'll help you get set up, running, and growing.";
 const introTokens = sidekickIntro.split(/(Sidekick|\s+)/).filter((token) => token.length > 0);
 
-function TitleIntro({ motion, onDone }: { motion: boolean; onDone: () => void }) {
+function TitleIntro({ motion, onReveal, onDone }: { motion: boolean; onReveal: () => void; onDone: () => void }) {
   const [count, setCount] = useState(0);
   const [leaving, setLeaving] = useState(false);
+  const reveal = useRef(onReveal);
   const done = useRef(onDone);
   const wordRef = useRef<HTMLSpanElement>(null);
   const placeRef = useRef<HTMLSpanElement>(null);
   const shift = useRef({ x: 0, y: 0 });
   useEffect(() => {
+    reveal.current = onReveal;
     done.current = onDone;
   });
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!motion || reduce) {
+      reveal.current();
       done.current();
       return;
     }
@@ -282,8 +277,9 @@ function TitleIntro({ motion, onDone }: { motion: boolean; onDone: () => void })
           const to = placeRef.current?.getBoundingClientRect();
           if (from && to) shift.current = { x: to.left - from.left, y: to.top - from.top };
           setLeaving(true);
+          reveal.current();
         });
-        later(2000 + 700, () => done.current());
+        later(2000 + 680, () => done.current());
         return;
       }
       const previous = introTokens[at - 2] ?? "";
