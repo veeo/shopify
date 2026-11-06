@@ -89,7 +89,8 @@ export type Effect =
   | { type: "add-product"; title: string; price: string; description?: string; wide?: boolean }
   | { type: "add-sidekick"; id: string }
   | { type: "artifact"; name: "payments-plan" | "best-sellers" }
-  | { type: "purpose-mode" };
+  | { type: "purpose-mode" }
+  | { type: "chips"; chips: Chip[] };
 
 export type MenuStyle = "push" | "drop";
 
@@ -203,19 +204,28 @@ export const sidekickMakeYourOwn =
   "You can also build your own sidekicks — agents with a job of their own. A chief of staff that keeps your week on track, a product scout that watches trends, or anything you can describe. Each one gets its own place on the left and its own conversations.";
 
 export function sidekickArrival(storeName: string) {
-  return `I'm Sidekick.\n\nYou set up and run ${storeName} from this conversation. I'll open the admin when a page needs you, and keep the conversation in front while we're deciding what to do. Other sidekicks can take on a specific job later.\n\nWhat did you come here to do?`;
+  return `One step is enough to make ${storeName} feel like yours.\n\nWhat do you want to do first?`;
 }
 
 export const arrivalChips: Chip[] = [
-  { label: "Start something new", tone: "primary" },
+  { label: "I have something to sell", tone: "primary" },
   { label: "I already sell somewhere", tone: "secondary" },
-  { label: "Show me around", tone: "secondary" },
+  { label: "Show me the store", tone: "secondary" },
 ];
 
-const sidekickArrivalPersona = `You are Sidekick, and this is the merchant's first moment in a brand-new Shopify store. They have not picked a setup task. Find the one thing they want to do next, then do it with them.
+/** Sidekick's first moment, before a choice. The nav and the admin stay offstage until then. */
+export function sidekickStage(state: PrototypeState) {
+  if (state.arrival !== "sidekick" || state.scenario !== "setup" || state.mode !== "thread") return false;
+  if (state.selectedAgentId !== "sidekick") return false;
+  return !(state.threads.sidekick ?? []).some((block) => block.type === "text" && block.role === "user");
+}
+
+const sidekickArrivalPersona = `You are Sidekick, and this is the merchant's first moment in a brand-new Shopify store. They just chose how to start. The navigation and the admin were hidden until that choice, and they are opening now. Do the one thing they picked.
 
 How this conversation works:
-- They were asked what they came to do. The real paths are: start something new (ask what they sell, then add that product), they already sell somewhere (open Products and ask where the catalog lives), or look around (stay on Home and name three things that make a store sellable: a product, getting paid, and shipping).
+- "I have something to sell" or "start something new": they have a product. Products is open wide. Ask what it is. When they name it, call addProduct with wide true.
+- "I already sell somewhere": Products is open wide. Ask where the catalog lives today.
+- "Show me the store" or "show me around": Home is open at its quiet width. Offer a product, getting paid, and shipping. Don't recite the rest of setup.
 - If they ask what you are: this conversation is how they set up and run the store. Other sidekicks can take a specific job later. Don't offer a catalog of sidekicks unless they ask.
 - One next step. Don't recite the whole setup list.
 
@@ -661,7 +671,9 @@ function revealNew(state: PrototypeState, run: () => void) {
   run();
   for (const [agentId, thread] of Object.entries(state.threads)) {
     state.threads[agentId] = thread.map((block) =>
-      block.type === "text" && block.role === "assistant" && !before[agentId]?.has(block.id) ? { ...block, typed: true } : block,
+      block.type === "text" && block.role === "assistant" && block.typed !== false && !before[agentId]?.has(block.id)
+        ? { ...block, typed: true }
+        : block,
     );
   }
   return state;
@@ -691,8 +703,8 @@ export function setupState(storeName = "My Store", arrival: Arrival = "tasks"): 
     ...(arrival === "sidekick"
       ? {
           persona: sidekickArrivalPersona,
-          preview: "Figuring out the next step",
-          topic: "New store",
+          preview: "With you from the first step",
+          topic: "",
           purpose: "Find the next step, then do it in the admin.",
         }
       : {}),
@@ -709,7 +721,7 @@ export function setupState(storeName = "My Store", arrival: Arrival = "tasks"): 
       sidekick:
         arrival === "sidekick"
           ? [
-              { id: "arrive", type: "text", role: "assistant", text: sidekickArrival(storeName), typed: true },
+              { id: "arrive", type: "text", role: "assistant", text: sidekickArrival(storeName) },
               { id: "arrive-chips", type: "chips", chips: arrivalChips },
             ]
           : [
@@ -958,6 +970,8 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
       }
       state.preview = "home-active";
       state.previewWide = false;
+    } else if (effect.type === "chips") {
+      push(state, "sidekick", { id: id(state), type: "chips", chips: effect.chips });
     }
   }
 }
@@ -971,24 +985,24 @@ const workPages = new Set<PreviewId>(["products", "product", "payments-setup", "
 /** The Sidekick opening. Exact phrases from the first chips, plus the same words typed. */
 function arrivalIntent(text: string, storeName: string): { text: string; effects: Effect[]; follow?: Chip[]; topic?: string } | null {
   const q = text.trim().toLowerCase().replace(/[.!?]+$/, "");
-  if (q === "start something new" || q === "start a new store") {
+  if (q === "i have something to sell" || q === "start something new" || q === "start a new store") {
     return {
       topic: "First product",
-      text: "Then we start with one thing you sell. What is it? A name is enough. I'll open a draft and bring the admin forward so you can add a price and a photo.",
-      effects: [{ type: "focus", wide: false }],
+      text: "Tell me the first thing you sell. A name is enough, and I'll add it here as a draft.",
+      effects: [{ type: "navigate", page: "products", wide: true }],
     };
   }
   if (q === "i already sell somewhere" || q === "i already have a store" || q === "bring a store i already have") {
     return {
       topic: "Existing catalog",
-      text: "Then we start from what you already sell. I opened Products. The drafts in there aren't live. Where do the real products live today, a spreadsheet or another shop?",
+      text: "I opened Products. Nothing in here is for sale yet. Where do the real products live today, a spreadsheet or another shop?",
       effects: [{ type: "navigate", page: "products", wide: true }],
     };
   }
-  if (q === "show me around" || q === "look around" || q === "just show me around") {
+  if (q === "show me the store" || q === "show me around" || q === "look around" || q === "just show me around") {
     return {
-      topic: "A look around",
-      text: `Home is ${storeName} before anything is for sale. When you want to sell, three things matter: something to sell, getting paid, and how an order ships. Pick one and I'll open it.`,
+      topic: "Your store",
+      text: `This is ${storeName}, before anything is for sale. When you're ready to sell, start with one of these.`,
       follow: [
         { label: "Add a product", tone: "primary" },
         { label: "Get paid", tone: "secondary" },
@@ -1036,7 +1050,12 @@ function productFrom(text: string) {
 
 function presentForSidekick(turn: { text: string; effects: Effect[] }, text: string, storeName: string) {
   const intent = arrivalIntent(text, storeName);
-  if (intent) return { text: intent.text, effects: intent.effects };
+  if (intent) {
+    return {
+      text: intent.text,
+      effects: intent.follow ? [...intent.effects, { type: "chips" as const, chips: intent.follow }] : intent.effects,
+    };
+  }
   const title = productFrom(text);
   if (title && turn.effects.every((effect) => effect.type !== "add-product")) {
     return {
@@ -1073,7 +1092,7 @@ export function runChip(state: PrototypeState, label: string) {
     const intent = arrivalIntent(label, state.storeName);
     if (intent) {
       push(state, "sidekick", { id: id(state), type: "text", role: "user", text: label });
-      push(state, "sidekick", { id: id(state), type: "text", role: "assistant", text: intent.text });
+      push(state, "sidekick", { id: id(state), type: "text", role: "assistant", text: intent.text, typed: false });
       if (intent.follow) push(state, "sidekick", { id: id(state), type: "chips", chips: intent.follow });
       applyEffects(state, intent.effects);
       if (intent.topic) patchAgent(state, "sidekick", { topic: intent.topic, preview: intent.text });
@@ -1469,6 +1488,13 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       push(next, action.agentId, { id: id(next), type: "text", role: "user", text: action.text });
       patchAgent(next, action.agentId, first ? { preview: action.text, topic: action.text } : { preview: action.text });
       next.conversationsOpen = false;
+      if (first && next.arrival === "sidekick" && action.agentId === "sidekick") {
+        const intent = arrivalIntent(action.text, next.storeName);
+        if (intent) {
+          applyEffects(next, intent.effects);
+          if (intent.topic) patchAgent(next, "sidekick", { topic: intent.topic, preview: intent.text });
+        }
+      }
       return next;
     }
     case "title":

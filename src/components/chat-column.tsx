@@ -12,6 +12,7 @@ import {
   purposes,
   sellers,
   selectedAgent,
+  sidekickStage,
   type Agent,
   type Block,
   type Connection,
@@ -74,6 +75,16 @@ export function ChatColumn({
   const title = state.mode === "add" ? "Add a sidekick" : purpose ? "Chief of staff" : agent.name;
   const topic = state.mode === "add" ? null : purpose ? "Set purpose" : agent.topic;
   const [editing, setEditing] = useState(false);
+  const stage = sidekickStage(state);
+  const [phase, setPhase] = useState<"welcome" | "handoff" | "ready">("welcome");
+  const prevStage = useRef(stage);
+  if (prevStage.current !== stage) {
+    prevStage.current = stage;
+    if (stage) setPhase("welcome");
+  }
+  const showWelcome = stage && phase !== "ready";
+  const showConversation = !showWelcome || phase === "handoff";
+  const arrive = stage && phase !== "welcome";
   const [typedDone, setTypedDone] = useState(() => new Set(typedOnce));
   const markTyped = useCallback((id: string) => {
     typedOnce.add(id);
@@ -93,8 +104,9 @@ export function ChatColumn({
   }, [thread.length, liveLength, busy]);
 
   return (
-    <section className="relative flex min-w-0 flex-1 flex-col px-8 pb-3 pt-7">
-      <>
+    <section data-opening={stage ? phase : "workspace"} className="relative flex min-h-0 min-w-0 flex-1 flex-col px-8 pb-3 pt-7">
+      {showConversation ? (
+      <div className={`flex min-h-0 flex-1 flex-col ${arrive ? "stage-in" : ""}`}>
           <header className="relative mb-6 flex items-start justify-between gap-4">
             <h1 className="min-w-0 flex-1 text-[25px] font-medium leading-8 tracking-[-0.75px]">
               {state.mode === "thread" && !purpose ? (
@@ -106,7 +118,7 @@ export function ChatColumn({
                   aria-controls="chats-menu"
                   className={`group -mx-2 flex max-w-full items-center gap-1.5 rounded-xl px-2 text-left transition-colors hover:bg-white/[0.05] ${listing ? "bg-white/[0.05]" : ""}`}
                 >
-                  <span className="max-w-[70%] shrink-0 truncate">{title}</span>
+                  <span className={topic ? "max-w-[70%] shrink-0 truncate" : "shrink-0"}>{title}</span>
                   {topic ? <span className="min-w-0 truncate font-normal text-[#737373]">· {topic}</span> : null}
                   <span className={`grid shrink-0 place-items-center text-[#8e8f8b] transition-transform duration-200 group-hover:text-white ${listing ? "rotate-180" : ""}`}>
                     <PIcon name="ChevronDown" size={20} />
@@ -148,8 +160,8 @@ export function ChatColumn({
 
           <div
             ref={scroller}
-            key={state.mode === "thread" ? agent.id : state.mode}
-            className={`${state.motion ? "page-in" : ""} scroll-thin min-h-0 flex-1 overflow-y-auto pb-4`}
+            key={state.mode === "thread" ? `thread-${agent.id}` : `thread-${state.mode}`}
+            className={`${state.motion && !stage ? "page-in" : ""} scroll-thin min-h-0 flex-1 overflow-y-auto pb-4`}
           >
             {state.mode === "add" ? (
               <AddGrid onAdd={onAddCatalog} onChip={onChip} />
@@ -186,7 +198,6 @@ export function ChatColumn({
               </div>
             )}
           </div>
-      </>
 
       {offline && state.mode === "thread" ? (
         <p className="mb-1 mt-2 px-4 text-[12px] text-[#8e8f8b]">
@@ -194,7 +205,7 @@ export function ChatColumn({
         </p>
       ) : null}
       <Composer
-        key={state.mode === "add" ? "add" : agent.id}
+        key={state.mode === "add" ? "composer-add" : `composer-${agent.id}`}
         state={state}
         agent={agent}
         suggestions={suggestionsFor(state)}
@@ -206,8 +217,97 @@ export function ChatColumn({
         onAddAgent={onAddAgent}
         lastReply={lastReply}
       />
+      </div>
+      ) : null}
+      {showWelcome ? (
+        <Opening
+          storeName={state.storeName}
+          motion={state.motion}
+          onHandoff={() => setPhase((current) => (current === "welcome" ? "handoff" : current))}
+          onDone={() => setPhase("ready")}
+        />
+      ) : null}
     </section>
   );
+}
+
+function Opening({
+  storeName,
+  motion,
+  onHandoff,
+  onDone,
+}: {
+  storeName: string;
+  motion: boolean;
+  onHandoff: () => void;
+  onDone: () => void;
+}) {
+  const [firstCount, setFirstCount] = useState(0);
+  const [secondCount, setSecondCount] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+  const handoff = useRef(onHandoff);
+  const done = useRef(onDone);
+  useEffect(() => {
+    handoff.current = onHandoff;
+    done.current = onDone;
+  });
+  useEffect(() => {
+    const first = `Welcome to ${storeName}.`.split(" ");
+    const second = "I'm Sidekick.".split(" ");
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!motion || reduce) {
+      handoff.current();
+      done.current();
+      return;
+    }
+    const timers: number[] = [];
+    const later = (ms: number, run: () => void) => {
+      timers.push(window.setTimeout(run, ms));
+    };
+    const step = 150;
+    const start = 380;
+    first.forEach((_, index) => later(start + index * step, () => setFirstCount(index + 1)));
+    const secondAt = start + first.length * step + 280;
+    second.forEach((_, index) => later(secondAt + index * step, () => setSecondCount(index + 1)));
+    const hold = secondAt + second.length * step + 900;
+    later(hold, () => {
+      setLeaving(true);
+      handoff.current();
+    });
+    later(hold + 880, () => done.current());
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer);
+    };
+  }, [storeName, motion]);
+  const first = `Welcome to ${storeName}.`;
+  const second = "I'm Sidekick.";
+  return (
+    <>
+      <p className="sr-only">
+        Welcome to {storeName}. I'm Sidekick.
+      </p>
+      <div aria-hidden className={`absolute inset-0 z-10 grid place-items-center bg-[#0c0d0c] px-8 ${leaving ? "welcome-leave pointer-events-none" : ""}`}>
+        <div className="max-w-[16em] text-balance text-center">
+          <p className="text-[25px] font-medium leading-8 tracking-[-0.75px]">
+            <WelcomeWords text={first} count={firstCount} />
+          </p>
+          <p className="mt-3 text-[25px] font-medium leading-8 tracking-[-0.75px] text-white/80">
+            <WelcomeWords text={second} count={secondCount} />
+          </p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function WelcomeWords({ text, count }: { text: string; count: number }) {
+  const words = text.split(" ");
+  return words.map((word, index) => (
+    <span key={`${word}-${index}`}>
+      <span className={index < count ? "welcome-word" : "inline-block opacity-0"}>{word}</span>
+      {index < words.length - 1 ? " " : ""}
+    </span>
+  ));
 }
 
 /** Dark label pill, shown after the admin's ~0.5s hover delay. `fixed` escapes overflow clipping. */
@@ -490,10 +590,7 @@ const pageSuggestions: Record<string, string[]> = {
 
 export function suggestionsFor(state: PrototypeState) {
   if (state.mode === "add") return ["Tell me more about creating a sidekick", "Which sidekick should I add first?", "Create my own sidekick", "What can sidekicks do?"];
-  if (state.arrival === "sidekick" && state.scenario === "setup" && state.selectedAgentId === "sidekick") {
-    const asked = (state.threads.sidekick ?? []).some((block) => block.type === "text" && block.role === "user");
-    if (!asked) return ["Start something new", "I already sell somewhere", "Show me around"];
-  }
+  if (sidekickStage(state)) return [];
   if (state.selectedAgentId !== "sidekick") {
     const asks = (state.threads[state.selectedAgentId] ?? [])
       .flatMap((block) => (block.type === "chips" ? block.chips.filter((chip) => chip.send).map((chip) => chip.label) : []))
@@ -878,7 +975,7 @@ export function Composer({
       </form>
       )}
 
-      {showSuggestions && !voiceOpen ? (
+      {showSuggestions && suggestions.length > 0 && !voiceOpen ? (
         <ul
           role="listbox"
           aria-label="Suggestions"
@@ -1471,15 +1568,17 @@ function BlockView({
   }
   if (block.type === "text") return <AssistantText block={block} answer={answer} rating={rating} onRate={onRate} />;
   if (block.type === "chips") {
+    const opening = block.id === "arrive-chips";
     return (
-      <div className="rise flex flex-wrap gap-2 py-1">
-        {block.chips.map((chip) => (
-          <ChipButton
-            key={chip.label}
-            label={chip.label}
-            tone={chip.tone}
-            onClick={() => (chip.send ? onAsk(chip.label) : onChip(chip.label))}
-          />
+      <div className={opening ? "flex flex-wrap gap-2 py-1" : "rise flex flex-wrap gap-2 py-1"}>
+        {block.chips.map((chip, index) => (
+          <span key={chip.label} className={opening ? "choice-in" : undefined} style={opening ? { animationDelay: `${280 + index * 140}ms` } : undefined}>
+            <ChipButton
+              label={chip.label}
+              tone={chip.tone}
+              onClick={() => (chip.send ? onAsk(chip.label) : onChip(chip.label))}
+            />
+          </span>
         ))}
       </div>
     );

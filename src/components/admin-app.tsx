@@ -16,6 +16,7 @@ import {
   reducer,
   scriptedTurn,
   selectedAgent,
+  sidekickStage,
   setupState,
   type Action,
   type Effect,
@@ -58,6 +59,9 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   const applied = useRef(new Set<string>());
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
   const dispatch = (action: Action) => setState((current) => reducer(current, action));
+  const stage = sidekickStage(state);
+  const stageRef = useRef(stage);
+  stageRef.current = stage;
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -65,9 +69,11 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
       const key = event.key.toLowerCase();
       if (key === "b") {
         event.preventDefault();
+        if (stageRef.current) return;
         setSidebarOpen((open) => !open);
       } else if (key === "k") {
         event.preventDefault();
+        if (stageRef.current) return;
         setPalette((current) => ({ open: !current.open }));
       }
     }
@@ -192,9 +198,13 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   }
 
   return (
-    <div className="fade-in relative flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white">
+    <div
+      data-shell={stage ? "conversation" : "workspace"}
+      className={`fade-in relative flex h-dvh gap-1 bg-[#0c0d0c] p-1 text-white ${stage ? "min-w-0" : "min-w-[1180px]"}`}
+    >
       <div className="p-partial-theme-admin-next-dark flex min-w-0 flex-1 gap-1 bg-[#0c0d0c] text-white">
         <AgentNav
+          present={!stage}
           state={state}
           navOpen={sidebarOpen}
           onToggleNav={() => setSidebarOpen((open) => !open)}
@@ -208,7 +218,11 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
           onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
         />
-        <div className="my-3 w-px shrink-0 bg-white/10" />
+        <div
+          aria-hidden
+          className="rail-reveal my-3 shrink-0 bg-white/10"
+          style={{ width: stage ? 0 : 1, opacity: stage ? 0 : 1 }}
+        />
         <ChatColumn
           state={state}
           liveSegments={liveAgentId === agent.id ? liveSegments : null}
@@ -233,6 +247,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         />
       </div>
       <PreviewColumn
+        present={!stage}
         state={state}
         onPreview={(page, wide) => dispatch({ type: "preview", page, wide })}
         onChip={(label) => dispatch({ type: "chip", label })}

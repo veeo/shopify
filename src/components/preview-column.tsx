@@ -16,6 +16,7 @@ type Nav = PageNav & {
 
 export function PreviewColumn({
   state,
+  present = true,
   onPreview,
   onChip,
   onAsk,
@@ -32,6 +33,7 @@ export function PreviewColumn({
   onSearch,
 }: {
   state: PrototypeState;
+  present?: boolean;
   onPreview: (page: PreviewId, wide?: boolean) => void;
   onChip: (label: string) => void;
   onAsk: (text: string) => void;
@@ -48,6 +50,19 @@ export function PreviewColumn({
   onSearch: (scope?: string) => void;
 }) {
   const wide = state.previewWide || state.preview === "payments-setup";
+  const panelWidth = wide ? 584 : 393;
+  const prevPresent = useRef(present);
+  const [entering, setEntering] = useState(false);
+  if (prevPresent.current !== present) {
+    prevPresent.current = present;
+    setEntering(present);
+  }
+  useEffect(() => {
+    if (!entering) return;
+    const timer = window.setTimeout(() => setEntering(false), 760);
+    return () => window.clearTimeout(timer);
+  }, [entering]);
+  const curtain = !present || entering;
   const [menu, setMenu] = useState(false);
   const menuRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -177,11 +192,17 @@ export function PreviewColumn({
   };
   return (
     <aside
-      className={`p-partial-theme-admin-next-light relative flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
-        state.motion ? "transition-[width,background-color] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
-      }`}
-      style={{ width: wide ? 584 : 393 }}
+      inert={!present ? true : undefined}
+      aria-hidden={!present || undefined}
+      className={`flex h-full shrink-0 justify-end overflow-hidden ${curtain ? "panel-reveal" : "panel-settle"} ${!present ? "pointer-events-none" : ""}`}
+      style={{ width: present ? panelWidth : 0, opacity: present ? 1 : 0 }}
     >
+      <div
+        className={`p-partial-theme-admin-next-light relative flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
+          state.motion ? "transition-colors duration-300" : ""
+        } ${curtain ? "" : "w-full"}`}
+        style={curtain ? { width: panelWidth } : undefined}
+      >
       <HeaderSlotProvider slot={slot}>
         <div
           inert={kind || closing ? true : undefined}
@@ -335,6 +356,7 @@ export function PreviewColumn({
           </div>
         ) : null}
       </HeaderSlotProvider>
+      </div>
     </aside>
   );
 }
