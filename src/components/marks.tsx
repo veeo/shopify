@@ -3,13 +3,11 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { useOrbAudio } from "@/components/orb-audio";
 import { canonicalOrb, isVoiceOrb, type OrbId, type VoiceOrbId } from "@/lib/prototype";
-import { DitherOrb } from "@/voiceorbs/orbs/dither-orb";
-import { GooeyOrb } from "@/voiceorbs/orbs/gooey-orb";
-import { GrainOrb } from "@/voiceorbs/orbs/grain-orb";
+import { AuraField } from "@/voiceorbs/orbs/aura-field";
 import { MercuryOrb } from "@/voiceorbs/orbs/mercury-orb";
 import { NebulaOrb } from "@/voiceorbs/orbs/nebula-orb";
-import { ParticlesOrb } from "@/voiceorbs/orbs/particles-orb";
 import { PlasmaOrb } from "@/voiceorbs/orbs/plasma-orb";
+import { TwistSphere } from "@/voiceorbs/orbs/twist-sphere";
 import type { OrbState } from "@/voiceorbs/lib/orb-state";
 
 export function ShopifyMark({ className = "h-6 w-[22px]", tone = "light" }: { className?: string; tone?: "light" | "dark" }) {
@@ -97,23 +95,17 @@ function VoiceOrb({
   };
   let node: ReactNode;
   switch (id) {
-    case "particles":
-      node = <ParticlesOrb {...props} />;
-      break;
     case "nebula":
       node = <NebulaOrb {...props} />;
       break;
     case "mercury":
       node = <MercuryOrb {...props} />;
       break;
-    case "dither":
-      node = <DitherOrb {...props} />;
+    case "twist":
+      node = <TwistSphere {...props} />;
       break;
-    case "grain":
-      node = <GrainOrb {...props} />;
-      break;
-    case "gooey":
-      node = <GooeyOrb {...props} />;
+    case "aura":
+      node = <AuraField {...props} />;
       break;
     default:
       node = <PlasmaOrb {...props} />;

@@ -7,7 +7,7 @@ export type BusinessType = (typeof businessTypes)[number];
 
 export type AgentGroup = "favorites" | "teams" | "channels" | "tools" | "hidden";
 
-export const voiceOrbIds = ["plasma", "particles", "nebula", "mercury", "dither", "grain", "gooey"] as const;
+export const voiceOrbIds = ["plasma", "nebula", "mercury", "twist", "aura"] as const;
 export type VoiceOrbId = (typeof voiceOrbIds)[number];
 
 export type OrbId =
@@ -27,23 +27,19 @@ export type OrbId =
 
 export const voiceOrbLabel: Record<VoiceOrbId, string> = {
   plasma: "Plasma Orb",
-  particles: "Particles Orb",
   nebula: "Nebula Orb",
   mercury: "Mercury Orb",
-  dither: "Dither Orb",
-  grain: "Grain Orb",
-  gooey: "Gooey Orb",
+  twist: "Twisted Colorful Sphere",
+  aura: "Aura Field",
 };
 
-/** Gallery defaults from VoiceOrbs. Custom colors override these per agent. */
+/** Gallery defaults. Twist's pair keeps the original cosine palette until a sidekick picks another. */
 export const voiceOrbTint: Record<VoiceOrbId, { from: string; to: string }> = {
   plasma: { from: "#7c3aed", to: "#06b6d4" },
-  particles: { from: "#f0abfc", to: "#818cf8" },
   nebula: { from: "#8b5cf6", to: "#22d3ee" },
   mercury: { from: "#cbd5e1", to: "#a5b4fc" },
-  dither: { from: "#a3e635", to: "#22d3ee" },
-  grain: { from: "#fb923c", to: "#e879f9" },
-  gooey: { from: "#f472b6", to: "#8b5cf6" },
+  twist: { from: "#22d3ee", to: "#f472b6" },
+  aura: { from: "#34d399", to: "#60a5fa" },
 };
 
 /** The same gradient pairs the VoiceOrbs gallery offers. */
@@ -63,26 +59,45 @@ export const orbColorPresets: { name: string; from: string; to: string }[] = [
 /** Slackbot, Muse, and Grokbot keep their own artwork. */
 export const exemptAvatarAgents = new Set(["slack", "grok", "muse"]);
 
-const legacyVoiceOrb: Partial<Record<OrbId, VoiceOrbId>> = {
+const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
   sidekick: "plasma",
-  chief: "particles",
+  chief: "twist",
   ideas: "nebula",
   trends: "mercury",
-  store: "dither",
-  agentic: "grain",
-  customers: "gooey",
+  store: "aura",
+  agentic: "twist",
+  customers: "aura",
   orders: "plasma",
-  custom: "particles",
+  custom: "nebula",
+  particles: "twist",
+  dither: "aura",
+  grain: "twist",
+  gooey: "aura",
+};
+
+/** Reused styles get a different gradient so two sidekicks don't look identical. */
+const reuseTint: Record<string, { from: string; to: string }> = {
+  agentic: { from: "#f43f5e", to: "#fb923c" },
+  customers: { from: "#f472b6", to: "#d946ef" },
+  orders: { from: "#22d3ee", to: "#2563eb" },
+  custom: { from: "#4f46e5", to: "#ec4899" },
 };
 
 export function isVoiceOrb(orb: string): orb is VoiceOrbId {
   return (voiceOrbIds as readonly string[]).includes(orb);
 }
 
-/** Stable avatar identity. Older generic sphere ids map onto a voice orb; branded ids stay put. */
-export function canonicalOrb(orb: OrbId): OrbId {
-  if (isVoiceOrb(orb) || orb === "grok" || orb === "slack" || orb === "muse") return orb;
+/** Stable avatar identity. Retired styles and older generic ids map onto the current lineup; branded ids stay put. */
+export function canonicalOrb(orb: string): OrbId {
+  if (orb === "grok" || orb === "slack" || orb === "muse") return orb;
+  if (isVoiceOrb(orb)) return orb;
   return legacyVoiceOrb[orb] ?? "plasma";
+}
+
+export function defaultOrbTint(id: string, orb: string): { from: string; to: string } | undefined {
+  if (reuseTint[id]) return reuseTint[id];
+  if (orb === "custom" || id.startsWith("custom-")) return reuseTint.custom;
+  return undefined;
 }
 
 export type Connection = { id: string; label: string; on: boolean };
@@ -473,6 +488,8 @@ function agent(
     connections: connections ?? connectionsFor(partial.id),
     ...rest,
     orb: canonicalOrb(partial.orb),
+    orbFrom: partial.orbFrom ?? defaultOrbTint(partial.id, partial.orb)?.from,
+    orbTo: partial.orbTo ?? defaultOrbTint(partial.id, partial.orb)?.to,
   };
 }
 
