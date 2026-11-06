@@ -631,6 +631,56 @@ body {
     transform-origin: top left;
     pointer-events: none;
   }
+
+  .team-orb {
+    overflow: hidden;
+    background: transparent;
+  }
+
+  .team-bob {
+    display: block;
+    transform-origin: center;
+    animation: team-bob 3.4s ease-in-out infinite;
+  }
+
+  .team-eye {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: team-blink 3.8s ease-in-out infinite;
+  }
+
+  .team-eye-late {
+    animation-delay: 0.05s;
+  }
+}
+
+@keyframes team-bob {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-3%) scale(1.025);
+  }
+}
+
+@keyframes team-blink {
+  0%,
+  80%,
+  100% {
+    transform: scaleY(1);
+  }
+  86%,
+  92% {
+    transform: scaleY(0.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-bob,
+  .team-eye {
+    animation: none;
+  }
 }
 
 .orb > i {

@@ -1494,7 +1494,8 @@ function Popover({
 
 function avatarChoices(agent: Agent): { id: OrbId; label: string }[] {
   if (exemptAvatarAgents.has(agent.id)) return [{ id: agent.orb, label: agent.name }];
-  return voiceOrbIds.map((id) => ({ id, label: voiceOrbLabel[id] }));
+  if (agent.group === "tools") return [{ id: "aura", label: voiceOrbLabel.aura }];
+  return voiceOrbIds.filter((id) => id !== "aura").map((id) => ({ id, label: voiceOrbLabel[id] }));
 }
 
 function EditSidekick({
