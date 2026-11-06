@@ -122,37 +122,36 @@ export function AgentNav({
     onSearch();
   }
 
+  const parked = !present;
   return (
     <aside
       ref={navRef}
-      inert={!present ? true : undefined}
-      aria-hidden={!present || undefined}
-      className={`flex h-full min-w-0 shrink-0 flex-col pb-3 pt-7 motion-reduce:transition-none ${curtain ? "nav-reveal overflow-hidden" : ""} ${!present ? "pointer-events-none" : ""} ${
-        present ? (collapsed ? "w-[64px]" : "w-[248px] gap-4 px-3") : ""
-      }`}
-      style={{
-        transition: curtain ? undefined : `width ${move}, opacity 200ms ease`,
-        width: present ? undefined : 0,
-        opacity: present ? 1 : 0,
-      }}
+      className={`relative flex h-full min-w-0 shrink-0 flex-col pb-3 pt-7 motion-reduce:transition-none ${collapsed ? "w-[64px]" : "w-[248px] px-3"} ${parked || curtain ? "overflow-hidden" : ""}`}
+      style={{ transition: curtain ? undefined : `width ${move}` }}
     >
+      <button
+        type="button"
+        data-flip="logo"
+        aria-label={navOpen ? "Collapse navigation" : "Expand navigation"}
+        aria-expanded={navOpen}
+        aria-keyshortcuts="Control+B Meta+B"
+        onClick={onToggleNav}
+        className={`group/logo press absolute top-7 z-20 grid size-8 place-items-center rounded-full transition-colors hover:bg-white/[0.08] ${collapsed ? "left-4" : "left-5"}`}
+      >
+        <span className="transition-opacity duration-150 group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0">
+          <ShopifyMark />
+        </span>
+        <span className="absolute inset-0 grid place-items-center text-white opacity-0 transition-opacity duration-150 group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100">
+          <PIcon name="LayoutSidebarLeft" size={20} />
+        </span>
+      </button>
+      <div
+        inert={parked ? true : undefined}
+        aria-hidden={parked || undefined}
+        className={`flex min-h-0 flex-1 flex-col ${collapsed ? "" : "gap-4"} ${parked ? "pointer-events-none -translate-x-full opacity-0" : ""} ${!parked && curtain ? "nav-reveal" : ""}`}
+      >
       <div className={`relative z-0 flex bg-transparent ${collapsed ? "flex-col items-center gap-4" : "items-center gap-1.5 pb-4 pl-2"}`}>
-        <button
-          type="button"
-          data-flip="logo"
-          aria-label={navOpen ? "Collapse navigation" : "Expand navigation"}
-          aria-expanded={navOpen}
-          aria-keyshortcuts="Control+B Meta+B"
-          onClick={onToggleNav}
-          className={`group/logo press relative grid size-8 shrink-0 place-items-center rounded-full transition-colors hover:bg-white/[0.08] ${collapsed ? "mb-2" : ""}`}
-        >
-          <span className="transition-opacity duration-150 group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0">
-            <ShopifyMark />
-          </span>
-          <span className="absolute inset-0 grid place-items-center text-white opacity-0 transition-opacity duration-150 group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100">
-            <PIcon name="LayoutSidebarLeft" size={20} />
-          </span>
-        </button>
+        <span className={`size-8 shrink-0 ${collapsed ? "mb-2" : ""}`} aria-hidden />
         <span data-flip="add" className={collapsed ? "" : "ml-auto"}>
           <IconButton label="Add a sidekick" onClick={onAdd} active={state.mode === "add"}>
             <PIcon name="Plus" size={20} />
@@ -216,7 +215,7 @@ export function AgentNav({
                     }
                   >
                     <span className="relative grid size-[31px] shrink-0 place-items-center rounded-full">
-                      <Orb id={item.orb} size={31} />
+                      <Orb id={item.orb} agentId={item.id} size={31} />
                       {collapsed && item.unread > 0 ? (
                         <span className="absolute -right-1.5 -top-1.5 z-10 grid size-4 place-items-center rounded-full bg-[#5631f4] text-[10px] font-medium text-white ring-2 ring-[#0c0d0c]">
                           {item.unread}
@@ -322,6 +321,7 @@ export function AgentNav({
             ) : null}
           </span>
         </span>
+      </div>
       </div>
     </aside>
   );

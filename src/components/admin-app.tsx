@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
 import { Orb } from "@/components/marks";
+import { OrbAudioProvider } from "@/components/orb-audio";
 import { PreviewColumn } from "@/components/preview-column";
 import { SearchPalette } from "@/components/search-palette";
 import {
@@ -60,8 +61,16 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   const applied = useRef(new Set<string>());
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
   const dispatch = (action: Action) => setState((current) => reducer(current, action));
-  const stage = sidekickStage(state);
-  const panels = sidekickPanels(state);
+  const opening = sidekickStage(state);
+  const [room, setRoom] = useState(false);
+  const [seenOpening, setSeenOpening] = useState(opening);
+  if (opening !== seenOpening) {
+    setSeenOpening(opening);
+    if (opening) setRoom(false);
+  }
+  // The title introduces Sidekick alone. The word Sidekick then slides into place as both sidebars come in, and the next step is written after that.
+  const stage = opening && !room;
+  const panels = sidekickPanels(state, room);
   const panelsRef = useRef(panels);
   useEffect(() => {
     panelsRef.current = { nav: panels.nav, preview: panels.preview };
@@ -73,9 +82,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
-  // While the conversation is alone it is already the width it will have once both sidebars are in,
-  // so the choice reveals the room around it instead of squeezing the words.
-  const conversationWidth = Math.max(360, viewport - (8 + 12 + 1 + 248 + 584));
+  // The title is introduced where it will sit once both sidebars are in, so the room opens around it and the words never move.
   const [seenStage, setSeenStage] = useState(stage);
   const [settling, setSettling] = useState(false);
   if (stage !== seenStage) {
@@ -237,9 +244,10 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   }
 
   return (
+    <OrbAudioProvider>
     <div
       data-shell={stage ? "conversation" : settling ? "reveal" : "workspace"}
-      className={`fade-in p-partial-theme-admin-next-dark relative flex h-dvh bg-[#0c0d0c] p-1 text-white ${stage ? "justify-center gap-0" : "min-w-[1180px] gap-1"}`}
+      className="fade-in p-partial-theme-admin-next-dark relative flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white"
     >
         <AgentNav
           present={panels.nav}
@@ -259,13 +267,9 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         <div
           aria-hidden
           className="rail-reveal my-3 shrink-0 bg-white/10"
-          style={{ width: panels.nav ? 1 : 0, opacity: panels.nav ? 1 : 0 }}
+          style={{ width: 1, opacity: panels.nav ? 1 : 0 }}
         />
-        <div
-          ref={chatRef}
-          className={`flex min-h-0 min-w-0 flex-col ${stage ? "shrink-0" : "flex-1"}`}
-          style={stage ? { width: conversationWidth } : undefined}
-        >
+        <div ref={chatRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
         <ChatColumn
           state={state}
           liveSegments={liveAgentId === agent.id ? liveSegments : null}
@@ -287,6 +291,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onOpenConversation={(id) => dispatch({ type: "open-conversation", id })}
           onDeleteConversation={(id) => dispatch({ type: "delete-conversation", id })}
           onRate={(id, value) => dispatch({ type: "rate", id, value })}
+          onIntroduced={() => setRoom(true)}
         />
         </div>
       <PreviewColumn
@@ -327,6 +332,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
       ) : null}
       <span className="sr-only">{agent.name}</span>
     </div>
+    </OrbAudioProvider>
   );
 }
 

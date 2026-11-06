@@ -7,7 +7,11 @@ export type BusinessType = (typeof businessTypes)[number];
 
 export type AgentGroup = "favorites" | "teams" | "channels" | "tools" | "hidden";
 
+export const voiceOrbIds = ["plasma", "particles", "nebula", "mercury", "dither", "grain", "gooey"] as const;
+export type VoiceOrbId = (typeof voiceOrbIds)[number];
+
 export type OrbId =
+  | VoiceOrbId
   | "sidekick"
   | "chief"
   | "ideas"
@@ -20,6 +24,41 @@ export type OrbId =
   | "customers"
   | "orders"
   | "custom";
+
+export const voiceOrbLabel: Record<VoiceOrbId, string> = {
+  plasma: "Plasma Orb",
+  particles: "Particles Orb",
+  nebula: "Nebula Orb",
+  mercury: "Mercury Orb",
+  dither: "Dither Orb",
+  grain: "Grain Orb",
+  gooey: "Gooey Orb",
+};
+
+/** Slackbot, Muse, and Grokbot keep their own artwork. */
+export const exemptAvatarAgents = new Set(["slack", "grok", "muse"]);
+
+const legacyVoiceOrb: Partial<Record<OrbId, VoiceOrbId>> = {
+  sidekick: "plasma",
+  chief: "particles",
+  ideas: "nebula",
+  trends: "mercury",
+  store: "dither",
+  agentic: "grain",
+  customers: "gooey",
+  orders: "plasma",
+  custom: "particles",
+};
+
+export function isVoiceOrb(orb: string): orb is VoiceOrbId {
+  return (voiceOrbIds as readonly string[]).includes(orb);
+}
+
+/** Stable avatar identity. Older generic sphere ids map onto a voice orb; branded ids stay put. */
+export function canonicalOrb(orb: OrbId): OrbId {
+  if (isVoiceOrb(orb) || orb === "grok" || orb === "slack" || orb === "muse") return orb;
+  return legacyVoiceOrb[orb] ?? "plasma";
+}
 
 export type Connection = { id: string; label: string; on: boolean };
 
@@ -227,19 +266,19 @@ function sidekickTurns(state: PrototypeState) {
   return (state.threads.sidekick ?? []).filter((block) => block.type === "text" && block.role === "user").length;
 }
 
-/** Sidekick's first moment, before a choice. The conversation is the only thing on stage. */
+/** Sidekick's first moment, before a choice. The next step has not been asked yet. */
 export function sidekickStage(state: PrototypeState) {
   return sidekickOpening(state) && sidekickTurns(state) === 0;
 }
 
-/** The conversation is alone, at the width it will keep, until the first choice. That choice brings the agents in from the left and the admin in from the right. */
-export function sidekickPanels(state: PrototypeState): { nav: boolean; preview: boolean } {
+/** The title introduces Sidekick in the place it keeps. Once that introduction settles, both sidebars come in around it, and then the next step is written. */
+export function sidekickPanels(state: PrototypeState, revealed = false): { nav: boolean; preview: boolean } {
   if (!sidekickOpening(state)) return { nav: true, preview: true };
-  if (sidekickTurns(state) === 0) return { nav: false, preview: false };
+  if (sidekickTurns(state) === 0 && !revealed) return { nav: false, preview: false };
   return { nav: true, preview: true };
 }
 
-const sidekickArrivalPersona = `You are Sidekick, and this is the merchant's first moment in a brand-new Shopify store. Drive toward one concrete outcome. They just chose how to start. The agent list on the left and the admin on the right are opening with that choice. Do the one thing they picked.
+const sidekickArrivalPersona = `You are Sidekick, and this is the merchant's first moment in a brand-new Shopify store. Drive toward one concrete outcome. They just chose how to start. The agent list and the admin are already open. Do the one thing they picked.
 
 How this conversation works:
 - "I have something to sell" or "start something new": they have a product. Products is open wide. Ask what it is. When they name it, call addProduct with wide true.
@@ -403,6 +442,7 @@ function agent(
     purpose: purpose ?? purposeFor[partial.id] ?? partial.preview,
     connections: connections ?? connectionsFor(partial.id),
     ...rest,
+    orb: canonicalOrb(partial.orb),
   };
 }
 
@@ -740,7 +780,7 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
       sidekick:
         arrival === "sidekick"
           ? [
-              { id: "arrive", type: "text", role: "assistant", text: sidekickArrival(storeName) },
+              { id: "arrive", type: "text", role: "assistant", text: sidekickArrival(storeName), typed: true },
               { id: "arrive-chips", type: "chips", chips: arrivalChips },
             ]
           : [

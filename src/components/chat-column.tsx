@@ -1,18 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChipButton, Orb } from "@/components/marks";
 import { Markdown } from "@/components/markdown";
+import { useOrbAudioPublish } from "@/components/orb-audio";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { pageMeta } from "@/lib/admin-nav";
 import {
+  canonicalOrb,
   catalog,
+  exemptAvatarAgents,
   paymentSteps,
   purposes,
   sellers,
   selectedAgent,
   sidekickStage,
+  voiceOrbIds,
+  voiceOrbLabel,
   type Agent,
   type Block,
   type Connection,
@@ -47,6 +52,7 @@ export function ChatColumn({
   onRate,
   onSwitch,
   onAddAgent,
+  onIntroduced,
 }: {
   state: PrototypeState;
   liveSegments: LiveSegment[] | null;
@@ -68,6 +74,7 @@ export function ChatColumn({
   onRate: (id: string, value: "up" | "down") => void;
   onSwitch: (id: string) => void;
   onAddAgent: () => void;
+  onIntroduced?: () => void;
 }) {
   const agent = selectedAgent(state);
   const purpose = state.selectedAgentId === "chief" && state.chiefPhase === "purpose" && state.mode === "thread";
@@ -75,17 +82,24 @@ export function ChatColumn({
   const title = state.mode === "add" ? "Add a sidekick" : purpose ? "Chief of staff" : agent.name;
   const topic = state.mode === "add" ? null : purpose ? "Set purpose" : agent.topic;
   const [editing, setEditing] = useState(false);
+  const [typedDone, setTypedDone] = useState(() => new Set(typedOnce));
   const stage = sidekickStage(state);
-  const [phase, setPhase] = useState<"welcome" | "handoff" | "ready">("welcome");
+  const [beat, setBeat] = useState<"title" | "message">("title");
   const [seenStage, setSeenStage] = useState(stage);
   if (seenStage !== stage) {
     setSeenStage(stage);
-    if (stage) setPhase("welcome");
+    if (stage) {
+      typedOnce.delete("arrive");
+      setTypedDone(new Set(typedOnce));
+      setBeat("title");
+    }
   }
-  const showWelcome = stage && phase !== "ready";
-  const showConversation = !showWelcome || phase === "handoff";
-  const arrive = stage && phase !== "welcome";
-  const [typedDone, setTypedDone] = useState(() => new Set(typedOnce));
+  const writing = stage && beat === "title";
+  const showThread = !stage || beat === "message";
+  const introduced = useRef(onIntroduced);
+  useEffect(() => {
+    introduced.current = onIntroduced;
+  });
   const markTyped = useCallback((id: string) => {
     typedOnce.add(id);
     setTypedDone(new Set(typedOnce));
@@ -104,12 +118,17 @@ export function ChatColumn({
   }, [thread.length, liveLength, busy]);
 
   return (
-    <section data-opening={stage ? phase : "workspace"} className="relative flex min-h-0 min-w-0 flex-1 flex-col px-8 pb-3 pt-7">
-      {showConversation ? (
-      <div className={`flex min-h-0 flex-1 flex-col ${arrive ? "stage-in" : ""}`}>
+    <section data-opening={stage ? beat : "workspace"} className="relative flex min-h-0 min-w-0 flex-1 flex-col px-8 pb-3 pt-7">
+      <div className="flex min-h-0 flex-1 flex-col">
           <header className="relative mb-6 flex items-start justify-between gap-4">
             <h1 className="min-w-0 flex-1 text-[25px] font-medium leading-8 tracking-[-0.75px]">
-              {state.mode === "thread" && !purpose ? (
+              {writing ? (
+                <TitleIntro
+                  motion={state.motion}
+                  onReveal={() => introduced.current?.()}
+                  onDone={() => setBeat("message")}
+                />
+              ) : state.mode === "thread" && !purpose ? (
                 <button
                   type="button"
                   onClick={() => onConversations(!listing)}
@@ -149,6 +168,7 @@ export function ChatColumn({
           </header>
           {editing ? (
             <EditSidekick
+              key={agent.id}
               agent={agent}
               onClose={() => setEditing(false)}
               onSave={(patch) => {
@@ -158,6 +178,7 @@ export function ChatColumn({
             />
           ) : null}
 
+          {showThread ? (
           <div
             ref={scroller}
             key={state.mode === "thread" ? `thread-${agent.id}` : `thread-${state.mode}`}
@@ -175,7 +196,8 @@ export function ChatColumn({
                       key={block.id}
                       text={block.text}
                       instant={!state.motion}
-                      delay={block.id === "hello" || block.id === "arrive" ? 1200 : 750}
+                      delay={block.id === "arrive" ? 160 : block.id === "hello" ? 1200 : 750}
+                      status={block.id !== "arrive"}
                       onDone={() => markTyped(block.id)}
                     />
                   ) : (
@@ -198,6 +220,9 @@ export function ChatColumn({
               </div>
             )}
           </div>
+          ) : (
+            <div className="min-h-0 flex-1" />
+          )}
 
       {offline && state.mode === "thread" ? (
         <p className="mb-1 mt-2 px-4 text-[12px] text-[#8e8f8b]">
@@ -218,45 +243,29 @@ export function ChatColumn({
         lastReply={lastReply}
       />
       </div>
-      ) : null}
-      {showWelcome ? (
-        <Opening
-          storeName={state.storeName}
-          motion={state.motion}
-          onHandoff={() => setPhase((current) => (current === "welcome" ? "handoff" : current))}
-          onDone={() => setPhase("ready")}
-        />
-      ) : null}
     </section>
   );
 }
 
-function Opening({
-  storeName,
-  motion,
-  onHandoff,
-  onDone,
-}: {
-  storeName: string;
-  motion: boolean;
-  onHandoff: () => void;
-  onDone: () => void;
-}) {
-  const [firstCount, setFirstCount] = useState(0);
-  const [secondCount, setSecondCount] = useState(0);
+const sidekickIntro = "Welcome to Shopify. I'm Sidekick. I'll help you get set up, running, and growing.";
+const introTokens = sidekickIntro.split(/(Sidekick|\s+)/).filter((token) => token.length > 0);
+
+function TitleIntro({ motion, onReveal, onDone }: { motion: boolean; onReveal: () => void; onDone: () => void }) {
+  const [count, setCount] = useState(0);
   const [leaving, setLeaving] = useState(false);
-  const handoff = useRef(onHandoff);
+  const reveal = useRef(onReveal);
   const done = useRef(onDone);
+  const wordRef = useRef<HTMLSpanElement>(null);
+  const placeRef = useRef<HTMLSpanElement>(null);
+  const shift = useRef({ x: 0, y: 0 });
   useEffect(() => {
-    handoff.current = onHandoff;
+    reveal.current = onReveal;
     done.current = onDone;
   });
   useEffect(() => {
-    const first = `Welcome to ${storeName}.`.split(" ");
-    const second = "I'm Sidekick.".split(" ");
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!motion || reduce) {
-      handoff.current();
+      reveal.current();
       done.current();
       return;
     }
@@ -264,50 +273,69 @@ function Opening({
     const later = (ms: number, run: () => void) => {
       timers.push(window.setTimeout(run, ms));
     };
-    const step = 150;
-    const start = 380;
-    first.forEach((_, index) => later(start + index * step, () => setFirstCount(index + 1)));
-    const secondAt = start + first.length * step + 280;
-    second.forEach((_, index) => later(secondAt + index * step, () => setSecondCount(index + 1)));
-    const hold = secondAt + second.length * step + 900;
-    later(hold, () => {
-      setLeaving(true);
-      handoff.current();
-    });
-    later(hold + 880, () => done.current());
+    let at = 0;
+    const tick = () => {
+      at = Math.min(introTokens.length, at + 2);
+      setCount(at);
+      if (at >= introTokens.length) {
+        later(2000, () => {
+          const from = wordRef.current?.getBoundingClientRect();
+          const to = placeRef.current?.getBoundingClientRect();
+          if (from && to) shift.current = { x: to.left - from.left, y: to.top - from.top };
+          setLeaving(true);
+          reveal.current();
+        });
+        later(2000 + 680, () => done.current());
+        return;
+      }
+      const previous = introTokens[at - 2] ?? "";
+      later(/[.!?]$/.test(previous) ? 160 : 45, tick);
+    };
+    later(160, tick);
     return () => {
       for (const timer of timers) window.clearTimeout(timer);
     };
-  }, [storeName, motion]);
-  const first = `Welcome to ${storeName}.`;
-  const second = "I'm Sidekick.";
+  }, [motion]);
+  useLayoutEffect(() => {
+    const el = wordRef.current;
+    if (!leaving || !el) return;
+    const { x, y } = shift.current;
+    if (Math.hypot(x, y) < 1) return;
+    const animation = el.animate([{ transform: "translate(0, 0)" }, { transform: `translate(${x}px, ${y}px)` }], {
+      duration: 680,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      fill: "forwards",
+    });
+    return () => animation.cancel();
+  }, [leaving]);
   return (
-    <>
-      <p className="sr-only">
-        Welcome to {storeName}. I&apos;m Sidekick.
+    <div className="relative -mx-2 px-2">
+      <p className="sr-only">{sidekickIntro}</p>
+      <p className={`flex items-center gap-1.5 ${leaving ? "relative z-20" : "pointer-events-none absolute left-2 top-0"}`}>
+        <span ref={placeRef} className="opacity-0">
+          Sidekick
+        </span>
+        <span className={`grid shrink-0 place-items-center text-[#8e8f8b] ${leaving ? "title-arrive" : "opacity-0"}`}>
+          <PIcon name="ChevronDown" size={20} />
+        </span>
       </p>
-      <div aria-hidden className={`absolute inset-0 z-10 grid place-items-center bg-[#0c0d0c] px-8 ${leaving ? "welcome-leave pointer-events-none" : ""}`}>
-        <div className="max-w-[16em] text-balance text-center">
-          <p className="text-[25px] font-medium leading-8 tracking-[-0.75px]">
-            <WelcomeWords text={first} count={firstCount} />
-          </p>
-          <p className="mt-3 text-[25px] font-medium leading-8 tracking-[-0.75px] text-white/80">
-            <WelcomeWords text={second} count={secondCount} />
-          </p>
-        </div>
-      </div>
-    </>
+      <p aria-hidden className={leaving ? "pointer-events-none absolute inset-x-2 top-0" : "min-h-8"}>
+        {introTokens.slice(0, count).map((token, index) =>
+          /^\s+$/.test(token) ? (
+            token
+          ) : token === "Sidekick" ? (
+            <span key={index} ref={wordRef} className="word-in relative z-10 inline-block">
+              {token}
+            </span>
+          ) : (
+            <span key={index} className={leaving ? "intro-rest" : "word-in"}>
+              {token}
+            </span>
+          ),
+        )}
+      </p>
+    </div>
   );
-}
-
-function WelcomeWords({ text, count }: { text: string; count: number }) {
-  const words = text.split(" ");
-  return words.map((word, index) => (
-    <span key={`${word}-${index}`}>
-      <span className={index < count ? "welcome-word" : "inline-block opacity-0"}>{word}</span>
-      {index < words.length - 1 ? " " : ""}
-    </span>
-  ));
 }
 
 /** Dark label pill, shown after the admin's ~0.5s hover delay. `fixed` escapes overflow clipping. */
@@ -676,6 +704,12 @@ export function Composer({
     [],
   );
 
+  const liveAgentId = state.mode === "add" ? "sidekick" : agent.id;
+  const reactive = !exemptAvatarAgents.has(liveAgentId);
+  useOrbAudioPublish(liveAgentId, reactive && (listening || transcribing) && !voiceOpen ? (listening ? "listening" : "thinking") : null, () =>
+    listening ? (recording.current?.level() ?? 0) : 0,
+  );
+
   useEffect(() => {
     if (!listening) return;
     let frame = 0;
@@ -867,11 +901,11 @@ export function Composer({
                   switchOpen ? "shadow-[0_0_0_3px_rgba(255,255,255,0.16)]" : ""
                 }`}
               >
-                <Orb id={state.mode === "add" ? "sidekick" : agent.orb} size={32} />
+                <Orb id={state.mode === "add" ? (state.agents.find((item) => item.id === "sidekick")?.orb ?? "sidekick") : agent.orb} agentId={liveAgentId} size={32} />
               </button>
             </Tip>
           ) : (
-            <Orb id={agent.orb} size={light ? 20 : 32} />
+            <Orb id={agent.orb} agentId={agent.id} size={light ? 20 : 32} />
           )}
           {listening ? (
             <span ref={meter} className="ml-1.5 flex h-5 items-center gap-[3px] text-[12px] text-[#8e8f8b]" style={{ "--level": 0 } as React.CSSProperties}>
@@ -933,6 +967,8 @@ export function Composer({
                     type="button"
                     aria-label="Voice mode"
                     onClick={() => {
+                      recognition.current?.stop();
+                      recognition.current = null;
                       recording.current?.cancel();
                       recording.current = null;
                       setListening(false);
@@ -1086,7 +1122,7 @@ function SidekickSwitcher({
             onClick={() => onPick(item.id)}
             className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] hover:bg-white/[0.07]"
           >
-            <Orb id={item.orb} size={24} />
+            <Orb id={item.orb} agentId={item.id} size={24} />
             <span className="min-w-0 flex-1 truncate">{item.name}</span>
             {item.id === current ? <PIcon name="Check" size={16} /> : null}
           </button>
@@ -1155,7 +1191,7 @@ function PlusMenu({
               onClick={() => onInsert(sub === "skills" ? `/${label.toLowerCase().replace(/\s+/g, "-")} ` : `@${label} `)}
               className={row}
             >
-              {sub === "mention" ? <Orb id={agents.find((item) => item.name === label)?.orb ?? "sidekick"} size={18} /> : null}
+              {sub === "mention" ? <Orb id={agents.find((item) => item.name === label)?.orb ?? "sidekick"} agentId={agents.find((item) => item.name === label)?.id} size={18} /> : null}
               <span className="truncate">{label}</span>
             </button>
           ))}
@@ -1437,7 +1473,10 @@ function Popover({
   );
 }
 
-const avatarChoices: OrbId[] = ["sidekick", "chief", "ideas", "trends", "grok", "muse", "slack", "store", "agentic", "customers", "orders"];
+function avatarChoices(agent: Agent): { id: OrbId; label: string }[] {
+  if (exemptAvatarAgents.has(agent.id)) return [{ id: agent.orb, label: agent.name }];
+  return voiceOrbIds.map((id) => ({ id, label: voiceOrbLabel[id] }));
+}
 
 function EditSidekick({
   agent,
@@ -1450,7 +1489,7 @@ function EditSidekick({
 }) {
   const [name, setName] = useState(agent.name);
   const [purpose, setPurpose] = useState(agent.purpose);
-  const [orb, setOrb] = useState(agent.orb);
+  const [orb, setOrb] = useState<OrbId>(canonicalOrb(agent.orb));
   const [connections, setConnections] = useState(agent.connections);
   const field = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white outline-none placeholder:text-[#8e8f8b] focus:border-white/30";
   return createPortal(
@@ -1476,16 +1515,16 @@ function EditSidekick({
         <fieldset>
           <legend className="mb-2 text-[12px] text-[#8e8f8b]">Avatar</legend>
           <div className="flex flex-wrap gap-2">
-            {avatarChoices.map((id) => (
+            {avatarChoices(agent).map((choice) => (
               <button
-                key={id}
+                key={choice.id}
                 type="button"
-                aria-label={id}
-                aria-pressed={orb === id}
-                onClick={() => setOrb(id)}
-                className={`press rounded-full ${orb === id ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-80 hover:opacity-100"}`}
+                aria-label={choice.label}
+                aria-pressed={orb === choice.id}
+                onClick={() => setOrb(choice.id)}
+                className={`press rounded-full ${orb === choice.id ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-80 hover:opacity-100"}`}
               >
-                <Orb id={id} size={36} />
+                <Orb id={choice.id} size={36} />
               </button>
             ))}
           </div>
@@ -1772,8 +1811,8 @@ function visibleBlocks(thread: Block[], done: Set<string>) {
 }
 
 /** Plays a scripted reply back like a live one: "Working on it" for a beat, then the words stream in. */
-function SimulatedTurn({ text, instant, delay, onDone }: { text: string; instant: boolean; delay: number; onDone: () => void }) {
-  const [shown, setShown] = useState<string | null>(null);
+function SimulatedTurn({ text, instant, delay, onDone, status = true }: { text: string; instant: boolean; delay: number; onDone: () => void; status?: boolean }) {
+  const [shown, setShown] = useState<string | null>(status ? null : "");
   const done = useRef(onDone);
   useEffect(() => {
     done.current = onDone;

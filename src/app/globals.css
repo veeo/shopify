@@ -310,7 +310,31 @@ body {
 }
 
 .welcome-leave {
-  animation: welcome-leave 880ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: welcome-leave 720ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes title-arrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.title-arrive {
+  animation: title-arrive 680ms ease both;
+}
+
+@keyframes intro-rest {
+  to {
+    opacity: 0;
+    filter: blur(1px);
+  }
+}
+
+.intro-rest {
+  animation: intro-rest 560ms ease forwards;
 }
 
 @keyframes stage-in {
@@ -434,6 +458,8 @@ body {
   .word-in,
   .welcome-word,
   .welcome-leave,
+  .title-arrive,
+  .intro-rest,
   .stage-in,
   .choice-in,
   .shimmer-text {
@@ -588,6 +614,18 @@ body {
     overflow: hidden;
     border-radius: 9999px;
     isolation: isolate;
+  }
+
+  .voice-slot {
+    background: transparent;
+  }
+
+  .voice-slot > .voice-orb {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100%;
+    max-height: 100%;
+    pointer-events: none;
   }
 }
 
