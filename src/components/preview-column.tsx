@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
+import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
-import { Badge, Body, Btn, Card as AdminCard, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
+import { Badge, Body, Btn, Card as AdminCard, circleButton, HeaderExtras, HeaderSlotProvider, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
+import { isSettingsPage, sectionChoices } from "@/lib/admin-nav";
 import type { BusinessType, PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
 
 type Nav = PageNav & {
@@ -22,10 +24,12 @@ export function PreviewColumn({
   onBusiness,
   onIdentity,
   onPaymentsNext,
+  onPaymentsBack,
   onProduct,
   onUpdateProduct,
   onAddProduct,
   onRail,
+  onSearch,
 }: {
   state: PrototypeState;
   onPreview: (page: PreviewId, wide?: boolean) => void;
@@ -36,40 +40,307 @@ export function PreviewColumn({
   onBusiness: (value: PrototypeState["businessType"]) => void;
   onIdentity: (patch: Partial<PrototypeState["identity"]>) => void;
   onPaymentsNext: () => void;
+  onPaymentsBack: () => void;
   onProduct: (id: string) => void;
   onUpdateProduct: (id: string, patch: Partial<Product>) => void;
   onAddProduct: () => void;
   onRail: (id: string) => void;
+  onSearch: (scope?: string) => void;
 }) {
   const wide = state.previewWide || state.preview === "payments-setup";
-  const nav: Nav = { onPreview, onRail, onChip, go: (page) => onPreview(page), rail: onRail, chip: onChip, ask: onAsk };
-  const grey = state.preview === "product";
+  const [menu, setMenu] = useState(false);
+  const menuRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const savedScroll = useRef(0);
+  // A click on the pushed page dismisses the menu. The pointerdown closes it
+  // before the click, so the click is swallowed here or it would activate whatever it landed on.
+  const swallow = useRef(false);
+  function setMenuOpen(next: boolean, restore: boolean) {
+    const el = scrollRef.current;
+    if (el && state.menuStyle === "push") {
+      if (next && !menuRef.current) {
+        savedScroll.current = el.scrollTop;
+        el.scrollTop = 0;
+      } else if (!next && menuRef.current && restore) {
+        el.scrollTop = savedScroll.current;
+      }
+    }
+    menuRef.current = next;
+    setMenu(next);
+  }
+  const closeMenu = useRef(setMenuOpen);
+  useEffect(() => {
+    closeMenu.current = setMenuOpen;
+  });
+  const nav: Nav = {
+    onPreview,
+    onRail,
+    onChip,
+    go: (page) => {
+      menuRef.current = false;
+      setMenu(false);
+      onPreview(page);
+    },
+    rail: (id) => {
+      menuRef.current = false;
+      setMenu(false);
+      onRail(id);
+    },
+    chip: onChip,
+    ask: onAsk,
+  };
+  const kind = state.preview === "payments-setup" ? "payments" : null;
+  const [closing, setClosing] = useState(false);
+  const closeTo = useRef<PreviewId>("products");
+  const closeTimer = useRef<number | null>(null);
+  const closed = useRef(false);
+  const sheetScroll = useRef<HTMLDivElement>(null);
+  const settingsBack = useRef<PreviewId>("settings");
+  const settingsRoot = useRef<PreviewId>("home-setup");
+  const seenPreview = useRef(state.preview);
+  if (kind && menu) setMenu(false);
+  const underlayPage: PreviewId = kind === "payments" ? "payments" : state.preview;
+  const settingsLevel = underlayPage === "settings" || isSettingsPage(underlayPage);
+  const headerRef = useRef<HTMLElement>(null);
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  const [menuTop, setMenuTop] = useState(84);
+  useLayoutEffect(() => {
+    if (!headerRef.current) return;
+    setMenuTop(headerRef.current.offsetHeight + 24);
+  }, [underlayPage, menu]);
+  useEffect(() => {
+    const prev = seenPreview.current;
+    const previewChanged = prev !== state.preview;
+    seenPreview.current = state.preview;
+    if (previewChanged && prev !== "product" && prev !== "payments-setup") {
+      const fromOutside = prev !== "settings" && !isSettingsPage(prev);
+      if (state.preview === "settings" && fromOutside) settingsRoot.current = prev;
+      if (isSettingsPage(state.preview) && !isSettingsPage(prev)) settingsBack.current = prev;
+    }
+    if (state.preview === "payments-setup") {
+      closed.current = false;
+      menuRef.current = false;
+      if (sheetScroll.current) sheetScroll.current.scrollTop = 0;
+      return;
+    }
+    if (!previewChanged) return;
+    const returning = (prev === "product" && state.preview === "products") || (prev === "payments-setup" && state.preview === "payments");
+    if (returning) return;
+    const el = scrollRef.current;
+    if (el) el.scrollTop = 0;
+    savedScroll.current = 0;
+  }, [state.preview, state.selectedProductId, state.paymentsStep]);
+  function finishClose() {
+    if (closed.current) return;
+    closed.current = true;
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    setClosing(false);
+    onPreview(closeTo.current);
+  }
+  function requestClose(page: PreviewId) {
+    if (closing) return;
+    menuRef.current = false;
+    setMenu(false);
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !state.motion) {
+      onPreview(page);
+      return;
+    }
+    closeTo.current = page;
+    setClosing(true);
+    closeTimer.current = window.setTimeout(finishClose, 520);
+  }
+  function onSheetAnimationEnd(event: AnimationEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget || event.animationName !== "sheet-leave" || !closing) return;
+    finishClose();
+  }
+  function retreatPayments() {
+    if (state.paymentsStep === "type") requestClose("payments");
+    else onPaymentsBack();
+  }
+  useEffect(() => {
+    if (!menu) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") closeMenu.current(false, true);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menu]);
+  const menuProps = {
+    preview: state.preview,
+    onOpen: (id: string) => nav.rail(id),
+    onGo: (page: PreviewId) => nav.go(page),
+    onSearch: (scope?: string) => {
+      setMenuOpen(false, true);
+      onSearch(scope);
+    },
+  };
   return (
     <aside
-      className={`p-partial-theme-admin-next-light h-full shrink-0 overflow-hidden rounded-[20px] text-[#303030] ${grey ? "bg-[#f7f7f7]" : "bg-white"} ${
-        state.motion ? "transition-[width] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
+      className={`p-partial-theme-admin-next-light relative flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
+        state.motion ? "transition-[width,background-color] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
       }`}
       style={{ width: wide ? 584 : 393 }}
     >
-      <div key={state.preview} className={`${state.motion ? "page-in" : ""} h-full overflow-y-auto [scrollbar-width:none]`}>
-        <Screen
-          state={state}
-          nav={nav}
-          onCard={onCard}
-          onDismissCard={onDismissCard}
-          onBusiness={onBusiness}
-          onIdentity={onIdentity}
-          onPaymentsNext={onPaymentsNext}
-          onProduct={onProduct}
-          onUpdateProduct={onUpdateProduct}
-          onAddProduct={onAddProduct}
-        />
-      </div>
+      <HeaderSlotProvider slot={slot}>
+        <div
+          inert={kind || closing ? true : undefined}
+          className={`relative flex min-h-0 flex-1 flex-col ${closing ? "sheet-restore" : kind ? "sheet-recede" : ""}`}
+        >
+          <div className="sheet-scrim pointer-events-none absolute inset-0 z-40 bg-black/25" />
+        <header ref={headerRef} className="relative z-30 flex shrink-0 items-center justify-between gap-3 px-6 pb-1 pt-7">
+          {state.preview === "product" ? (
+            <button
+              type="button"
+              aria-label="Back to products"
+              onClick={() => {
+                menuRef.current = false;
+                setMenu(false);
+                onPreview("products");
+              }}
+              className={circleButton}
+            >
+              <PIcon name="ChevronLeft" size={20} />
+            </button>
+          ) : settingsLevel ? (
+            <button
+              type="button"
+              aria-label="Back"
+              onClick={() => {
+                menuRef.current = false;
+                setMenu(false);
+                onPreview(underlayPage === "settings" ? settingsRoot.current : settingsBack.current);
+              }}
+              className={circleButton}
+            >
+              <PIcon name="ChevronLeft" size={20} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              aria-label={menu ? "Close admin menu" : "Open admin menu"}
+              aria-expanded={menu}
+              aria-controls="admin-menu"
+              onClick={() => setMenuOpen(!menu, true)}
+              className={circleButton}
+            >
+              <span className="relative grid size-5 place-items-center">
+                <span className={`absolute transition-all duration-200 ${menu ? "scale-75 rotate-90 opacity-0" : "opacity-100"}`}>
+                  <PIcon name="Menu" size={20} />
+                </span>
+                <span className={`absolute transition-all duration-200 ${menu ? "opacity-100" : "-rotate-90 scale-75 opacity-0"}`}>
+                  <PIcon name="X" size={20} />
+                </span>
+              </span>
+            </button>
+          )}
+          <div ref={setSlot} className="flex min-w-0 items-center justify-end gap-1.5" />
+        </header>
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none]">
+          {state.menuStyle === "push" ? (
+            <div
+              className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+                menu ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+              }`}
+            >
+              <div className="overflow-hidden" inert={menu ? undefined : true}>
+                <div id={menu ? "admin-menu" : undefined} className="border-b border-[#ebebeb] px-6 pb-3 pt-5">
+                  <AdminMenu {...menuProps} />
+                </div>
+              </div>
+            </div>
+          ) : null}
+          <div
+            key={underlayPage}
+            className={`${state.motion ? "page-in" : ""} ${menu && state.menuStyle === "push" ? "opacity-40 transition-opacity duration-300" : "opacity-100 transition-opacity duration-300"}`}
+            onPointerDownCapture={(event) => {
+              if (!menu || state.menuStyle !== "push") return;
+              swallow.current = true;
+              event.preventDefault();
+              event.stopPropagation();
+              setMenuOpen(false, true);
+            }}
+            onClickCapture={(event) => {
+              if (!swallow.current) return;
+              swallow.current = false;
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            <Screen
+              page={underlayPage}
+              state={state}
+              nav={nav}
+              onCard={onCard}
+              onDismissCard={onDismissCard}
+              onBusiness={onBusiness}
+              onIdentity={onIdentity}
+              onPaymentsNext={onPaymentsNext}
+              onPaymentsBack={onPaymentsBack}
+              onProduct={(id) => {
+                menuRef.current = false;
+                setMenu(false);
+                onProduct(id);
+              }}
+              onUpdateProduct={onUpdateProduct}
+              onAddProduct={onAddProduct}
+            />
+          </div>
+        </div>
+        {state.menuStyle === "drop" && menu ? (
+          <>
+            <button type="button" aria-label="Close admin menu" onClick={() => setMenu(false)} className="absolute inset-0 z-20" />
+            <div
+              id="admin-menu"
+              role="menu"
+              aria-label="Admin menu"
+              className="pop-in absolute inset-x-6 z-30 max-h-[calc(100%-108px)] overflow-y-auto rounded-2xl bg-white p-2 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.16)]"
+              style={{ top: menuTop }}
+            >
+              <AdminMenu {...menuProps} />
+            </div>
+          </>
+        ) : null}
+        </div>
+        {kind ? (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Set up Shopify Payments"
+            onAnimationEnd={onSheetAnimationEnd}
+            className={`absolute inset-x-0 bottom-0 top-[72px] z-50 flex flex-col overflow-hidden rounded-t-[22px] shadow-[0_-16px_40px_rgba(0,0,0,0.18)] ${
+              closing ? "sheet-leave" : "sheet-enter"
+            } bg-white`}
+          >
+            <header className="flex shrink-0 items-center justify-between gap-3 px-6 pb-1 pt-7">
+              <button
+                type="button"
+                aria-label={state.paymentsStep === "type" ? "Back to payments" : "Back"}
+                onClick={retreatPayments}
+                className={circleButton}
+              >
+                <PIcon name="ChevronLeft" size={20} />
+              </button>
+            </header>
+            <div ref={sheetScroll} className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none]">
+              <PaymentsSetup
+                state={state}
+                onBusiness={onBusiness}
+                onIdentity={onIdentity}
+                onNext={onPaymentsNext}
+                onBack={onPaymentsBack}
+                onClose={() => requestClose("payments")}
+              />
+            </div>
+          </div>
+        ) : null}
+      </HeaderSlotProvider>
     </aside>
   );
 }
 
 function Screen(props: {
+  page: PreviewId;
   state: PrototypeState;
   nav: Nav;
   onCard: (id: string) => void;
@@ -77,12 +348,13 @@ function Screen(props: {
   onBusiness: (value: PrototypeState["businessType"]) => void;
   onIdentity: (patch: Partial<PrototypeState["identity"]>) => void;
   onPaymentsNext: () => void;
+  onPaymentsBack: () => void;
   onProduct: (id: string) => void;
   onUpdateProduct: (id: string, patch: Partial<Product>) => void;
   onAddProduct: () => void;
 }) {
-  const { state, nav } = props;
-  switch (state.preview) {
+  const { state, nav, page } = props;
+  switch (page) {
     case "home-setup":
       return <HomeSetup state={state} nav={nav} onCard={props.onCard} onDismiss={props.onDismissCard} />;
     case "home-active":
@@ -96,24 +368,20 @@ function Screen(props: {
           onBusiness={props.onBusiness}
           onIdentity={props.onIdentity}
           onNext={props.onPaymentsNext}
-          onBack={() => nav.onPreview("payments")}
-          onHome={() => nav.onRail("home")}
+          onBack={props.onPaymentsBack}
+          onClose={() => nav.onPreview("payments")}
         />
       );
     case "products":
       return <Products state={state} onProduct={props.onProduct} onAdd={props.onAddProduct} nav={nav} />;
     case "product":
-      return <ProductEdit state={state} onBack={() => nav.onPreview("products")} onUpdate={props.onUpdateProduct} />;
+      return <ProductEdit state={state} onBack={() => nav.onPreview("products")} onProduct={props.onProduct} onUpdate={props.onUpdateProduct} />;
     default:
-      return <AdminPage page={state.preview} state={state} nav={nav} />;
+      return <AdminPage page={page} state={state} nav={nav} />;
   }
 }
 
 /* Shared pieces for the Figma-designed screens (active home, payments setup) */
-
-function Page({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
-  return <div className={`flex flex-col gap-6 pb-[86px] pt-7 ${wide ? "px-8" : "px-6"}`}>{children}</div>;
-}
 
 function H1({ children }: { children: ReactNode }) {
   return <h2 className="text-[25px] font-medium leading-8 tracking-[-0.75px] text-[#171817]">{children}</h2>;
@@ -151,21 +419,6 @@ function Pill({
     >
       {children}
     </button>
-  );
-}
-
-function BackPill({ onBack, onHome, icon = "Home" }: { onBack: () => void; onHome?: () => void; icon?: PolarisIconName }) {
-  return (
-    <div className="flex">
-      <span className="inline-flex h-8 items-center overflow-hidden rounded-full border border-[#e3e3e3] bg-white shadow-[0_3px_15px_rgba(0,0,0,0.03)]">
-        <button type="button" aria-label="Back" onClick={onBack} className="press grid h-full place-items-center pl-2 pr-0.5 hover:bg-[#f7f7f7]">
-          <PIcon name="ChevronLeft" size={20} />
-        </button>
-        <button type="button" aria-label="Home" onClick={onHome ?? onBack} className="press grid h-full place-items-center pl-1 pr-3 hover:bg-[#f7f7f7]">
-          <PIcon name={icon} size={20} />
-        </button>
-      </span>
-    </div>
   );
 }
 
@@ -247,17 +500,11 @@ function HomeSetup({
 }) {
   const hidden = new Set([...state.cardsDone, ...state.cardsDismissed]);
   return (
-    <div className="flex flex-col gap-6 px-4 pb-10 pt-3">
-      <div className="flex h-7 items-center justify-between text-[12px]">
-        <ReadyToSell onLaunch={() => nav.go("online-store-preferences")} />
-        <span className="text-[#616161]">
-          Questions?{" "}
-          <a href="tel:8449821186" className="font-semibold text-[#303030] underline underline-offset-2 hover:decoration-2">
-            (844) 982-1186
-          </a>
-        </span>
-      </div>
-      <h2 className="pt-4 text-center text-[21px] font-medium leading-[1.25] tracking-[-0.5px] text-[#303030]">
+    <div className="flex flex-col gap-6 px-6 pb-10 pt-5">
+      <HeaderExtras>
+        <TrialNote onPlan={() => nav.go("plan")} />
+      </HeaderExtras>
+      <h2 className="text-left text-[22px] font-medium leading-[1.3] tracking-[-0.44px] text-[#171817]">
         <button
           type="button"
           onClick={() => nav.go("settings-general")}
@@ -470,29 +717,62 @@ const ranges = {
 
 type RangeId = keyof typeof ranges;
 
+const headerNote = "flex items-center gap-1.5 text-[12px] leading-4 text-[#616161]";
+
+function TrialNote({ onPlan }: { onPlan: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button type="button" aria-expanded={open} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} className={headerNote}>
+        Trial end in 1 day
+        <span className="grid size-[18px] place-items-center">
+          <span className="grid size-4 place-items-center rounded-full bg-[#ffdbd7]">
+            <span className="size-2 rounded-full bg-[#eb1700]" />
+          </span>
+        </span>
+      </button>
+      {open ? (
+        <span className="absolute right-0 top-full z-50 pt-2">
+          <span className="pop-in flex w-[240px] flex-col items-start gap-1.5 rounded-2xl bg-white p-3 text-left text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.16)]">
+            <span className="flex items-center gap-1.5 text-[13px] font-semibold">
+              <span className="grid size-4 place-items-center rounded-full bg-[#ffdbd7]">
+                <span className="size-2 rounded-full bg-[#eb1700]" />
+              </span>
+              Trial ends in 1 day
+            </span>
+            <span className="text-[12px] leading-[1.4] text-[#616161]">Pick a plan to keep selling after the trial.</span>
+            <span className="pt-1">
+              <Btn tone="primary" onClick={onPlan}>
+                Select a plan
+              </Btn>
+            </span>
+          </span>
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function HomeActive({ nav }: { nav: Nav }) {
   const [range, setRange] = useState<RangeId>("month");
   const data = ranges[range];
   const next: Record<RangeId, RangeId> = { today: "week", week: "month", month: "today" };
   const analytics = () => nav.onRail("analytics");
   return (
-    <div className="flex flex-col gap-6 px-8 pb-[86px] pt-7">
+    <div className="flex flex-col gap-6 px-6 pb-[86px] pt-5">
+      <HeaderExtras>
+        <button type="button" onClick={analytics} className={`press rounded-lg px-1.5 py-1 hover:bg-[#f1f1f1] ${headerNote}`}>
+          82 visitors right now
+          <span className="flex -space-x-2">
+            {["/assets/visitor-a.png", "/assets/visitor-b.png", "/assets/user.png"].map((src) => (
+              <img key={src} src={src} alt="" className="size-5 rounded-full border-[1.5px] border-white object-cover" />
+            ))}
+          </span>
+        </button>
+      </HeaderExtras>
       <div className="flex flex-col gap-6">
-        <div className="flex h-8 items-center justify-between">
-          <H1>Home</H1>
-          <button type="button" onClick={analytics} className="press group flex items-center gap-1.5 text-[12px] leading-[1.45] tracking-[-0.12px] text-[#737572] hover:text-[#171817]">
-            82 visitors right now
-            <span className="flex -space-x-2">
-              {["/assets/visitor-a.png", "/assets/visitor-b.png", "/assets/user.png"].map((src) => (
-                <img key={src} src={src} alt="" className="size-5 rounded-full border-[1.5px] border-white object-cover" />
-              ))}
-            </span>
-            <span className="text-[#171817] transition-transform group-hover:translate-x-0.5">
-              <PIcon name="ChevronRight" size={20} />
-            </span>
-          </button>
-        </div>
-        <div className="-mr-8 flex gap-2 overflow-x-auto pr-8 [scrollbar-width:none]">
+        <H1>Home</H1>
+        <div className="-mr-6 flex gap-2 overflow-x-auto pr-6 [scrollbar-width:none]">
           <Pill tone="ink" onClick={() => setRange(next[range])} className="pl-3 pr-[13px]">
             <PIcon name="Calendar" size={20} />
             {data.label}
@@ -739,28 +1019,81 @@ function PaymentsSetup({
   onIdentity,
   onNext,
   onBack,
-  onHome,
+  onClose,
 }: {
   state: PrototypeState;
   onBusiness: (value: PrototypeState["businessType"]) => void;
   onIdentity: (patch: Partial<PrototypeState["identity"]>) => void;
   onNext: () => void;
   onBack: () => void;
-  onHome: () => void;
+  onClose: () => void;
 }) {
-  const identity = state.paymentsStep === "identity" || state.paymentsStep === "done";
+  const step = state.paymentsStep;
+  const [twoStep, setTwoStep] = useState(true);
+  const [holder, setHolder] = useState("");
+  const [routing, setRouting] = useState("");
+  const [account, setAccount] = useState("");
+  const title =
+    step === "identity"
+      ? "Identity verification"
+      : step === "security"
+        ? "Account security"
+        : step === "payout"
+          ? "Payout account"
+          : step === "done"
+            ? "Shopify Payments"
+            : "Set up Shopify Payments";
+  const subtitle =
+    step === "identity"
+      ? "Add the name on your government ID"
+      : step === "security"
+        ? "Protect the account that receives payouts"
+        : step === "payout"
+          ? "Choose where Shopify should send your money"
+          : step === "done"
+            ? "This store can start accepting payments"
+            : "Tell us about your store to start accepting payments";
   return (
-    <Page wide>
-      <BackPill onBack={onBack} onHome={onHome} />
-      <div className="flex flex-col gap-1">
-        <H1>Set up Shopify Payments</H1>
-        <p className="text-[13px] leading-[1.4] tracking-[-0.13px] text-[#4a4a4a]">Tell us about your store to start accepting payments</p>
-      </div>
-      <div key={identity ? "identity" : "type"} className="rise">
-        <Card className="p-2">
-          <p className="p-4 text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">{identity ? "What’s your legal name?" : "I am running my store as:"}</p>
-          {identity ? (
-            <div className="flex flex-col gap-3 px-4 pb-4">
+    <>
+      <TopBar title={title} />
+      <div className="flex flex-col gap-6 px-6 pb-[86px]">
+        <p className="text-[13px] leading-[1.4] tracking-[-0.13px] text-[#4a4a4a]">{subtitle}</p>
+        <div key={step} className="rise">
+          {step === "type" ? (
+            <Card className="p-2">
+              <p className="p-4 text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">I am running my store as:</p>
+              <div role="radiogroup" aria-label="Business type" className="flex flex-col gap-1">
+                {(Object.keys(businessCopy) as BusinessType[]).map((key) => {
+                  const selected = state.businessType === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => onBusiness(key)}
+                      className={`press press-row flex gap-3 rounded-2xl p-3 text-left transition-colors ${selected ? "bg-[#f7f7f7]" : "hover:bg-[#fafafa]"}`}
+                    >
+                      <span
+                        className={`mt-1 grid size-4 shrink-0 place-items-center rounded-full transition-colors ${
+                          selected ? "bg-[#171717]" : "border border-[#ccc] bg-white"
+                        }`}
+                      >
+                        <span className={`rounded-full bg-white transition-transform ${selected ? "size-2 scale-100" : "size-2 scale-0"}`} />
+                      </span>
+                      <span className="flex flex-col">
+                        <span className="text-[15px] font-medium leading-6 tracking-[-0.15px]">{businessCopy[key].title}</span>
+                        <span className="text-[13px] leading-[1.4] tracking-[-0.13px] text-[#4a4a4a]">{businessCopy[key].body}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+          ) : null}
+          {step === "identity" ? (
+            <Card className="gap-3 p-4">
+              <p className="text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">What’s your legal name?</p>
               <s-text-field
                 label="First name"
                 name="first-name"
@@ -775,49 +1108,45 @@ function PaymentsSetup({
                 value={state.identity.last}
                 onInput={(event) => onIdentity({ last: event.currentTarget.value })}
               />
-            </div>
-          ) : (
-            <div role="radiogroup" aria-label="Business type" className="flex flex-col gap-1">
-              {(Object.keys(businessCopy) as BusinessType[]).map((key) => {
-                const selected = state.businessType === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => onBusiness(key)}
-                    className={`press press-row flex gap-3 rounded-2xl p-3 text-left transition-colors ${selected ? "bg-[#f7f7f7]" : "hover:bg-[#fafafa]"}`}
-                  >
-                    <span
-                      className={`mt-1 grid size-4 shrink-0 place-items-center rounded-full transition-colors ${
-                        selected ? "bg-[#171717]" : "border border-[#ccc] bg-white"
-                      }`}
-                    >
-                      <span className={`rounded-full bg-white transition-transform ${selected ? "size-2 scale-100" : "size-2 scale-0"}`} />
-                    </span>
-                    <span className="flex flex-col">
-                      <span className="text-[15px] font-medium leading-6 tracking-[-0.15px]">{businessCopy[key].title}</span>
-                      <span className="text-[13px] leading-[1.4] tracking-[-0.13px] text-[#4a4a4a]">{businessCopy[key].body}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            </Card>
+          ) : null}
+          {step === "security" ? (
+            <Card className="gap-3 p-4">
+              <p className="text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">Turn on two-step authentication</p>
+              <p className="text-[13px] leading-[1.4] text-[#4a4a4a]">A code is required when you sign in from a new browser. You can change this later in Settings.</p>
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f7f7] px-3 py-2.5">
+                <span className="text-[13px] font-medium">Two-step authentication</span>
+                <Toggle on={twoStep} onChange={setTwoStep} label="Two-step authentication" />
+              </div>
+            </Card>
+          ) : null}
+          {step === "payout" ? (
+            <Card className="gap-3 p-4">
+              <p className="text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">Bank account for payouts</p>
+              <s-text-field label="Account holder" name="account-holder" value={holder} onInput={(event) => setHolder(event.currentTarget.value)} />
+              <s-text-field label="Routing number" name="routing-number" value={routing} onInput={(event) => setRouting(event.currentTarget.value)} />
+              <s-text-field label="Account number" name="account-number" value={account} onInput={(event) => setAccount(event.currentTarget.value)} />
+            </Card>
+          ) : null}
+          {step === "done" ? (
+            <Card className="items-start gap-2 p-4">
+              <p className="text-[15px] font-medium leading-[1.4] tracking-[-0.15px]">You’re ready to get paid</p>
+              <p className="text-[13px] leading-[1.4] text-[#4a4a4a]">Business details, identity, account security, and a payout account are saved on this prototype.</p>
+            </Card>
+          ) : null}
+        </div>
+        <div className="flex justify-end gap-2">
+          {step === "type" ? null : (
+            <Pill tone="fill" onClick={onBack}>
+              Back
+            </Pill>
           )}
-        </Card>
-      </div>
-      <div className="flex justify-end gap-2">
-        {identity ? (
-          <Pill tone="fill" onClick={onBack}>
-            Back
+          <Pill tone="dark" onClick={step === "done" ? onClose : onNext}>
+            {step === "type" ? "Next" : step === "done" ? "Done" : "Continue"}
           </Pill>
-        ) : null}
-        <Pill tone="dark" onClick={onNext}>
-          {identity ? "Continue" : "Next"}
-        </Pill>
+        </div>
       </div>
-    </Page>
+    </>
   );
 }
 
@@ -839,9 +1168,8 @@ const configRows: { icon: PolarisIconName; label: string }[] = [
 function Payments({ nav }: { nav: Nav }) {
   return (
     <>
-      <TopBar back="Settings" onBack={() => nav.go("settings")} title="Settings" />
+      <TopBar title="Payments" sections={sectionChoices("payments") ?? undefined} current="payments" onSection={(page) => nav.go(page)} />
       <Body>
-        <h2 className="px-1 pt-2 text-[20px] font-bold leading-7 tracking-[-0.3px]">Payments</h2>
         <Section
           title="Shopify Payments"
           aside={
@@ -929,10 +1257,12 @@ function Products({ state, onProduct, onAdd, nav }: { state: PrototypeState; onP
   return (
     <>
       <TopBar
-        icon="Product"
         title="Products"
+        sections={sectionChoices("products") ?? undefined}
+        current="products"
+        onSection={(page) => nav.go(page)}
         actions={[{ label: "Add product", tone: "primary", onClick: onAdd }]}
-        more={[{ label: "View as" }, { label: "Import" }, { label: "Export" }, { label: "Collections", onClick: () => nav.go("collections") }, { label: "Inventory", onClick: () => nav.go("inventory") }]}
+        more={[{ label: "View as" }, { label: "Import" }, { label: "Export" }]}
       />
       <Body>
         <AdminCard flush>
@@ -1024,10 +1354,12 @@ function Label({ children }: { children: ReactNode }) {
 function ProductEdit({
   state,
   onBack,
+  onProduct,
   onUpdate,
 }: {
   state: PrototypeState;
   onBack: () => void;
+  onProduct: (id: string) => void;
   onUpdate: (id: string, patch: Partial<Product>) => void;
 }) {
   const [taxed, setTaxed] = useState(true);
@@ -1035,11 +1367,24 @@ function ProductEdit({
   const product = state.products.find((item) => item.id === state.selectedProductId) ?? state.products[0];
   if (!product) return null;
   const fresh = !product.title && !product.description;
+  const title = product.title.trim() || (fresh ? "Add product" : "Untitled product");
   return (
     <>
-      <TopBar back="Products" onBack={onBack} title="Products" actions={[{ label: fresh ? "Save" : "Save", tone: "primary", onClick: onBack }]} />
+      <HeaderExtras>
+        <Btn tone="white" onClick={onBack}>
+          Cancel
+        </Btn>
+        <Btn tone="primary" onClick={onBack}>
+          Save
+        </Btn>
+      </HeaderExtras>
+      <TopBar
+        title={title}
+        choices={state.products.map((item) => ({ id: item.id, label: item.title.trim() || "Untitled product" }))}
+        choice={product.id}
+        onChoice={onProduct}
+      />
       <Body>
-        <h2 className="px-1 pt-1 text-[20px] font-bold leading-7 tracking-[-0.3px]">{fresh ? "Add product" : product.title || "Untitled product"}</h2>
         <AdminCard className="flex flex-col gap-3">
           <label className="flex flex-col gap-1">
             <Label>Title</Label>

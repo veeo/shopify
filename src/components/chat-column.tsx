@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChipButton, IconButton, Orb } from "@/components/marks";
+import { createPortal } from "react-dom";
+import { ChipButton, Orb } from "@/components/marks";
 import { Markdown } from "@/components/markdown";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { pageMeta } from "@/lib/admin-nav";
@@ -13,7 +14,9 @@ import {
   selectedAgent,
   type Agent,
   type Block,
+  type Connection,
   type Conversation,
+  type OrbId,
   type PrototypeState,
   type Segment,
   type Source,
@@ -35,10 +38,7 @@ export function ChatColumn({
   onStart,
   onAddCatalog,
   onCreate,
-  onScenario,
-  onMotion,
-  onReset,
-  onCloseExperiments,
+  onEditAgent,
   onConversations,
   onNewChat,
   onOpenConversation,
@@ -59,10 +59,7 @@ export function ChatColumn({
   onStart: () => void;
   onAddCatalog: (id: string) => void;
   onCreate: (name: string, purpose: string) => void;
-  onScenario: (scenario: "setup" | "active") => void;
-  onMotion: (on: boolean) => void;
-  onReset: () => void;
-  onCloseExperiments: () => void;
+  onEditAgent: (patch: { id: string; name: string; purpose: string; orb: OrbId; connections: Connection[] }) => void;
   onConversations: (open: boolean) => void;
   onNewChat: () => void;
   onOpenConversation: (id: string) => void;
@@ -76,7 +73,7 @@ export function ChatColumn({
   const listing = state.mode === "thread" && state.conversationsOpen;
   const title = state.mode === "add" ? "Add a sidekick" : purpose ? "Chief of staff" : agent.name;
   const topic = state.mode === "add" ? null : purpose ? "Set purpose" : agent.topic;
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [typedDone, setTypedDone] = useState(() => new Set(typedOnce));
   const markTyped = useCallback((id: string) => {
     typedOnce.add(id);
@@ -98,7 +95,7 @@ export function ChatColumn({
   return (
     <section className="relative flex min-w-0 flex-1 flex-col px-8 pb-3 pt-7">
       <>
-          <header className="relative mb-3 flex items-start justify-between gap-4">
+          <header className="relative mb-6 flex items-start justify-between gap-4">
             <h1 className="min-w-0 flex-1 text-[25px] font-medium leading-8 tracking-[-0.75px]">
               {state.mode === "thread" && !purpose ? (
                 <button
@@ -122,59 +119,31 @@ export function ChatColumn({
                 </span>
               )}
             </h1>
-            <div className="flex gap-1.5">
-              {state.mode === "thread" ? (
-                <Tip label="New chat">
-                  <IconButton label="New chat" onClick={onNewChat}>
-                    <PIcon name="Compose" size={20} />
-                  </IconButton>
-                </Tip>
-              ) : null}
-              <IconButton label="More" onClick={() => setMoreOpen((open) => !open)} active={moreOpen} controls="more-menu">
-                <PIcon name="MenuHorizontal" size={20} />
-              </IconButton>
-            </div>
             {listing ? (
               <ChatsMenu
+                agentName={agent.name}
                 current={thread.some((block) => block.type === "text" && block.role === "user") ? agent.topic || "Current conversation" : null}
                 list={state.conversations[agent.id] ?? []}
                 onClose={() => onConversations(false)}
                 onNewChat={onNewChat}
+                onEdit={() => {
+                  onConversations(false);
+                  setEditing(true);
+                }}
                 onOpen={onOpenConversation}
                 onDelete={onDeleteConversation}
               />
             ) : null}
           </header>
-
-          {moreOpen ? (
-            <Popover id="more-menu" onDismiss={() => setMoreOpen(false)} className="right-8 top-16 w-56 p-1.5">
-              {state.mode === "thread" && !purpose ? (
-                <MenuItem
-                  onClick={() => {
-                    setMoreOpen(false);
-                    onConversations(true);
-                  }}
-                >
-                  View all chats
-                </MenuItem>
-              ) : null}
-              <MenuItem
-                onClick={() => {
-                  setMoreOpen(false);
-                  onReset();
-                }}
-              >
-                Reset this scenario
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  setMoreOpen(false);
-                  onScenario(state.scenario === "active" ? "setup" : "active");
-                }}
-              >
-                {state.scenario === "active" ? "Back to new merchant" : "Open the live store"}
-              </MenuItem>
-            </Popover>
+          {editing ? (
+            <EditSidekick
+              agent={agent}
+              onClose={() => setEditing(false)}
+              onSave={(patch) => {
+                onEditAgent({ id: agent.id, ...patch });
+                setEditing(false);
+              }}
+            />
           ) : null}
 
           <div
@@ -187,14 +156,14 @@ export function ChatColumn({
             ) : purpose ? (
               <Purpose state={state} onPurpose={onPurpose} onStart={onStart} onChip={onChip} />
             ) : (
-              <div className="flex max-w-[640px] flex-col gap-2">
+              <div className="flex w-full flex-col gap-2">
                 {visibleBlocks(thread, typedSettled).map((block, index, list) =>
                   block.type === "text" && block.typed && !typedSettled.has(block.id) ? (
                     <SimulatedTurn
                       key={block.id}
                       text={block.text}
                       instant={!state.motion}
-                      delay={block.id === "hello" ? 1200 : 750}
+                      delay={block.id === "hello" || block.id === "arrive" ? 1200 : 750}
                       onDone={() => markTyped(block.id)}
                     />
                   ) : (
@@ -237,46 +206,29 @@ export function ChatColumn({
         onAddAgent={onAddAgent}
         lastReply={lastReply}
       />
-
-      {state.experimentsOpen ? (
-        <Popover
-          id="experiments-menu"
-          onDismiss={onCloseExperiments}
-          className="bottom-20 left-8 w-72 origin-bottom-left p-4"
-        >
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-[13px] font-medium">Experiments</p>
-            <s-button variant="tertiary" onClick={onCloseExperiments}>
-              Close
-            </s-button>
-          </div>
-          <p className="mb-2 text-[12px] text-[#8e8f8b]">Scenario</p>
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            {(["setup", "active"] as const).map((scenario) => (
-              <s-button
-                key={scenario}
-                variant={state.scenario === scenario ? "primary" : "secondary"}
-                inlineSize="fill"
-                onClick={() => onScenario(scenario)}
-              >
-                {scenario === "setup" ? "New merchant" : "Active store"}
-              </s-button>
-            ))}
-          </div>
-          <s-switch label="Motion" checked={state.motion} onChange={(event) => onMotion(event.currentTarget.checked)} />
-          <div className="mt-3">
-            <s-button variant="tertiary" onClick={onReset}>
-              Reset scenario
-            </s-button>
-          </div>
-        </Popover>
-      ) : null}
     </section>
   );
 }
 
-/** Dark label pill above the trigger, shown after the admin's ~0.5s hover delay. */
+/** Dark label pill, shown after the admin's ~0.5s hover delay. `fixed` escapes overflow clipping. */
 export function Tip({
+  label,
+  children,
+  side = "top",
+  keys,
+  fixed = false,
+}: {
+  label: string;
+  children: React.ReactNode;
+  side?: "top" | "top-start" | "bottom" | "right" | "left";
+  keys?: string[];
+  fixed?: boolean;
+}) {
+  if (fixed) return <FixedTip label={label} side={side} keys={keys}>{children}</FixedTip>;
+  return <HoverTip label={label} side={side} keys={keys}>{children}</HoverTip>;
+}
+
+function HoverTip({
   label,
   children,
   side = "top",
@@ -299,7 +251,7 @@ export function Tip({
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none absolute z-50 flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-[#1a1a1a] px-2 py-1 text-[12px] font-medium leading-4 text-white opacity-0 shadow-[0_4px_12px_rgba(0,0,0,0.4)] transition-opacity duration-100 group-hover/tip:opacity-100 group-hover/tip:delay-500 group-has-[:focus-visible]/tip:opacity-100 ${place}`}
+        className={`pointer-events-none absolute z-[200] flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-[#1a1a1a] px-2 py-1 text-[12px] font-medium leading-4 text-white opacity-0 shadow-[0_4px_12px_rgba(0,0,0,0.4)] transition-opacity duration-100 group-hover/tip:opacity-100 group-hover/tip:delay-500 group-has-[:focus-visible]/tip:opacity-100 ${place}`}
       >
         {label}
         {keys?.map((key) => (
@@ -308,6 +260,101 @@ export function Tip({
           </kbd>
         ))}
       </span>
+    </span>
+  );
+}
+
+function FixedTip({
+  label,
+  children,
+  side = "right",
+  keys,
+}: {
+  label: string;
+  children: React.ReactNode;
+  side?: "top" | "top-start" | "bottom" | "right" | "left";
+  keys?: string[];
+}) {
+  const anchor = useRef<HTMLSpanElement>(null);
+  const timer = useRef(0);
+  const [box, setBox] = useState<{ top: number; left: number } | null>(null);
+
+  function place() {
+    const rect = anchor.current?.getBoundingClientRect();
+    if (!rect) return;
+    const next =
+      side === "right"
+        ? { top: rect.top + rect.height / 2, left: rect.right + 8 }
+        : side === "left"
+          ? { top: rect.top + rect.height / 2, left: rect.left - 8 }
+          : side === "bottom"
+            ? { top: rect.bottom + 6, left: rect.left + rect.width / 2 }
+            : side === "top-start"
+              ? { top: rect.top - 6, left: rect.left }
+              : { top: rect.top - 6, left: rect.left + rect.width / 2 };
+    setBox((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+  }
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  useEffect(() => {
+    if (!box) return;
+    const sync = () => place();
+    window.addEventListener("scroll", sync, true);
+    window.addEventListener("resize", sync);
+    return () => {
+      window.removeEventListener("scroll", sync, true);
+      window.removeEventListener("resize", sync);
+    };
+    // place reads the latest anchor and side; resubscribe only when the tip opens or the side changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [box, side]);
+
+  function show(delay: number) {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(place, delay);
+  }
+
+  function hide() {
+    window.clearTimeout(timer.current);
+    setBox(null);
+  }
+
+  const shift = {
+    top: "-translate-x-1/2 -translate-y-full",
+    "top-start": "-translate-y-full",
+    bottom: "-translate-x-1/2",
+    right: "-translate-y-1/2",
+    left: "-translate-x-full -translate-y-1/2",
+  }[side];
+
+  return (
+    <span
+      ref={anchor}
+      className="relative inline-flex"
+      onMouseEnter={() => show(500)}
+      onMouseLeave={hide}
+      onFocus={() => show(0)}
+      onBlur={hide}
+    >
+      {children}
+      {box
+        ? createPortal(
+            <span
+              role="tooltip"
+              style={{ top: box.top, left: box.left }}
+              className={`fade-in pointer-events-none fixed z-[400] flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-[#1a1a1a] px-2 py-1 text-[12px] font-medium leading-4 text-white shadow-[0_4px_12px_rgba(0,0,0,0.4)] ${shift}`}
+            >
+              {label}
+              {keys?.map((key) => (
+                <kbd key={key} className="rounded bg-white/15 px-1 font-sans text-[10px] font-semibold uppercase leading-4 tracking-wide text-white/80">
+                  {key}
+                </kbd>
+              ))}
+            </span>,
+            document.body,
+          )
+        : null}
     </span>
   );
 }
@@ -331,17 +378,21 @@ function dayGroup(at: number, now: number) {
 }
 
 function ChatsMenu({
+  agentName,
   current,
   list,
   onClose,
   onNewChat,
+  onEdit,
   onOpen,
   onDelete,
 }: {
+  agentName: string;
   current: string | null;
   list: Conversation[];
   onClose: () => void;
   onNewChat: () => void;
+  onEdit: () => void;
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
@@ -363,6 +414,14 @@ function ChatsMenu({
       >
         <PIcon name="Compose" size={18} />
         Start new chat
+      </button>
+      <button
+        type="button"
+        onClick={onEdit}
+        className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] font-medium hover:bg-white/[0.07]"
+      >
+        <PIcon name="Edit" size={18} />
+        Edit {agentName}
       </button>
       <div className="my-1 h-px bg-white/10" />
       <div className="scroll-thin max-h-[380px] overflow-y-auto">
@@ -431,6 +490,10 @@ const pageSuggestions: Record<string, string[]> = {
 
 export function suggestionsFor(state: PrototypeState) {
   if (state.mode === "add") return ["Tell me more about creating a sidekick", "Which sidekick should I add first?", "Create my own sidekick", "What can sidekicks do?"];
+  if (state.arrival === "sidekick" && state.scenario === "setup" && state.selectedAgentId === "sidekick") {
+    const asked = (state.threads.sidekick ?? []).some((block) => block.type === "text" && block.role === "user");
+    if (!asked) return ["Start something new", "I already sell somewhere", "Show me around"];
+  }
   if (state.selectedAgentId !== "sidekick") {
     const asks = (state.threads[state.selectedAgentId] ?? [])
       .flatMap((block) => (block.type === "chips" ? block.chips.filter((chip) => chip.send).map((chip) => chip.label) : []))
@@ -1275,15 +1338,98 @@ function Popover({
   );
 }
 
-function MenuItem({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="press press-row block w-full rounded-xl px-3 py-2 text-left text-[13px] hover:bg-white/[0.06] active:bg-white/10"
-    >
-      {children}
-    </button>
+const avatarChoices: OrbId[] = ["sidekick", "chief", "ideas", "trends", "grok", "muse", "slack", "store", "agentic", "customers", "orders"];
+
+function EditSidekick({
+  agent,
+  onClose,
+  onSave,
+}: {
+  agent: Agent;
+  onClose: () => void;
+  onSave: (patch: { name: string; purpose: string; orb: OrbId; connections: Connection[] }) => void;
+}) {
+  const [name, setName] = useState(agent.name);
+  const [purpose, setPurpose] = useState(agent.purpose);
+  const [orb, setOrb] = useState(agent.orb);
+  const [connections, setConnections] = useState(agent.connections);
+  const field = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white outline-none placeholder:text-[#8e8f8b] focus:border-white/30";
+  return createPortal(
+    <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" role="presentation" onMouseDown={onClose}>
+      <form
+        role="dialog"
+        aria-labelledby="edit-sidekick-title"
+        className="pop-in flex w-full max-w-[420px] flex-col gap-4 rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 text-white shadow-[0_24px_64px_rgba(0,0,0,0.45)]"
+        onMouseDown={(event) => event.stopPropagation()}
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave({ name, purpose, orb, connections });
+        }}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="edit-sidekick-title" className="text-[16px] font-medium">
+            Edit {agent.name}
+          </h2>
+          <button type="button" aria-label="Close" onClick={onClose} className="press grid size-8 place-items-center rounded-full text-[#c4c4c4] hover:bg-white/10 hover:text-white">
+            <PIcon name="X" size={18} />
+          </button>
+        </div>
+        <fieldset>
+          <legend className="mb-2 text-[12px] text-[#8e8f8b]">Avatar</legend>
+          <div className="flex flex-wrap gap-2">
+            {avatarChoices.map((id) => (
+              <button
+                key={id}
+                type="button"
+                aria-label={id}
+                aria-pressed={orb === id}
+                onClick={() => setOrb(id)}
+                className={`press rounded-full ${orb === id ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-80 hover:opacity-100"}`}
+              >
+                <Orb id={id} size={36} />
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <label className="flex flex-col gap-1.5 text-[12px] text-[#8e8f8b]">
+          Name
+          <input value={name} onChange={(event) => setName(event.target.value)} className={field} />
+        </label>
+        <label className="flex flex-col gap-1.5 text-[12px] text-[#8e8f8b]">
+          Purpose
+          <textarea value={purpose} rows={3} onChange={(event) => setPurpose(event.target.value)} className={`${field} resize-none leading-5`} />
+        </label>
+        <fieldset>
+          <legend className="mb-1 text-[12px] text-[#8e8f8b]">Connections</legend>
+          <ul className="flex flex-col">
+            {connections.map((item) => (
+              <li key={item.id} className="flex items-center justify-between gap-3 border-t border-white/10 py-2 first:border-t-0">
+                <span className="text-[13px]">{item.label}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={item.on}
+                  aria-label={item.label}
+                  onClick={() => setConnections((list) => list.map((entry) => (entry.id === item.id ? { ...entry, on: !entry.on } : entry)))}
+                  className={`press relative h-5 w-9 rounded-full transition-colors ${item.on ? "bg-[#5631f4]" : "bg-white/15"}`}
+                >
+                  <span className={`absolute top-0.5 size-4 rounded-full bg-white transition-[translate] ${item.on ? "translate-x-4" : "translate-x-0.5"}`} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="press rounded-full px-3 py-1.5 text-[13px] text-[#c4c4c4] hover:bg-white/10 hover:text-white">
+            Cancel
+          </button>
+          <button type="submit" className="press rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-black hover:bg-[#eee]">
+            Save
+          </button>
+        </div>
+      </form>
+    </div>,
+    document.body,
   );
 }
 

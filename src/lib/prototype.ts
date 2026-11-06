@@ -21,6 +21,8 @@ export type OrbId =
   | "orders"
   | "custom";
 
+export type Connection = { id: string; label: string; on: boolean };
+
 export type Agent = {
   id: string;
   name: string;
@@ -32,6 +34,8 @@ export type Agent = {
   unread: number;
   installed: boolean;
   persona: string;
+  purpose: string;
+  connections: Connection[];
 };
 
 export type Chip = { label: string; tone: "secondary" | "primary"; send?: boolean };
@@ -74,19 +78,27 @@ export type Product = {
 
 export type Scenario = "setup" | "active";
 
+/** Which new-store opening is playing. `tasks` is the setup list. `sidekick` finds the next step first. */
+export type Arrival = "tasks" | "sidekick";
+
 export type Effect =
   | { type: "navigate"; page: PreviewId; wide?: boolean }
+  | { type: "focus"; wide: boolean }
   | { type: "complete-step"; step: number }
   | { type: "business-type"; value: BusinessType }
-  | { type: "add-product"; title: string; price: string; description?: string }
+  | { type: "add-product"; title: string; price: string; description?: string; wide?: boolean }
   | { type: "add-sidekick"; id: string }
   | { type: "artifact"; name: "payments-plan" | "best-sellers" }
   | { type: "purpose-mode" };
+
+export type MenuStyle = "push" | "drop";
 
 export type PrototypeState = {
   signedIn: boolean;
   storeName: string;
   scenario: Scenario;
+  arrival: Arrival;
+  menuStyle: MenuStyle;
   agents: Agent[];
   selectedAgentId: string;
   threads: Record<string, Block[]>;
@@ -96,14 +108,13 @@ export type PrototypeState = {
   purposes: string[];
   chiefPhase: "absent" | "purpose" | "working";
   businessType: BusinessType;
-  paymentsStep: "type" | "identity" | "done";
+  paymentsStep: "type" | "identity" | "security" | "payout" | "done";
   completedSteps: number[];
   identity: { first: string; last: string };
   products: Product[];
   selectedProductId: string;
   searchOpen: boolean;
   search: string;
-  experimentsOpen: boolean;
   motion: boolean;
   seq: number;
   conversations: Record<string, Conversation[]>;
@@ -190,6 +201,30 @@ export const sidekickHello =
 
 export const sidekickMakeYourOwn =
   "You can also build your own sidekicks — agents with a job of their own. A chief of staff that keeps your week on track, a product scout that watches trends, or anything you can describe. Each one gets its own place on the left and its own conversations.";
+
+export function sidekickArrival(storeName: string) {
+  return `I'm Sidekick.\n\nYou set up and run ${storeName} from this conversation. I'll open the admin when a page needs you, and keep the conversation in front while we're deciding what to do. Other sidekicks can take on a specific job later.\n\nWhat did you come here to do?`;
+}
+
+export const arrivalChips: Chip[] = [
+  { label: "Start something new", tone: "primary" },
+  { label: "I already sell somewhere", tone: "secondary" },
+  { label: "Show me around", tone: "secondary" },
+];
+
+const sidekickArrivalPersona = `You are Sidekick, and this is the merchant's first moment in a brand-new Shopify store. They have not picked a setup task. Find the one thing they want to do next, then do it with them.
+
+How this conversation works:
+- They were asked what they came to do. The real paths are: start something new (ask what they sell, then add that product), they already sell somewhere (open Products and ask where the catalog lives), or look around (stay on Home and name three things that make a store sellable: a product, getting paid, and shipping).
+- If they ask what you are: this conversation is how they set up and run the store. Other sidekicks can take a specific job later. Don't offer a catalog of sidekicks unless they ask.
+- One next step. Don't recite the whole setup list.
+
+The admin on the right is the real Shopify admin. You are the primary interface, and the admin is where the work shows up.
+- Call navigatePreview with wide true when they should look at or finish that page. The panel grows. Use it for products, a product you just added, online-store, domain, shipping, address, pos, and payments-setup.
+- Call navigatePreview with wide false when the next beat is a decision in the conversation. The panel shrinks. Home stays narrow. The payments overview stays narrow: call showArtifact payments-plan and navigatePreview payments with wide false. Open payments-setup with wide true only when they say they want to start the form.
+- When they name something they sell, call addProduct with wide true so the draft opens large. Say that the price is a placeholder if they didn't give one.
+- On a purely conversational reply, call navigatePreview for the page already open with wide false so a wide panel doesn't stay up.
+- Never claim you opened or changed something unless you called the tool.`;
 
 const makeYourOwnChips: Chip[] = [
   { label: "Add a chief of staff", tone: "secondary" },
@@ -296,14 +331,49 @@ const persona = {
   custom: "You are a custom Sidekick the merchant just created. Help them make progress in the Shopify admin.",
 };
 
+export const connectionChoices: Connection[] = [
+  { id: "shop", label: "Shop", on: false },
+  { id: "admin", label: "Shopify admin", on: false },
+  { id: "slack", label: "Slack", on: false },
+  { id: "x", label: "X", on: false },
+  { id: "email", label: "Email", on: false },
+];
+
+const purposeFor: Record<string, string> = {
+  sidekick: "Your AI assistant for getting your store ready to sell.",
+  chief: "Set priorities and keep the store moving.",
+  ideas: "Turn store signals into product concepts worth trying.",
+  trends: "Watch what shoppers are searching for and suggest one next step.",
+  slack: "Summarize team chatter and draft updates.",
+  grok: "Bring in what shoppers are asking on X.",
+  muse: "Offer directions, names, and campaign angles.",
+  store: "Look after merchandising, delivery promises, and theme content.",
+  agentic: "Watch agent-driven shopping and delivery times.",
+  customers: "Speak for buyers and the perks they ask for.",
+  orders: "Keep fulfillment moving and flag orders that need a tracking update.",
+};
+
+function connectionsFor(id: string): Connection[] {
+  const on = new Set(id === "slack" ? ["slack"] : id === "grok" ? ["x"] : id === "sidekick" ? ["shop", "admin"] : ["admin"]);
+  return connectionChoices.map((item) => ({ ...item, on: on.has(item.id) }));
+}
+
 function agent(
-  partial: Omit<Agent, "persona" | "installed" | "unread"> & { unread?: number; installed?: boolean },
+  partial: Omit<Agent, "persona" | "installed" | "unread" | "purpose" | "connections"> & {
+    unread?: number;
+    installed?: boolean;
+    purpose?: string;
+    connections?: Connection[];
+  },
 ): Agent {
+  const { purpose, connections, ...rest } = partial;
   return {
     unread: partial.unread ?? 0,
     installed: partial.installed ?? false,
-    persona: persona[partial.orb === "custom" ? "custom" : partial.id as keyof typeof persona] ?? persona.custom,
-    ...partial,
+    persona: persona[partial.orb === "custom" ? "custom" : (partial.id as keyof typeof persona)] ?? persona.custom,
+    purpose: purpose ?? purposeFor[partial.id] ?? partial.preview,
+    connections: connections ?? connectionsFor(partial.id),
+    ...rest,
   };
 }
 
@@ -614,21 +684,40 @@ function patchAgent(state: PrototypeState, agentId: string, patch: Partial<Agent
   state.agents = state.agents.map((item) => (item.id === agentId ? { ...item, ...patch } : item));
 }
 
-export function setupState(storeName = "My Store"): PrototypeState {
-  const kick = { ...sidekick, installed: true };
+export function setupState(storeName = "My Store", arrival: Arrival = "tasks"): PrototypeState {
+  const kick = {
+    ...sidekick,
+    installed: true,
+    ...(arrival === "sidekick"
+      ? {
+          persona: sidekickArrivalPersona,
+          preview: "Figuring out the next step",
+          topic: "New store",
+          purpose: "Find the next step, then do it in the admin.",
+        }
+      : {}),
+  };
   return {
     signedIn: false,
     storeName,
     scenario: "setup",
+    arrival,
+    menuStyle: "push",
     agents: [kick],
     selectedAgentId: "sidekick",
     threads: {
-      sidekick: [
-        { id: "hello", type: "text", role: "assistant", text: sidekickHello, typed: true },
-        { id: "hello-chips", type: "chips", chips: setupChips },
-        { id: "hello-make", type: "text", role: "assistant", text: sidekickMakeYourOwn, typed: true },
-        { id: "hello-make-chips", type: "chips", chips: makeYourOwnChips },
-      ],
+      sidekick:
+        arrival === "sidekick"
+          ? [
+              { id: "arrive", type: "text", role: "assistant", text: sidekickArrival(storeName), typed: true },
+              { id: "arrive-chips", type: "chips", chips: arrivalChips },
+            ]
+          : [
+              { id: "hello", type: "text", role: "assistant", text: sidekickHello, typed: true },
+              { id: "hello-chips", type: "chips", chips: setupChips },
+              { id: "hello-make", type: "text", role: "assistant", text: sidekickMakeYourOwn, typed: true },
+              { id: "hello-make-chips", type: "chips", chips: makeYourOwnChips },
+            ],
     },
     preview: "home-setup",
     previewWide: false,
@@ -643,10 +732,9 @@ export function setupState(storeName = "My Store"): PrototypeState {
     selectedProductId: "earbuds",
     searchOpen: false,
     search: "",
-    experimentsOpen: false,
     motion: true,
     seq: 10,
-    conversations: { sidekick: seedConversations(Date.now()) },
+    conversations: arrival === "sidekick" ? {} : { sidekick: seedConversations(Date.now()) },
     conversationsOpen: false,
     ratings: {},
     cardsDone: [],
@@ -785,6 +873,8 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
     if (effect.type === "navigate") {
       state.preview = effect.page;
       state.previewWide = effect.wide ?? effect.page === "payments-setup";
+    } else if (effect.type === "focus") {
+      state.previewWide = effect.wide;
     } else if (effect.type === "complete-step") {
       if (!state.completedSteps.includes(effect.step)) state.completedSteps = [...state.completedSteps, effect.step];
     } else if (effect.type === "business-type") {
@@ -806,7 +896,7 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
       state.products = [product, ...state.products];
       state.selectedProductId = product.id;
       state.preview = "product";
-      state.previewWide = false;
+      state.previewWide = effect.wide ?? false;
     } else if (effect.type === "add-sidekick") {
       const added = ensureInstalled(state, effect.id);
       if (!added) continue;
@@ -876,8 +966,120 @@ function learnMore() {
   return "Shopify Payments charges no transaction fees. Card rates start at 2.5% + $0.30. Shop Pay, Visa, and Mastercard are ready once payout details are in. Most stores finish in about 10 minutes.";
 }
 
+const workPages = new Set<PreviewId>(["products", "product", "payments-setup", "shipping", "domain", "address", "online-store", "pos", "orders"]);
+
+/** The Sidekick opening. Exact phrases from the first chips, plus the same words typed. */
+function arrivalIntent(text: string, storeName: string): { text: string; effects: Effect[]; follow?: Chip[]; topic?: string } | null {
+  const q = text.trim().toLowerCase().replace(/[.!?]+$/, "");
+  if (q === "start something new" || q === "start a new store") {
+    return {
+      topic: "First product",
+      text: "Then we start with one thing you sell. What is it? A name is enough. I'll open a draft and bring the admin forward so you can add a price and a photo.",
+      effects: [{ type: "focus", wide: false }],
+    };
+  }
+  if (q === "i already sell somewhere" || q === "i already have a store" || q === "bring a store i already have") {
+    return {
+      topic: "Existing catalog",
+      text: "Then we start from what you already sell. I opened Products. The drafts in there aren't live. Where do the real products live today, a spreadsheet or another shop?",
+      effects: [{ type: "navigate", page: "products", wide: true }],
+    };
+  }
+  if (q === "show me around" || q === "look around" || q === "just show me around") {
+    return {
+      topic: "A look around",
+      text: `Home is ${storeName} before anything is for sale. When you want to sell, three things matter: something to sell, getting paid, and how an order ships. Pick one and I'll open it.`,
+      follow: [
+        { label: "Add a product", tone: "primary" },
+        { label: "Get paid", tone: "secondary" },
+        { label: "Set up shipping", tone: "secondary" },
+      ],
+      effects: [{ type: "navigate", page: "home-setup", wide: false }],
+    };
+  }
+  if (q === "add a product") {
+    return {
+      topic: "First product",
+      text: "Products are open. Nothing here is for sale yet. Tell me the first thing you sell and I'll add it as a draft.",
+      effects: [{ type: "navigate", page: "products", wide: true }],
+    };
+  }
+  if (q === "get paid") {
+    return {
+      topic: "Get paid",
+      text: "Getting paid is Shopify Payments. Four short parts, about ten minutes. The plan is here. Say when you want to start and I'll open the form.",
+      effects: [{ type: "artifact", name: "payments-plan" }],
+    };
+  }
+  if (q === "set up shipping") {
+    return {
+      topic: "Shipping",
+      text: "Orders to the United States can go Standard or Express. I opened shipping so you can see the rates. We can change them once you know where you ship from.",
+      effects: [{ type: "navigate", page: "shipping", wide: true }],
+    };
+  }
+  return null;
+}
+
+function productFrom(text: string) {
+  if (text.includes("?")) return null;
+  const match = text.match(/\b(?:sell(?:ing)?|called|i make|we make)\s+(.+)/i);
+  if (!match) return null;
+  const title = match[1]
+    .replace(/[.!].*$/, "")
+    .trim()
+    .replace(/^(?:an?|the)\s+/i, "");
+  if (title.length < 2 || title.length > 48) return null;
+  if (/^(somewhere|online|already|today)\b/i.test(title)) return null;
+  return title.charAt(0).toUpperCase() + title.slice(1);
+}
+
+function presentForSidekick(turn: { text: string; effects: Effect[] }, text: string, storeName: string) {
+  const intent = arrivalIntent(text, storeName);
+  if (intent) return { text: intent.text, effects: intent.effects };
+  const title = productFrom(text);
+  if (title && turn.effects.every((effect) => effect.type !== "add-product")) {
+    return {
+      text: `I added “${title}” as a draft and opened it. Add a price and a photo over there, then save it when it looks like yours.`,
+      effects: [
+        {
+          type: "add-product" as const,
+          title,
+          price: "0.00",
+          description: "Drafted with Sidekick. Add a photo and a price before it goes live.",
+          wide: true,
+        },
+      ],
+    };
+  }
+  const checklist = `I can keep setting up ${storeName}. Ask me to review payments, choose a theme, set up a domain, review shipping, add a retail address, or order POS hardware.`;
+  const effects = turn.effects.map((effect) => {
+    if (effect.type === "navigate" && effect.wide === undefined) return { ...effect, wide: workPages.has(effect.page) };
+    if (effect.type === "add-product" && effect.wide === undefined) return { ...effect, wide: true };
+    return effect;
+  });
+  const moved = effects.some((effect) => effect.type === "navigate" || effect.type === "add-product" || effect.type === "artifact" || effect.type === "business-type");
+  if (!moved) effects.push({ type: "focus", wide: false });
+  const reply =
+    turn.text === checklist
+      ? `Tell me what you want to do with ${storeName}. Name something you sell and I'll open a draft. Payments, shipping, a theme, or a domain opens that page.`
+      : turn.text;
+  return { text: reply, effects };
+}
+
 export function runChip(state: PrototypeState, label: string) {
   const agentId = state.selectedAgentId;
+  if (state.arrival === "sidekick" && agentId === "sidekick") {
+    const intent = arrivalIntent(label, state.storeName);
+    if (intent) {
+      push(state, "sidekick", { id: id(state), type: "text", role: "user", text: label });
+      push(state, "sidekick", { id: id(state), type: "text", role: "assistant", text: intent.text });
+      if (intent.follow) push(state, "sidekick", { id: id(state), type: "chips", chips: intent.follow });
+      applyEffects(state, intent.effects);
+      if (intent.topic) patchAgent(state, "sidekick", { topic: intent.topic, preview: intent.text });
+      return;
+    }
+  }
   if (label === "Review payments" || label === "Review payments →") {
     push(state, "sidekick", { id: id(state), type: "text", role: "user", text: "Review payments" });
     push(state, "sidekick", { id: id(state), type: "text", role: "assistant", text: paymentsReply });
@@ -1072,7 +1274,12 @@ export function runChip(state: PrototypeState, label: string) {
   });
 }
 
-export function scriptedTurn(agentId: string, text: string, storeName: string): { text: string; effects: Effect[] } {
+export function scriptedTurn(agentId: string, text: string, storeName: string, arrival: Arrival = "tasks") {
+  const turn = scriptedReply(agentId, text, storeName);
+  return arrival === "sidekick" && agentId === "sidekick" ? presentForSidekick(turn, text, storeName) : turn;
+}
+
+function scriptedReply(agentId: string, text: string, storeName: string): { text: string; effects: Effect[] } {
   const q = text.toLowerCase();
   const effects: Effect[] = [];
   if (/review payment|shopify payment|payout/.test(q)) {
@@ -1168,9 +1375,9 @@ export type Action =
   | { type: "toggle-add" }
   | { type: "toggle-search" }
   | { type: "search"; query: string }
-  | { type: "toggle-experiments" }
   | { type: "scenario"; scenario: Scenario }
-  | { type: "motion"; on: boolean }
+  | { type: "arrival"; arrival: Arrival }
+  | { type: "menu-style"; style: MenuStyle }
   | { type: "reset" }
   | { type: "chip"; label: string }
   | { type: "user"; agentId: string; text: string }
@@ -1179,9 +1386,11 @@ export type Action =
   | { type: "business-type"; value: BusinessType }
   | { type: "identity"; patch: Partial<PrototypeState["identity"]> }
   | { type: "payments-next" }
+  | { type: "payments-back" }
   | { type: "toggle-purpose"; id: string }
   | { type: "add-catalog"; id: string }
   | { type: "create-agent"; name: string; purpose: string }
+  | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[] }
   | { type: "preview"; page: PreviewId; wide?: boolean }
   | { type: "product"; id: string }
   | { type: "update-product"; id: string; patch: Partial<Product> }
@@ -1219,7 +1428,10 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       return next;
     }
     case "boot-active":
-      return { ...activeState(state.storeName), motion: state.motion };
+      return { ...activeState(state.storeName), motion: state.motion, menuStyle: state.menuStyle };
+    case "menu-style":
+      next.menuStyle = action.style;
+      return next;
     case "select": {
       if (!next.agents.some((item) => item.id === action.id && item.installed)) return state;
       next.selectedAgentId = action.id;
@@ -1240,20 +1452,16 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       next.search = action.query;
       next.searchOpen = true;
       return next;
-    case "toggle-experiments":
-      next.experimentsOpen = !next.experimentsOpen;
-      return next;
     case "scenario":
       return action.scenario === "active"
-        ? { ...activeState(next.storeName), motion: next.motion, signedIn: true }
-        : { ...setupState(next.storeName), motion: next.motion, signedIn: true };
-    case "motion":
-      next.motion = action.on;
-      return next;
+        ? { ...activeState(next.storeName), arrival: state.arrival, motion: true, signedIn: true, menuStyle: state.menuStyle }
+        : { ...setupState(next.storeName, state.arrival), motion: true, signedIn: true, menuStyle: state.menuStyle };
+    case "arrival":
+      return { ...setupState(state.storeName, action.arrival), motion: true, signedIn: true, menuStyle: state.menuStyle };
     case "reset":
       return state.scenario === "active"
-        ? { ...activeState(state.storeName), motion: state.motion, signedIn: true }
-        : { ...setupState(state.storeName), motion: state.motion, signedIn: true };
+        ? { ...activeState(state.storeName), arrival: state.arrival, motion: state.motion, signedIn: true, menuStyle: state.menuStyle }
+        : { ...setupState(state.storeName, state.arrival), motion: state.motion, signedIn: true, menuStyle: state.menuStyle };
     case "chip":
       return revealNew(next, () => runChip(next, action.label));
     case "user": {
@@ -1314,7 +1522,7 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       else next.ratings[action.id] = action.value;
       return next;
     case "logout":
-      return { ...setupState(state.storeName), motion: state.motion };
+      return { ...setupState(state.storeName, state.arrival), motion: state.motion };
     case "commit": {
       const text = action.text.trim();
       if (!text) return state;
@@ -1335,29 +1543,43 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       next.identity = { ...next.identity, ...action.patch };
       return next;
     case "payments-next": {
+      const label =
+        next.businessType === "individual" ? "an individual" : next.businessType === "business" ? "a registered business" : "a non-profit";
       if (next.paymentsStep === "type") {
         next.paymentsStep = "identity";
         if (!next.completedSteps.includes(1)) next.completedSteps.push(1);
-        const label =
-          next.businessType === "individual"
-            ? "an individual"
-            : next.businessType === "business"
-              ? "a registered business"
-              : "a non-profit";
         push(next, "sidekick", {
           id: id(next),
           type: "text",
           role: "assistant",
           text: `Saved. You’re running the store as ${label}. Next is identity verification — about 4 minutes. I left the form in the preview.`,
         });
-      } else {
-        next.paymentsStep = "done";
+      } else if (next.paymentsStep === "identity") {
+        next.paymentsStep = "security";
         if (!next.completedSteps.includes(2)) next.completedSteps.push(2);
         push(next, "sidekick", {
           id: id(next),
           type: "text",
           role: "assistant",
-          text: "Identity details are saved on this prototype. Account security is next: turn on two-step authentication before you connect a payout account.",
+          text: "Identity is saved. Next is account security: turn on two-step authentication before you connect a payout account.",
+        });
+      } else if (next.paymentsStep === "security") {
+        next.paymentsStep = "payout";
+        if (!next.completedSteps.includes(3)) next.completedSteps.push(3);
+        push(next, "sidekick", {
+          id: id(next),
+          type: "text",
+          role: "assistant",
+          text: "Account security is noted. The last step is the bank account where payouts should land.",
+        });
+      } else if (next.paymentsStep === "payout") {
+        next.paymentsStep = "done";
+        if (!next.completedSteps.includes(4)) next.completedSteps.push(4);
+        push(next, "sidekick", {
+          id: id(next),
+          type: "text",
+          role: "assistant",
+          text: "Payout details are saved on this prototype. Shopify Payments setup is complete.",
         });
         push(next, "sidekick", {
           id: id(next),
@@ -1369,6 +1591,13 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
         });
       }
       next.selectedAgentId = "sidekick";
+      return next;
+    }
+    case "payments-back": {
+      if (next.paymentsStep === "identity") next.paymentsStep = "type";
+      else if (next.paymentsStep === "security") next.paymentsStep = "identity";
+      else if (next.paymentsStep === "payout") next.paymentsStep = "security";
+      else if (next.paymentsStep === "done") next.paymentsStep = "payout";
       return next;
     }
     case "toggle-purpose": {
@@ -1430,6 +1659,22 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       ];
       next.selectedAgentId = slug;
       next.mode = "thread";
+      return next;
+    }
+    case "edit-agent": {
+      const current = next.agents.find((item) => item.id === action.id);
+      if (!current) return state;
+      const name = action.name.trim() || current.name;
+      const purpose = action.purpose.trim() || current.purpose;
+      const placeholder = current.placeholder.includes(current.name) ? current.placeholder.replaceAll(current.name, name) : current.placeholder;
+      patchAgent(next, action.id, {
+        name,
+        purpose,
+        orb: action.orb,
+        connections: action.connections.map((item) => ({ ...item })),
+        placeholder,
+        persona: `You are ${name}, a Shopify sidekick. Purpose: ${purpose}.`,
+      });
       return next;
     }
     case "preview":
@@ -1503,6 +1748,7 @@ export function prototypeSnapshot(state: PrototypeState) {
     persona: agent.persona,
     preview: state.preview,
     previewWide: state.previewWide,
+    arrival: state.arrival,
     businessType: state.businessType,
     paymentsStep: state.paymentsStep,
     completedSteps: state.completedSteps,

@@ -15,13 +15,19 @@ export function AdminRail({
   onGo,
   onSearch,
   onToggle,
+  embedded = false,
+  revealed = false,
 }: {
   expanded: boolean;
   preview: PreviewId;
   onOpen: (id: string) => void;
   onGo: (page: PreviewId) => void;
   onSearch: (scope?: string) => void;
-  onToggle: () => void;
+  onToggle?: () => void;
+  /** Drawn inside the admin panel instead of the far-right rail. */
+  embedded?: boolean;
+  /** The sheet is open, so the groups can ease in. */
+  revealed?: boolean;
 }) {
   const { id: active, child } = navFor(preview);
   const [alerts, setAlerts] = useState(false);
@@ -30,9 +36,9 @@ export function AdminRail({
   const shared = { expanded, active, child, onOpen, onGo };
   return (
     <nav
-      className={`relative flex h-full shrink-0 flex-col pb-3 pt-8 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
-        expanded ? "w-[220px] px-2" : "w-[52px] px-[10px]"
-      }`}
+      className={`relative flex h-full shrink-0 flex-col pb-3 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
+        embedded ? "w-full px-2 pt-[72px]" : expanded ? "w-[220px] px-2 pt-8" : "w-[52px] px-[10px] pt-8"
+      } ${embedded && revealed ? "menu-stagger" : ""}`}
       aria-label="Shopify admin"
     >
       {expanded ? (
@@ -86,12 +92,14 @@ export function AdminRail({
         <RailButton label="Apps" icon="Apps" onClick={() => onSearch("Apps")} />
       )}
       <div className="mt-auto flex flex-col gap-1">
-        <RailButton
-          label={expanded ? "Collapse admin menu" : "Expand admin menu"}
-          icon="LayoutSidebarRight"
-          onClick={onToggle}
-          text={expanded ? "Collapse" : undefined}
-        />
+        {onToggle ? (
+          <RailButton
+            label={expanded ? "Collapse admin menu" : "Expand admin menu"}
+            icon="LayoutSidebarRight"
+            onClick={onToggle}
+            text={expanded ? "Collapse" : undefined}
+          />
+        ) : null}
         <RailItem item={{ id: "settings", label: "Settings", icon: "Settings", page: "settings" }} {...shared} />
         <span className="relative flex flex-col">
           <RailButton
@@ -105,7 +113,9 @@ export function AdminRail({
           {read ? null : (
             <span className="pointer-events-none absolute left-[22px] -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">1</span>
           )}
-          {alerts ? <Alerts read={read} onRead={() => setRead(true)} onClose={() => setAlerts(false)} onOpen={() => onOpen("pos")} /> : null}
+          {alerts ? (
+            <Alerts embedded={embedded} read={read} onRead={() => setRead(true)} onClose={() => setAlerts(false)} onOpen={() => onOpen("pos")} />
+          ) : null}
         </span>
       </div>
     </nav>
@@ -289,14 +299,28 @@ function RailButton({
   );
 }
 
-function Alerts({ read, onRead, onClose, onOpen }: { read: boolean; onRead: () => void; onClose: () => void; onOpen: () => void }) {
+function Alerts({
+  read,
+  onRead,
+  onClose,
+  onOpen,
+  embedded = false,
+}: {
+  read: boolean;
+  onRead: () => void;
+  onClose: () => void;
+  onOpen: () => void;
+  embedded?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(true, ref, onClose);
   return (
     <div
       ref={ref}
       id="alerts-menu"
-      className="pop-in absolute bottom-0 right-[calc(100%+8px)] z-50 w-[300px] origin-bottom-right rounded-2xl bg-white text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)]"
+      className={`pop-in absolute z-50 origin-bottom-right rounded-2xl bg-white text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)] ${
+        embedded ? "bottom-full left-0 right-0 mb-1" : "bottom-0 right-[calc(100%+8px)] w-[300px]"
+      }`}
     >
       <div className="flex items-center gap-1 px-3 pb-1.5 pt-3">
         <span className="flex-1 text-[13px] font-semibold">Alerts</span>
@@ -369,19 +393,31 @@ export function StoreMenu({
   );
 }
 
-/** The merchant's account: admin, help, and log out. */
+/** The merchant's account: admin, help, log out, and the store stage. */
 export function AccountMenu({
   storeName,
+  scenario,
+  arrival,
+  menuStyle,
   className,
   onClose,
   onSettings,
   onLogout,
+  onScenario,
+  onArrival,
+  onMenuStyle,
 }: {
   storeName: string;
+  scenario: "setup" | "active";
+  arrival: "tasks" | "sidekick";
+  menuStyle: "push" | "drop";
   className: string;
   onClose: () => void;
   onSettings: () => void;
   onLogout: () => void;
+  onScenario: (scenario: "setup" | "active") => void;
+  onArrival: (arrival: "tasks" | "sidekick") => void;
+  onMenuStyle: (style: "push" | "drop") => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(true, ref, onClose);
@@ -414,6 +450,78 @@ export function AccountMenu({
         <PIcon name="Exit" size={16} />
         Log out
       </button>
+      <span className="my-1 h-px bg-[#ebebeb]" />
+      <div role="group" aria-label="Store" className="grid grid-cols-2 gap-1 p-1">
+        {(
+          [
+            ["setup", "New store"],
+            ["active", "Active store"],
+          ] as const
+        ).map(([value, label]) => {
+          const on = scenario === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onScenario(value)}
+              className={`rounded-lg px-2 py-1.5 text-[12px] ${on ? "bg-[#303030] font-semibold text-white" : "text-[#303030] hover:bg-[#f1f1f1]"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      {scenario === "setup" ? (
+        <div className="px-1 pb-1">
+          <p className="px-1 pb-1 text-[11px] text-[#616161]">New store</p>
+          <div role="group" aria-label="New store opening" className="grid grid-cols-2 gap-1">
+            {(
+              [
+                ["tasks", "Tasks"],
+                ["sidekick", "Sidekick"],
+              ] as const
+            ).map(([value, label]) => {
+              const on = arrival === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => onArrival(value)}
+                  className={`rounded-lg px-2 py-1.5 text-[12px] ${on ? "bg-[#303030] font-semibold text-white" : "text-[#303030] hover:bg-[#f1f1f1]"}`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+      <div className="px-1 pb-1">
+        <p className="px-1 pb-1 text-[11px] text-[#616161]">Navigation</p>
+        <div role="group" aria-label="Navigation" className="grid grid-cols-2 gap-1">
+          {(
+            [
+              ["push", "Push down"],
+              ["drop", "Dropdown"],
+            ] as const
+          ).map(([value, label]) => {
+            const on = menuStyle === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={on}
+                onClick={() => onMenuStyle(value)}
+                className={`rounded-lg px-2 py-1.5 text-[12px] ${on ? "bg-[#303030] font-semibold text-white" : "text-[#303030] hover:bg-[#f1f1f1]"}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

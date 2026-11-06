@@ -7,7 +7,6 @@ import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
 import { Orb } from "@/components/marks";
 import { PreviewColumn } from "@/components/preview-column";
-import { AdminRail } from "@/components/admin-rail";
 import { SearchPalette } from "@/components/search-palette";
 import {
   activeState,
@@ -35,7 +34,6 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   );
   const [booting, setBooting] = useState(true);
   const [offline, setOffline] = useState(false);
-  const [navOpen, setNavOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [palette, setPalette] = useState<{ open: boolean; scope?: string }>({ open: false });
   // The turn being streamed. Cleared in the same update that commits its reply, so the live view and
@@ -89,7 +87,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
       pending.done = true;
       setLive(null);
       setState((current) => {
-        const script = scriptedTurn(pending.agentId, pending.text, current.storeName);
+        const script = scriptedTurn(pending.agentId, pending.text, current.storeName, current.arrival);
         const withText = reducer(current, { type: "commit", agentId: pending.agentId, text: script.text });
         return reducer(withText, { type: "effects", effects: script.effects });
       });
@@ -110,7 +108,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
     let answer = text;
     setState((current) => {
       if (!text) {
-        const script = scriptedTurn(pending.agentId, pending.text, current.storeName);
+        const script = scriptedTurn(pending.agentId, pending.text, current.storeName, current.arrival);
         answer = script.text;
         const withScript = reducer(current, { type: "commit", agentId: pending.agentId, text: script.text });
         return reducer(withScript, { type: "effects", effects: script.effects });
@@ -171,9 +169,8 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
   }
 
   function logout() {
-    setNavOpen(false);
     setSidebarOpen(true);
-    enter((current) => ({ ...setupState(current.storeName), motion: current.motion, signedIn: true }));
+    enter((current) => ({ ...setupState(current.storeName, current.arrival), motion: current.motion, signedIn: true }));
   }
 
   function stop() {
@@ -207,7 +204,9 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onAdd={() => dispatch({ type: "toggle-add" })}
           onSearch={() => dispatch({ type: "toggle-search" })}
           onQuery={(query) => dispatch({ type: "search", query })}
-          onExperiments={() => dispatch({ type: "toggle-experiments" })}
+          onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
+          onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
+          onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
         />
         <div className="my-3 w-px shrink-0 bg-white/10" />
         <ChatColumn
@@ -225,10 +224,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onStart={() => dispatch({ type: "chip", label: "Start working" })}
           onAddCatalog={(id) => dispatch({ type: "add-catalog", id })}
           onCreate={(name, purpose) => dispatch({ type: "create-agent", name, purpose })}
-          onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
-          onMotion={(on) => dispatch({ type: "motion", on })}
-          onReset={() => dispatch({ type: "reset" })}
-          onCloseExperiments={() => dispatch({ type: "toggle-experiments" })}
+          onEditAgent={(patch) => dispatch({ type: "edit-agent", ...patch })}
           onConversations={(open) => dispatch({ type: "conversations", open })}
           onNewChat={() => dispatch({ type: "new-chat" })}
           onOpenConversation={(id) => dispatch({ type: "open-conversation", id })}
@@ -251,21 +247,13 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
         onBusiness={(value) => dispatch({ type: "business-type", value })}
         onIdentity={(patch) => dispatch({ type: "identity", patch })}
         onPaymentsNext={() => dispatch({ type: "payments-next" })}
+        onPaymentsBack={() => dispatch({ type: "payments-back" })}
         onProduct={(id) => dispatch({ type: "product", id })}
         onUpdateProduct={(id, patch) => dispatch({ type: "update-product", id, patch })}
         onAddProduct={() => dispatch({ type: "add-blank-product" })}
         onRail={(id) => dispatch({ type: "rail", id })}
+        onSearch={(scope) => setPalette({ open: true, scope })}
       />
-      <div className="p-partial-theme-admin-next-dark flex">
-        <AdminRail
-          expanded={navOpen}
-          preview={state.preview}
-          onOpen={(id) => dispatch({ type: "rail", id })}
-          onGo={(page) => dispatch({ type: "preview", page })}
-          onSearch={(scope) => setPalette({ open: true, scope })}
-          onToggle={() => setNavOpen((open) => !open)}
-        />
-      </div>
       {palette.open ? (
         <SearchPalette
           state={state}
@@ -359,6 +347,7 @@ function mapTool(name: string, input: unknown): Effect | null {
       title: value.title,
       price: typeof value.price === "string" ? value.price : "0.00",
       description: typeof value.description === "string" ? value.description : undefined,
+      wide: value.wide === true,
     };
   }
   if (name === "addSidekick" && typeof value.id === "string") return { type: "add-sidekick", id: value.id };

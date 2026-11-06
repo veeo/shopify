@@ -258,8 +258,10 @@ const allNav = [...mainNav, ...channelNav];
 export function navFor(page: PreviewId): { id: string; child: PreviewId | null } {
   if (page === "home-setup" || page === "home-active") return { id: "home", child: null };
   if (page === "product") return { id: "products", child: null };
-  if (page === "settings" || page === "settings-general" || page === "payments-setup" || settingsNav.some((row) => row.page === page)) {
-    return { id: "settings", child: null };
+  if (page === "settings") return { id: "settings", child: null };
+  if (page === "payments-setup") return { id: "settings", child: "payments" };
+  if (page === "settings-general" || settingsNav.some((row) => row.page === page)) {
+    return { id: "settings", child: page === "settings-general" ? "settings-general" : page };
   }
   for (const item of allNav) {
     if (item.page === page && !item.children?.some((child) => child.page === page)) return { id: item.id, child: null };
@@ -282,4 +284,33 @@ export function pageMeta(page: PreviewId): { title: string; icon: PolarisIconNam
 
 export function findNav(id: string) {
   return allNav.find((item) => item.id === id) ?? null;
+}
+
+/** A settings section such as General or Payments, one level in from the settings list. */
+export function isSettingsPage(page: PreviewId) {
+  return page === "settings-general" || settingsNav.some((row) => row.page === page);
+}
+
+/** Pages you can switch between from the large title on this page. */
+export function sectionChoices(page: PreviewId): { label: string; page: PreviewId }[] | null {
+  if (page === "product" || page === "payments-setup" || page === "home-setup" || page === "home-active" || page === "settings") {
+    return null;
+  }
+  for (const item of allNav) {
+    if (item.page === "home") continue;
+    const pages: { label: string; page: PreviewId }[] = [];
+    const seen = new Set<string>();
+    const add = (label: string, id: PreviewId) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      pages.push({ label, page: id });
+    };
+    add(item.label, item.page);
+    for (const child of item.children ?? []) add(child.label, child.page);
+    if (seen.has(page) && pages.length > 1) return pages;
+  }
+  if (page === "settings-general" || settingsNav.some((row) => row.page === page)) {
+    return [{ label: "General", page: "settings-general" }, ...settingsNav.map((row) => ({ label: row.label, page: row.page }))];
+  }
+  return null;
 }
