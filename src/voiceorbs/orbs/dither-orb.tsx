@@ -37,7 +37,8 @@ const GL_ATTRIBUTES: WebGLContextAttributes = {
   powerPreference: 'low-power',
 };
 
-const CANVAS_OVERDRAW = 1.18;
+// The gallery overdraws the canvas by 1.18. Inside a scaled avatar that overhang is clipped into a cap, so the sphere stays inside its box.
+const CANVAS_OVERDRAW = 1;
 const TRANSPARENT = '#00000000';
 const DOT_PX = 2.8;
 const BASE_FRAME = 6000;
@@ -217,7 +218,7 @@ export const DitherOrb = ({
               frame={BASE_FRAME}
               fit="cover"
               minPixelRatio={1}
-              maxPixelCount={canvasSize * canvasSize * (size <= 64 ? 1 : MAX_PIXEL_RATIO * MAX_PIXEL_RATIO)}
+              maxPixelCount={canvasSize * canvasSize * MAX_PIXEL_RATIO * MAX_PIXEL_RATIO}
               webGlContextAttributes={GL_ATTRIBUTES}
             />
           </div>

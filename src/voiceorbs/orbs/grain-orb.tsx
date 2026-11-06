@@ -259,7 +259,7 @@ export const GrainOrb = ({
               speed={0}
               frame={BASE_FRAME}
               minPixelRatio={1}
-              maxPixelCount={size * size * (size <= 64 ? 1 : MAX_PIXEL_RATIO * MAX_PIXEL_RATIO)}
+              maxPixelCount={size * size * MAX_PIXEL_RATIO * MAX_PIXEL_RATIO}
               webGlContextAttributes={GL_ATTRIBUTES}
             />
           </div>

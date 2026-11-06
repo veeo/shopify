@@ -292,6 +292,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onDeleteConversation={(id) => dispatch({ type: "delete-conversation", id })}
           onRate={(id, value) => dispatch({ type: "rate", id, value })}
           onIntroduced={() => setRoom(true)}
+          onIntroFinished={() => dispatch({ type: "intro-seen" })}
         />
         </div>
       <PreviewColumn

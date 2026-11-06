@@ -181,7 +181,7 @@ export function VoiceMode({
             : null;
   useOrbAudioPublish(agent.id, exempt ? null : orbState, () => {
     if (phase === "listening") return recording.current?.level() ?? 0;
-    if (phase === "speaking") return playback.current?.level() ?? 0;
+    if (phase === "speaking") return playback.current?.level() ?? -1;
     return 0;
   });
 
@@ -198,7 +198,7 @@ export function VoiceMode({
       >
         {phase === "listening" ? <span className="absolute inset-0 animate-ping rounded-full bg-white/[0.06]" /> : null}
         <span ref={orb} className="grid place-items-center transition-[scale] duration-100 ease-out">
-          <Orb id={agent.orb} agentId={agent.id} size={48} />
+          <Orb id={agent.orb} agentId={agent.id} size={48} colorFrom={agent.orbFrom} colorTo={agent.orbTo} />
         </span>
       </button>
       <div className="min-w-0 flex-1" aria-live="polite">

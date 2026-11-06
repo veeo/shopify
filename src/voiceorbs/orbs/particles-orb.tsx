@@ -136,17 +136,17 @@ export const ParticlesOrb = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const dpr = Math.min(window.devicePixelRatio || 1, size <= 48 ? 1 : 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = size * dpr;
     canvas.height = size * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const center = size / 2;
     const smallness = Math.min(1, size / 140);
-    const dotScale = size < 56 ? 0.85 : 0.55 + 0.45 * smallness;
-    const alphaScale = size < 56 ? 0.72 : smallness * smallness;
+    const dotScale = 0.55 + 0.45 * smallness;
+    const alphaScale = smallness * smallness;
     const baseRadius = center * 0.62;
-    const n = size < 56 ? 220 : PARTICLE_COUNT;
+    const n = PARTICLE_COUNT;
     const px = new Float32Array(n);
     const py = new Float32Array(n);
     const pr = new Float32Array(n);

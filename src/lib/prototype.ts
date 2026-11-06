@@ -35,6 +35,31 @@ export const voiceOrbLabel: Record<VoiceOrbId, string> = {
   gooey: "Gooey Orb",
 };
 
+/** Gallery defaults from VoiceOrbs. Custom colors override these per agent. */
+export const voiceOrbTint: Record<VoiceOrbId, { from: string; to: string }> = {
+  plasma: { from: "#7c3aed", to: "#06b6d4" },
+  particles: { from: "#f0abfc", to: "#818cf8" },
+  nebula: { from: "#8b5cf6", to: "#22d3ee" },
+  mercury: { from: "#cbd5e1", to: "#a5b4fc" },
+  dither: { from: "#a3e635", to: "#22d3ee" },
+  grain: { from: "#fb923c", to: "#e879f9" },
+  gooey: { from: "#f472b6", to: "#8b5cf6" },
+};
+
+/** The same gradient pairs the VoiceOrbs gallery offers. */
+export const orbColorPresets: { name: string; from: string; to: string }[] = [
+  { name: "Iris", from: "#818cf8", to: "#22d3ee" },
+  { name: "Orchid", from: "#8b5cf6", to: "#d946ef" },
+  { name: "Aurora", from: "#22d3ee", to: "#34d399" },
+  { name: "Sunset", from: "#fbbf24", to: "#f43f5e" },
+  { name: "Cosmic", from: "#fc466b", to: "#3f5efb" },
+  { name: "Neon", from: "#22d3ee", to: "#d946ef" },
+  { name: "Metal", from: "#94a3b8", to: "#e2e8f0" },
+  { name: "Magma", from: "#f43f5e", to: "#fb923c" },
+  { name: "Gold", from: "#b45309", to: "#fde68a" },
+  { name: "Nebula", from: "#4f46e5", to: "#ec4899" },
+];
+
 /** Slackbot, Muse, and Grokbot keep their own artwork. */
 export const exemptAvatarAgents = new Set(["slack", "grok", "muse"]);
 
@@ -75,6 +100,9 @@ export type Agent = {
   persona: string;
   purpose: string;
   connections: Connection[];
+  /** VoiceOrb gradient. Absent means the gallery default for `orb`. */
+  orbFrom?: string;
+  orbTo?: string;
 };
 
 export type Chip = { label: string; tone: "secondary" | "primary"; send?: boolean };
@@ -168,6 +196,8 @@ export type PrototypeState = {
   lookbook: boolean;
   /** The design the merchant chose, once they have. */
   theme: string | null;
+  /** The Sidekick title intro has already played this session. Returning to Sidekick must not replay it. */
+  introPlayed: boolean;
 };
 
 export type Conversation = { id: string; title: string; at: number; blocks: Block[] };
@@ -266,14 +296,14 @@ function sidekickTurns(state: PrototypeState) {
   return (state.threads.sidekick ?? []).filter((block) => block.type === "text" && block.role === "user").length;
 }
 
-/** Sidekick's first moment, before a choice. The next step has not been asked yet. */
+/** Sidekick's first moment, before a choice. The next step has not been asked yet. Once the title intro has played, coming back does not start it again. */
 export function sidekickStage(state: PrototypeState) {
-  return sidekickOpening(state) && sidekickTurns(state) === 0;
+  return sidekickOpening(state) && !state.introPlayed && sidekickTurns(state) === 0;
 }
 
 /** The title introduces Sidekick in the place it keeps. Once that introduction settles, both sidebars come in around it, and then the next step is written. */
 export function sidekickPanels(state: PrototypeState, revealed = false): { nav: boolean; preview: boolean } {
-  if (!sidekickOpening(state)) return { nav: true, preview: true };
+  if (!sidekickOpening(state) || state.introPlayed) return { nav: true, preview: true };
   if (sidekickTurns(state) === 0 && !revealed) return { nav: false, preview: false };
   return { nav: true, preview: true };
 }
@@ -812,6 +842,7 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
     cardsDismissed: [],
     lookbook: false,
     theme: null,
+    introPlayed: false,
   };
 }
 
@@ -1501,7 +1532,8 @@ export type Action =
   | { type: "toggle-purpose"; id: string }
   | { type: "add-catalog"; id: string }
   | { type: "create-agent"; name: string; purpose: string }
-  | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[] }
+  | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string }
+  | { type: "intro-seen" }
   | { type: "preview"; page: PreviewId; wide?: boolean }
   | { type: "product"; id: string }
   | { type: "update-product"; id: string; patch: Partial<Product> }
@@ -1779,6 +1811,9 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       next.mode = "thread";
       return next;
     }
+    case "intro-seen":
+      next.introPlayed = true;
+      return next;
     case "edit-agent": {
       const current = next.agents.find((item) => item.id === action.id);
       if (!current) return state;
@@ -1792,6 +1827,8 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
         connections: action.connections.map((item) => ({ ...item })),
         placeholder,
         persona: `You are ${name}, a Shopify sidekick. Purpose: ${purpose}.`,
+        orbFrom: action.orbFrom,
+        orbTo: action.orbTo,
       });
       return next;
     }

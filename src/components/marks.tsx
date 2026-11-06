@@ -29,12 +29,24 @@ export function ShopifyMark({ className = "h-6 w-[22px]", tone = "light" }: { cl
   );
 }
 
-export function Orb({ id, size = 32, agentId }: { id: OrbId; size?: number; agentId?: string }) {
+export function Orb({
+  id,
+  size = 32,
+  agentId,
+  colorFrom,
+  colorTo,
+}: {
+  id: OrbId;
+  size?: number;
+  agentId?: string;
+  colorFrom?: string;
+  colorTo?: string;
+}) {
   const resolved = canonicalOrb(id);
   const audio = useOrbAudio(agentId);
   const style = { "--s": `${size}px` } as CSSProperties;
   if (isVoiceOrb(resolved)) {
-    return <VoiceOrb id={resolved} size={size} state={audio.state} levelRef={audio.levelRef} />;
+    return <VoiceOrb id={resolved} size={size} state={audio.state} levelRef={audio.levelRef} colorFrom={colorFrom} colorTo={colorTo} />;
   }
   switch (resolved) {
     case "grok":
@@ -52,23 +64,37 @@ export function Orb({ id, size = 32, agentId }: { id: OrbId; size?: number; agen
         </span>
       );
     default:
-      return <VoiceOrb id="plasma" size={size} state={audio.state} levelRef={audio.levelRef} />;
+      return <VoiceOrb id="plasma" size={size} state={audio.state} levelRef={audio.levelRef} colorFrom={colorFrom} colorTo={colorTo} />;
   }
 }
+
+/** VoiceOrbs are authored around a 144px sphere. Draw them there, then scale into the avatar slot. */
+const ORB_RENDER = 144;
 
 function VoiceOrb({
   id,
   size,
   state,
   levelRef,
+  colorFrom,
+  colorTo,
 }: {
   id: VoiceOrbId;
   size: number;
   state?: OrbState;
   levelRef?: RefObject<number>;
+  colorFrom?: string;
+  colorTo?: string;
 }) {
-  const style = { "--s": `${size}px` } as CSSProperties;
-  const props = { size, state, levelRef, label: "", className: "voice-orb" };
+  const style = { "--s": `${size}px`, "--render": `${ORB_RENDER}px`, "--fit": size / ORB_RENDER } as CSSProperties;
+  const props = {
+    size: ORB_RENDER,
+    state,
+    levelRef,
+    label: "",
+    className: "voice-orb",
+    ...(colorFrom && colorTo ? { colorFrom, colorTo } : {}),
+  };
   let node: ReactNode;
   switch (id) {
     case "particles":
@@ -94,7 +120,7 @@ function VoiceOrb({
   }
   return (
     <span className="orb voice-slot" style={style} aria-hidden>
-      {node}
+      <span className="voice-orb-fit">{node}</span>
     </span>
   );
 }

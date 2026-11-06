@@ -215,7 +215,7 @@ export function AgentNav({
                     }
                   >
                     <span className="relative grid size-[31px] shrink-0 place-items-center rounded-full">
-                      <Orb id={item.orb} agentId={item.id} size={31} />
+                      <Orb id={item.orb} agentId={item.id} size={31} colorFrom={item.orbFrom} colorTo={item.orbTo} />
                       {collapsed && item.unread > 0 ? (
                         <span className="absolute -right-1.5 -top-1.5 z-10 grid size-4 place-items-center rounded-full bg-[#5631f4] text-[10px] font-medium text-white ring-2 ring-[#0c0d0c]">
                           {item.unread}

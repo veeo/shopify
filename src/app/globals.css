@@ -617,14 +617,18 @@ body {
   }
 
   .voice-slot {
+    overflow: visible;
     background: transparent;
   }
 
-  .voice-slot > .voice-orb {
-    width: 100% !important;
-    height: 100% !important;
-    max-width: 100%;
-    max-height: 100%;
+  .voice-orb-fit {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--render);
+    height: var(--render);
+    transform: scale(var(--fit));
+    transform-origin: top left;
     pointer-events: none;
   }
 }
