@@ -61,10 +61,10 @@ export function AgentNav({
   const placed = useRef(new Map<string, { left: number; top: number }>());
   const skipSlide = useRef(true);
   const [sliding, setSliding] = useState(false);
-  const prevPresent = useRef(present);
   const [revealing, setRevealing] = useState(false);
-  if (prevPresent.current !== present) {
-    prevPresent.current = present;
+  const [seenPresent, setSeenPresent] = useState(present);
+  if (seenPresent !== present) {
+    setSeenPresent(present);
     setRevealing(present);
   }
   useEffect(() => {
@@ -127,10 +127,15 @@ export function AgentNav({
       ref={navRef}
       inert={!present ? true : undefined}
       aria-hidden={!present || undefined}
-      className={`h-full shrink-0 ${curtain ? "nav-reveal overflow-hidden" : "nav-settle"} ${!present ? "pointer-events-none" : ""}`}
-      style={{ width: present ? (collapsed ? 64 : 248) : 0, opacity: present ? 1 : 0 }}
+      className={`flex h-full min-w-0 shrink-0 flex-col pb-3 pt-7 motion-reduce:transition-none ${curtain ? "nav-reveal overflow-hidden" : ""} ${!present ? "pointer-events-none" : ""} ${
+        present ? (collapsed ? "w-[64px]" : "w-[248px] gap-4 px-3") : ""
+      }`}
+      style={{
+        transition: curtain ? undefined : `width ${move}, opacity 200ms ease`,
+        width: present ? undefined : 0,
+        opacity: present ? 1 : 0,
+      }}
     >
-      <div className={`flex h-full min-h-0 flex-col pb-3 pt-7 ${curtain ? (collapsed ? "w-[64px]" : "w-[248px] gap-4 px-3") : collapsed ? "w-full" : "w-full gap-4 px-3"}`}>
       <div className={`relative z-0 flex bg-transparent ${collapsed ? "flex-col items-center gap-4" : "items-center gap-1.5 pb-4 pl-2"}`}>
         <button
           type="button"
@@ -317,7 +322,6 @@ export function AgentNav({
             ) : null}
           </span>
         </span>
-      </div>
       </div>
     </aside>
   );

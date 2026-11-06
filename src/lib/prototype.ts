@@ -715,7 +715,7 @@ function patchAgent(state: PrototypeState, agentId: string, patch: Partial<Agent
   state.agents = state.agents.map((item) => (item.id === agentId ? { ...item, ...patch } : item));
 }
 
-export function setupState(storeName = "My Store", arrival: Arrival = "tasks"): PrototypeState {
+export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"): PrototypeState {
   const kick = {
     ...sidekick,
     installed: true,
@@ -859,7 +859,7 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
 };
 
 export function activeState(storeName = "My Store"): PrototypeState {
-  const base = setupState(storeName);
+  const base = setupState(storeName, "tasks");
   const installed = catalog.map((item) => ({
     ...item,
     installed: true,

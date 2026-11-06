@@ -51,10 +51,10 @@ export function PreviewColumn({
 }) {
   const wide = state.previewWide || state.preview === "payments-setup";
   const panelWidth = wide ? 584 : 393;
-  const prevPresent = useRef(present);
   const [entering, setEntering] = useState(false);
-  if (prevPresent.current !== present) {
-    prevPresent.current = present;
+  const [seenPresent, setSeenPresent] = useState(present);
+  if (seenPresent !== present) {
+    setSeenPresent(present);
     setEntering(present);
   }
   useEffect(() => {
@@ -199,7 +199,7 @@ export function PreviewColumn({
     >
       <div
         className={`p-partial-theme-admin-next-light relative flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
-          state.motion ? "transition-colors duration-300" : ""
+          state.motion ? "transition-[background-color] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
         } ${curtain ? "" : "w-full"}`}
         style={curtain ? { width: panelWidth } : undefined}
       >

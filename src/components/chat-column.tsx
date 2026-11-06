@@ -77,9 +77,9 @@ export function ChatColumn({
   const [editing, setEditing] = useState(false);
   const stage = sidekickStage(state);
   const [phase, setPhase] = useState<"welcome" | "handoff" | "ready">("welcome");
-  const prevStage = useRef(stage);
-  if (prevStage.current !== stage) {
-    prevStage.current = stage;
+  const [seenStage, setSeenStage] = useState(stage);
+  if (seenStage !== stage) {
+    setSeenStage(stage);
     if (stage) setPhase("welcome");
   }
   const showWelcome = stage && phase !== "ready";
@@ -284,7 +284,7 @@ function Opening({
   return (
     <>
       <p className="sr-only">
-        Welcome to {storeName}. I'm Sidekick.
+        Welcome to {storeName}. I&apos;m Sidekick.
       </p>
       <div aria-hidden className={`absolute inset-0 z-10 grid place-items-center bg-[#0c0d0c] px-8 ${leaving ? "welcome-leave pointer-events-none" : ""}`}>
         <div className="max-w-[16em] text-balance text-center">
