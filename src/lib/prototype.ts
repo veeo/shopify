@@ -21,7 +21,6 @@ export type OrbId =
   | "muse"
   | "store"
   | "shop"
-  | "agentic"
   | "customers"
   | "orders"
   | "custom";
@@ -65,7 +64,6 @@ const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
   chief: "twist",
   ideas: "plasma",
   trends: "mercury",
-  agentic: "twist",
   customers: "aura",
   orders: "aura",
   custom: "nebula",
@@ -77,7 +75,6 @@ const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
 
 /** Reused styles get a different gradient so two sidekicks don't look identical. */
 const reuseTint: Record<string, { from: string; to: string }> = {
-  agentic: { from: "#f43f5e", to: "#fb923c" },
   customers: { from: "#f472b6", to: "#d946ef" },
   orders: { from: "#22d3ee", to: "#2563eb" },
   custom: { from: "#4f46e5", to: "#ec4899" },
@@ -246,13 +243,6 @@ function seedConversations(now: number): Conversation[] {
       day + 7_200_000,
       "How do I get started with my Shopify store?",
       "Start with the basics: pick a theme, add a few products, and set up payments. The setup guide on Home walks through each step, and I can do most of them with you.",
-    ),
-    convo(
-      "agentic",
-      "Agentic storefronts explained",
-      2 * day,
-      "What are agentic storefronts?",
-      "Agentic storefronts let AI shopping agents like ChatGPT, Copilot, and Shop find and sell your products. Shopify syncs your catalog and policies so agents can answer questions and check out on your behalf. You can manage them under **Sales channels › Agentic**.",
     ),
     convo(
       "product",
@@ -429,7 +419,6 @@ const storeFacts = [
   "The Desk Lamp page says it ships in 5–7 days. Ads running this week say it ships this week.",
   "Open orders: #1078 Danielle Hudson, $369.99, paid, unfulfilled, 3 items (headphones and accessories). #1077 Maya Chen, $89, paid, unfulfilled, desk lamp. #1075 Priya Patel, $58, unpaid and unfulfilled.",
   "Shop app conversion is 1.6% against 2.7% on Online Store. The Shop listing crops the headphone photo.",
-  "AI shopping agents placed 41 orders this month, $6,840, and stall when the lamp delivery date disagrees with the ad.",
   "Returning customers are 28% of orders. People on their second order ask for a longer headphone warranty, not a points program.",
   "Search is up 22% week over week for “travel charger” and “desk setup.”",
   "Already in progress: Product ideas is drafting a $289 bundle of the headphones, the earbuds case, and a cable. Online store is rewriting the lamp delivery line. Orders is clearing #1078, #1077, and #1075. Shop app is fixing the listing crop. Muse has the restock line “Back in stock. Ships tomorrow.” Slack has a welcome-email draft and the #ops note about the 14 headphones. Grok still owes a reply on whether the headphones work for calls through a USB-C hub.",
@@ -454,8 +443,6 @@ const persona = {
     "You are the Online store agent. You look after the theme, product pages, and delivery promises. The Desk Lamp page still says 5–7 days while this week's ads say it ships this week.",
   shop:
     "You are the Shop app agent. Shop conversion is 1.6% against 2.7% on the online store. The Shop listing crops the headphone photo, and that is the first fix.",
-  agentic:
-    "You are Agentic storefronts. AI shopping agents placed 41 orders and $6,840 this month. They stall on the desk lamp because the delivery date on the page does not match the ad.",
   customers:
     "You are the Customers agent. 28% of orders are from people who have bought before. Second-order buyers ask for a longer warranty on the headphones, not a points program.",
   orders:
@@ -481,7 +468,6 @@ const purposeFor: Record<string, string> = {
   muse: "Offer directions, names, and campaign angles.",
   store: "Look after merchandising, delivery promises, and theme content.",
   shop: "Watch the Shop channel and the listings shoppers see there.",
-  agentic: "Watch agent-driven shopping and delivery times.",
   customers: "Speak for buyers and the perks they ask for.",
   orders: "Keep fulfillment moving and flag orders that need a tracking update.",
 };
@@ -585,15 +571,6 @@ export const catalog: Agent[] = [
     topic: "Shop",
     placeholder: "Ask Shop app…",
     orb: "shop",
-  }),
-  agent({
-    id: "agentic",
-    name: "Agentic storefronts",
-    group: "channels",
-    preview: "Agent orders stall when the lamp date doesn’t match the ad.",
-    topic: "Agent traffic",
-    placeholder: "Ask Agentic storefronts…",
-    orb: "agentic",
   }),
   agent({
     id: "customers",
@@ -955,10 +932,6 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
   shop: {
     text: "Shop brought in sessions and converted at 1.6% over the last 30 days. The online store converted at 2.7%. The Shop listing crops the headphone photo, so the grid shows the earcup and not the product. That’s the first fix.",
     asks: ["Fix the Shop listing crop", "How does Shop compare to the online store?"],
-  },
-  agentic: {
-    text: "AI shopping agents placed 41 orders this month, $6,840. Most of the ones that stall do it on the desk lamp, because the page says 5–7 days and the ad says this week. I’d give them one ship-by date.",
-    asks: ["What should the ship-by date say?", "How much are agent orders worth?"],
   },
   customers: {
     text: "28% of this month’s orders are from people who’ve bought before. The ones on their second order keep asking for two years of warranty on the headphones, not a points program. That’s the smaller test.",
@@ -1556,7 +1529,6 @@ function scriptedReply(agentId: string, text: string, storeName: string): { text
     muse: "The restock line is “Back in stock. Ships tomorrow.” One desk photo of the headphones, and leave the lamp out.",
     store: "The Desk Lamp page should say it ships this week, matching the ads. I can open the product if you want to edit it.",
     shop: "Shop converts at 1.6% against 2.7% on the online store. The listing crop on the headphones is the first fix.",
-    agentic: "Agent orders are 41 this month, $6,840. They stall when the lamp page says 5–7 days and the ad says this week.",
     customers: "28% of orders are from returning buyers. The ask on the second order is a longer headphone warranty, not points.",
     orders: "#1078 and #1077 are paid and unfulfilled. #1075 is unpaid. I can open orders in the preview.",
     custom: "Tell me what you want this sidekick to take off your plate.",
