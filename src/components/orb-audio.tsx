@@ -32,7 +32,8 @@ function createStore(): Store {
     },
     publish: (token, agentId, state) => {
       owner = token;
-      if (state !== "listening" && state !== "speaking") levelRef.current = 0;
+      // Negative means "no live samples": the orb falls back to that state's own motion.
+      if (state !== "listening" && state !== "speaking") levelRef.current = -1;
       if (feed.agentId === agentId && feed.state === state) return;
       feed = { agentId, state };
       emit();
@@ -40,7 +41,7 @@ function createStore(): Store {
     clear: (token) => {
       if (owner !== token) return;
       owner = null;
-      levelRef.current = 0;
+      levelRef.current = -1;
       if (feed.agentId === null && feed.state === "idle") return;
       feed = idleFeed;
       emit();
@@ -63,7 +64,8 @@ export function useOrbAudioPublish(agentId: string, state: OrbState | null, read
     store.publish(token, agentId, state);
     let frame = 0;
     const tick = () => {
-      store.levelRef.current = read();
+      const level = read();
+      store.levelRef.current = state === "listening" || state === "speaking" ? level : -1;
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);

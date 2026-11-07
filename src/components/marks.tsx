@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { type CSSProperties, type ReactNode, type RefObject } from "react";
 import { useOrbAudio } from "@/components/orb-audio";
 import { canonicalOrb, isVoiceOrb, type OrbId, type VoiceOrbId } from "@/lib/prototype";
-import { DitherOrb } from "@/voiceorbs/orbs/dither-orb";
-import { GooeyOrb } from "@/voiceorbs/orbs/gooey-orb";
-import { GrainOrb } from "@/voiceorbs/orbs/grain-orb";
+import { GrokBot, MuseBall, OnlineStoreMark, ShopAppMark, SlackOrb } from "@/components/team-marks";
+import { AuraField } from "@/voiceorbs/orbs/aura-field";
 import { MercuryOrb } from "@/voiceorbs/orbs/mercury-orb";
 import { NebulaOrb } from "@/voiceorbs/orbs/nebula-orb";
-import { ParticlesOrb } from "@/voiceorbs/orbs/particles-orb";
 import { PlasmaOrb } from "@/voiceorbs/orbs/plasma-orb";
+import { TwistSphere } from "@/voiceorbs/orbs/twist-sphere";
 import type { OrbState } from "@/voiceorbs/lib/orb-state";
 
 export function ShopifyMark({ className = "h-6 w-[22px]", tone = "light" }: { className?: string; tone?: "light" | "dark" }) {
@@ -29,136 +28,87 @@ export function ShopifyMark({ className = "h-6 w-[22px]", tone = "light" }: { cl
   );
 }
 
-export function Orb({ id, size = 32, agentId }: { id: OrbId; size?: number; agentId?: string }) {
+export function Orb({
+  id,
+  size = 32,
+  agentId,
+  colorFrom,
+  colorTo,
+}: {
+  id: OrbId;
+  size?: number;
+  agentId?: string;
+  colorFrom?: string;
+  colorTo?: string;
+}) {
   const resolved = canonicalOrb(id);
   const audio = useOrbAudio(agentId);
-  const style = { "--s": `${size}px` } as CSSProperties;
   if (isVoiceOrb(resolved)) {
-    return <VoiceOrb id={resolved} size={size} state={audio.state} levelRef={audio.levelRef} />;
+    return <VoiceOrb id={resolved} size={size} state={audio.state} levelRef={audio.levelRef} colorFrom={colorFrom} colorTo={colorTo} />;
   }
   switch (resolved) {
     case "grok":
-      return <ParticleOrb size={size} />;
+      return <GrokBot size={size} state={audio.state} levelRef={audio.levelRef} />;
     case "muse":
-      return (
-        <span className="orb orb-img bg-white" style={style} aria-hidden>
-          <img alt="" src="/assets/orb-muse.png" className="origin-[50%_45%] scale-[1.4]" />
-        </span>
-      );
+      return <MuseBall size={size} state={audio.state} levelRef={audio.levelRef} />;
     case "slack":
-      return (
-        <span className="orb orb-img bg-white" style={style} aria-hidden>
-          <img alt="" src="/assets/orb-slack.png" className="scale-[1.12]" />
-        </span>
-      );
+      return <SlackOrb size={size} state={audio.state} levelRef={audio.levelRef} />;
+    case "store":
+      return <OnlineStoreMark size={size} />;
+    case "shop":
+      return <ShopAppMark size={size} />;
     default:
-      return <VoiceOrb id="plasma" size={size} state={audio.state} levelRef={audio.levelRef} />;
+      return <VoiceOrb id="plasma" size={size} state={audio.state} levelRef={audio.levelRef} colorFrom={colorFrom} colorTo={colorTo} />;
   }
 }
+
+/** VoiceOrbs are authored around a 144px sphere. Draw them there, then scale into the avatar slot. */
+const ORB_RENDER = 144;
 
 function VoiceOrb({
   id,
   size,
   state,
   levelRef,
+  colorFrom,
+  colorTo,
 }: {
   id: VoiceOrbId;
   size: number;
   state?: OrbState;
   levelRef?: RefObject<number>;
+  colorFrom?: string;
+  colorTo?: string;
 }) {
-  const style = { "--s": `${size}px` } as CSSProperties;
-  const props = { size, state, levelRef, label: "", className: "voice-orb" };
+  const style = { "--s": `${size}px`, "--render": `${ORB_RENDER}px`, "--fit": size / ORB_RENDER } as CSSProperties;
+  const props = {
+    size: ORB_RENDER,
+    state,
+    levelRef,
+    label: "",
+    className: "voice-orb",
+    ...(colorFrom && colorTo ? { colorFrom, colorTo } : {}),
+  };
   let node: ReactNode;
   switch (id) {
-    case "particles":
-      node = <ParticlesOrb {...props} />;
-      break;
     case "nebula":
       node = <NebulaOrb {...props} />;
       break;
     case "mercury":
       node = <MercuryOrb {...props} />;
       break;
-    case "dither":
-      node = <DitherOrb {...props} />;
+    case "twist":
+      node = <TwistSphere {...props} />;
       break;
-    case "grain":
-      node = <GrainOrb {...props} />;
-      break;
-    case "gooey":
-      node = <GooeyOrb {...props} />;
+    case "aura":
+      node = <AuraField {...props} />;
       break;
     default:
       node = <PlasmaOrb {...props} />;
   }
   return (
     <span className="orb voice-slot" style={style} aria-hidden>
-      {node}
-    </span>
-  );
-}
-
-function ParticleOrb({ size }: { size: number }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = ref.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    ctx.scale(dpr, dpr);
-
-    const count = Math.round(size * 3.5);
-    const golden = Math.PI * (3 - Math.sqrt(5));
-    const points = Array.from({ length: count }, (_, index) => {
-      const y = 1 - (index / (count - 1)) * 2;
-      const radius = Math.sqrt(1 - y * y);
-      const theta = golden * index;
-      return { x: Math.cos(theta) * radius, y, z: Math.sin(theta) * radius, jitter: 0.94 + Math.random() * 0.1 };
-    });
-
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const r = size * 0.4;
-    const c = size / 2;
-    let frame = 0;
-    let angle = 0;
-
-    const draw = () => {
-      ctx.clearRect(0, 0, size, size);
-      ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, size, size);
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      const tilt = 0.35;
-      for (const point of points) {
-        const x = point.x * cos - point.z * sin;
-        const z0 = point.x * sin + point.z * cos;
-        const y = point.y * Math.cos(tilt) - z0 * Math.sin(tilt);
-        const z = point.y * Math.sin(tilt) + z0 * Math.cos(tilt);
-        const depth = (z + 1) / 2;
-        ctx.globalAlpha = Math.min(1, 0.3 + depth * 0.75 + Math.abs(y) * Math.abs(y) * 0.4);
-        ctx.fillStyle = "#fff";
-        const dot = Math.max(1.1, (size / 36) * (0.6 + depth * 0.6));
-        ctx.beginPath();
-        ctx.arc(c + x * r * point.jitter, c + y * r * point.jitter, dot / 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-      if (!reduce) {
-        angle += 0.008;
-        frame = requestAnimationFrame(draw);
-      }
-    };
-    draw();
-    return () => cancelAnimationFrame(frame);
-  }, [size]);
-
-  return (
-    <span className="orb bg-black" style={{ "--s": `${size}px` } as CSSProperties} aria-hidden>
-      <canvas ref={ref} style={{ width: size, height: size }} />
+      <span className="voice-orb-fit">{node}</span>
     </span>
   );
 }

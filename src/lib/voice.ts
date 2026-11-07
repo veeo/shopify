@@ -1,3 +1,29 @@
+/** VoiceOrbs gallery loudness: voice-band energy, 0 silent through 1 loud. */
+const VOICE_MIN_HZ = 85;
+const VOICE_MAX_HZ = 3800;
+const LEVEL_FLOOR = 0.14;
+const LEVEL_RANGE = 0.62;
+const PEAK_WEIGHT = 0.35;
+
+function voiceLevel(analyser: AnalyserNode, bins: Uint8Array) {
+  analyser.getByteFrequencyData(bins as Uint8Array<ArrayBuffer>);
+  const nyquist = analyser.context.sampleRate / 2;
+  const count = analyser.frequencyBinCount;
+  const binFor = (hz: number) => Math.min(count, Math.max(1, Math.round((hz / nyquist) * count)));
+  const lo = binFor(VOICE_MIN_HZ);
+  const hi = Math.max(lo + 1, binFor(VOICE_MAX_HZ));
+  let sum = 0;
+  let peak = 0;
+  for (let i = lo; i < hi; i += 1) {
+    const value = bins[i] ?? 0;
+    sum += value;
+    if (value > peak) peak = value;
+  }
+  const average = sum / (hi - lo) / 255;
+  const energy = (1 - PEAK_WEIGHT) * average + PEAK_WEIGHT * (peak / 255);
+  return Math.min(1, Math.max(0, (energy - LEVEL_FLOOR) / LEVEL_RANGE));
+}
+
 export type Recording = {
   /** 0–1 loudness of the last few milliseconds of input. */
   level: () => number;
@@ -18,8 +44,9 @@ export async function startRecording(): Promise<Recording> {
   const context = new AudioContext();
   const analyser = context.createAnalyser();
   analyser.fftSize = 512;
+  analyser.smoothingTimeConstant = 0.7;
   context.createMediaStreamSource(stream).connect(analyser);
-  const samples = new Uint8Array(analyser.fftSize);
+  const bins = new Uint8Array(analyser.frequencyBinCount);
 
   const release = () => {
     stream.getTracks().forEach((track) => track.stop());
@@ -27,12 +54,7 @@ export async function startRecording(): Promise<Recording> {
   };
 
   return {
-    level: () => {
-      analyser.getByteTimeDomainData(samples);
-      let sum = 0;
-      for (const value of samples) sum += ((value - 128) / 128) ** 2;
-      return Math.min(1, Math.sqrt(sum / samples.length) * 4);
-    },
+    level: () => voiceLevel(analyser, bins),
     stop: () =>
       new Promise<Blob>((resolve) => {
         recorder.onstop = () => {
@@ -87,10 +109,11 @@ export async function speak(text: string): Promise<Playback> {
     const context = new AudioContext();
     const analyser = context.createAnalyser();
     analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.7;
     const source = context.createMediaElementSource(audio);
     source.connect(analyser);
     analyser.connect(context.destination);
-    const samples = new Uint8Array(analyser.fftSize);
+    const bins = new Uint8Array(analyser.frequencyBinCount);
     const done = new Promise<void>((resolve) => {
       const finish = () => {
         URL.revokeObjectURL(url);
@@ -103,12 +126,7 @@ export async function speak(text: string): Promise<Playback> {
     });
     await audio.play();
     return {
-      level: () => {
-        analyser.getByteTimeDomainData(samples);
-        let sum = 0;
-        for (const value of samples) sum += ((value - 128) / 128) ** 2;
-        return Math.min(1, Math.sqrt(sum / samples.length) * 4);
-      },
+      level: () => voiceLevel(analyser, bins),
       done,
       stop: () => audio.pause(),
     };
@@ -119,7 +137,7 @@ export async function speak(text: string): Promise<Playback> {
 
 function speakWithBrowser(text: string): Playback {
   const synth = window.speechSynthesis;
-  if (!synth) return { level: () => 0, done: Promise.resolve(), stop: () => undefined };
+  if (!synth) return { level: () => -1, done: Promise.resolve(), stop: () => undefined };
   const utterance = new SpeechSynthesisUtterance(text);
   const done = new Promise<void>((resolve) => {
     utterance.onend = () => resolve();
@@ -128,8 +146,8 @@ function speakWithBrowser(text: string): Playback {
   synth.cancel();
   synth.speak(utterance);
   return {
-    // The browser speech engine does not expose samples, so this fallback cannot drive a real level.
-    level: () => 0,
+    // speechSynthesis has no sample stream. A negative level tells the orb to use its speaking motion.
+    level: () => -1,
     done,
     stop: () => synth.cancel(),
   };

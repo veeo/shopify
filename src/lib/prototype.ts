@@ -7,7 +7,7 @@ export type BusinessType = (typeof businessTypes)[number];
 
 export type AgentGroup = "favorites" | "teams" | "channels" | "tools" | "hidden";
 
-export const voiceOrbIds = ["plasma", "particles", "nebula", "mercury", "dither", "grain", "gooey"] as const;
+export const voiceOrbIds = ["plasma", "nebula", "mercury", "twist", "aura"] as const;
 export type VoiceOrbId = (typeof voiceOrbIds)[number];
 
 export type OrbId =
@@ -20,44 +20,81 @@ export type OrbId =
   | "grok"
   | "muse"
   | "store"
-  | "agentic"
+  | "shop"
   | "customers"
   | "orders"
   | "custom";
 
 export const voiceOrbLabel: Record<VoiceOrbId, string> = {
   plasma: "Plasma Orb",
-  particles: "Particles Orb",
   nebula: "Nebula Orb",
   mercury: "Mercury Orb",
-  dither: "Dither Orb",
-  grain: "Grain Orb",
-  gooey: "Gooey Orb",
+  twist: "Twisted Colorful Sphere",
+  aura: "Aura Field",
 };
 
-/** Slackbot, Muse, and Grokbot keep their own artwork. */
-export const exemptAvatarAgents = new Set(["slack", "grok", "muse"]);
+/** Gallery defaults. Twist's pair keeps the original cosine palette until a sidekick picks another. */
+export const voiceOrbTint: Record<VoiceOrbId, { from: string; to: string }> = {
+  plasma: { from: "#7c3aed", to: "#06b6d4" },
+  nebula: { from: "#8b5cf6", to: "#22d3ee" },
+  mercury: { from: "#cbd5e1", to: "#a5b4fc" },
+  twist: { from: "#22d3ee", to: "#f472b6" },
+  aura: { from: "#34d399", to: "#60a5fa" },
+};
 
-const legacyVoiceOrb: Partial<Record<OrbId, VoiceOrbId>> = {
-  sidekick: "plasma",
-  chief: "particles",
-  ideas: "nebula",
+/** The same gradient pairs the VoiceOrbs gallery offers. */
+export const orbColorPresets: { name: string; from: string; to: string }[] = [
+  { name: "Iris", from: "#818cf8", to: "#22d3ee" },
+  { name: "Orchid", from: "#8b5cf6", to: "#d946ef" },
+  { name: "Aurora", from: "#22d3ee", to: "#34d399" },
+  { name: "Sunset", from: "#fbbf24", to: "#f43f5e" },
+  { name: "Cosmic", from: "#fc466b", to: "#3f5efb" },
+  { name: "Neon", from: "#22d3ee", to: "#d946ef" },
+  { name: "Metal", from: "#94a3b8", to: "#e2e8f0" },
+  { name: "Magma", from: "#f43f5e", to: "#fb923c" },
+  { name: "Gold", from: "#b45309", to: "#fde68a" },
+  { name: "Nebula", from: "#4f46e5", to: "#ec4899" },
+];
+
+/** Slackbot, Muse, and Grokbot keep their own artwork. */
+export const exemptAvatarAgents = new Set(["slack", "grok", "muse", "store", "shop"]);
+
+const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
+  sidekick: "twist",
+  chief: "twist",
+  ideas: "plasma",
   trends: "mercury",
-  store: "dither",
-  agentic: "grain",
-  customers: "gooey",
-  orders: "plasma",
-  custom: "particles",
+  customers: "aura",
+  orders: "aura",
+  custom: "nebula",
+  particles: "twist",
+  dither: "plasma",
+  grain: "twist",
+  gooey: "aura",
+};
+
+/** Reused styles get a different gradient so two sidekicks don't look identical. */
+const reuseTint: Record<string, { from: string; to: string }> = {
+  customers: { from: "#f472b6", to: "#d946ef" },
+  orders: { from: "#22d3ee", to: "#2563eb" },
+  custom: { from: "#4f46e5", to: "#ec4899" },
 };
 
 export function isVoiceOrb(orb: string): orb is VoiceOrbId {
   return (voiceOrbIds as readonly string[]).includes(orb);
 }
 
-/** Stable avatar identity. Older generic sphere ids map onto a voice orb; branded ids stay put. */
-export function canonicalOrb(orb: OrbId): OrbId {
-  if (isVoiceOrb(orb) || orb === "grok" || orb === "slack" || orb === "muse") return orb;
+/** Stable avatar identity. Retired styles and older generic ids map onto the current lineup; branded ids stay put. */
+export function canonicalOrb(orb: string): OrbId {
+  if (orb === "grok" || orb === "slack" || orb === "muse" || orb === "store" || orb === "shop") return orb;
+  if (isVoiceOrb(orb)) return orb;
   return legacyVoiceOrb[orb] ?? "plasma";
+}
+
+export function defaultOrbTint(id: string, orb: string): { from: string; to: string } | undefined {
+  if (reuseTint[id]) return reuseTint[id];
+  if (orb === "custom" || id.startsWith("custom-")) return reuseTint.custom;
+  return undefined;
 }
 
 export type Connection = { id: string; label: string; on: boolean };
@@ -75,6 +112,9 @@ export type Agent = {
   persona: string;
   purpose: string;
   connections: Connection[];
+  /** VoiceOrb gradient. Absent means the gallery default for `orb`. */
+  orbFrom?: string;
+  orbTo?: string;
 };
 
 export type Chip = { label: string; tone: "secondary" | "primary"; send?: boolean };
@@ -146,7 +186,7 @@ export type PrototypeState = {
   threads: Record<string, Block[]>;
   preview: PreviewId;
   previewWide: boolean;
-  mode: "thread" | "add";
+  mode: "thread" | "add" | "create";
   purposes: string[];
   chiefPhase: "absent" | "purpose" | "working";
   businessType: BusinessType;
@@ -168,6 +208,8 @@ export type PrototypeState = {
   lookbook: boolean;
   /** The design the merchant chose, once they have. */
   theme: string | null;
+  /** The Sidekick title intro has already played this session. Returning to Sidekick must not replay it. */
+  introPlayed: boolean;
 };
 
 export type Conversation = { id: string; title: string; at: number; blocks: Block[] };
@@ -201,13 +243,6 @@ function seedConversations(now: number): Conversation[] {
       day + 7_200_000,
       "How do I get started with my Shopify store?",
       "Start with the basics: pick a theme, add a few products, and set up payments. The setup guide on Home walks through each step, and I can do most of them with you.",
-    ),
-    convo(
-      "agentic",
-      "Agentic storefronts explained",
-      2 * day,
-      "What are agentic storefronts?",
-      "Agentic storefronts let AI shopping agents like ChatGPT, Copilot, and Shop find and sell your products. Shopify syncs your catalog and policies so agents can answer questions and check out on your behalf. You can manage them under **Sales channels › Agentic**.",
     ),
     convo(
       "product",
@@ -266,14 +301,14 @@ function sidekickTurns(state: PrototypeState) {
   return (state.threads.sidekick ?? []).filter((block) => block.type === "text" && block.role === "user").length;
 }
 
-/** Sidekick's first moment, before a choice. The next step has not been asked yet. */
+/** Sidekick's first moment, before a choice. The next step has not been asked yet. Once the title intro has played, coming back does not start it again. */
 export function sidekickStage(state: PrototypeState) {
-  return sidekickOpening(state) && sidekickTurns(state) === 0;
+  return sidekickOpening(state) && !state.introPlayed && sidekickTurns(state) === 0;
 }
 
 /** The title introduces Sidekick in the place it keeps. Once that introduction settles, both sidebars come in around it, and then the next step is written. */
 export function sidekickPanels(state: PrototypeState, revealed = false): { nav: boolean; preview: boolean } {
-  if (!sidekickOpening(state)) return { nav: true, preview: true };
+  if (!sidekickOpening(state) || state.introPlayed) return { nav: true, preview: true };
   if (sidekickTurns(state) === 0 && !revealed) return { nav: false, preview: false };
   return { nav: true, preview: true };
 }
@@ -360,42 +395,58 @@ export const purposes = [
 
 export const sellers = [
   {
-    title: "Cloud Headphones",
-    meta: "$64,800 · 342 orders",
-    advice: "Test a carrying-case bundle. Carry the offer through email and agentic ads.",
-    image: "/assets/headphones.webp",
+    title: "Studio ANC Headphones",
+    meta: "$18,640 · 76 orders",
+    advice: "14 left in stock. Reorder before Monday’s ads, and show the case in the first photo.",
+    image: "/assets/products/studio-anc-headphones.webp",
   },
   {
-    title: "Studio Desk Lamp",
-    meta: "$38,400 · 216 orders",
-    advice: "Make delivery and warranty clear. Match the message across paid channels.",
-    image: "/assets/lamp.webp",
+    title: "USB-C Power Bank",
+    meta: "$6,370 · 130 orders",
+    advice: "The sitewide 20% off is filling carts on its own. Offer it only after a headphone is added.",
+    image: "/assets/products/usb-c-power-bank.webp",
   },
 ] as const;
 
+/** Shared operating picture for an electronics store. Every sidekick can act on these figures. */
+const storeFacts = [
+  "Store facts for this electronics store, as of Saturday Nov 7, 2026. Use these numbers. Do not invent a different sales total. Home opens on Last 30 days.",
+  "Last 30 days: $48,393 total sales, 386 orders, average order value $125 (down from $134 the previous 30 days). Conversion 2.7% on 14,280 sessions.",
+  "Last 7 days: $11,285, 92 orders. Today: $2,079 and 14 orders, 9 of them fulfilled. Today matches the analytics cards.",
+  "Studio ANC Headphones, $249: $18,640 and 76 orders, about 39% of revenue. 14 units left. Reorder before Monday’s ads.",
+  "USB-C Power Bank, $49: $6,370 and 130 orders. A sitewide 20% off is creating accessory-only carts and pulling the average order down.",
+  "Portable Charger, $59: $5,310 and 90 orders. Desk Lamp, $89: $4,450 and 50 orders. Wireless Mouse, $39: $3,120 and 80 orders.",
+  "The Desk Lamp page says it ships in 5–7 days. Ads running this week say it ships this week.",
+  "Open orders: #1078 Danielle Hudson, $369.99, paid, unfulfilled, 3 items (headphones and accessories). #1077 Maya Chen, $89, paid, unfulfilled, desk lamp. #1075 Priya Patel, $58, unpaid and unfulfilled.",
+  "Shop app conversion is 1.6% against 2.7% on Online Store. The Shop listing crops the headphone photo.",
+  "Returning customers are 28% of orders. People on their second order ask for a longer headphone warranty, not a points program.",
+  "Search is up 22% week over week for “travel charger” and “desk setup.”",
+  "Already in progress: Product ideas is drafting a $289 bundle of the headphones, the earbuds case, and a cable. Online store is rewriting the lamp delivery line. Orders is clearing #1078, #1077, and #1075. Shop app is fixing the listing crop. Muse has the restock line “Back in stock. Ships tomorrow.” Slack has a welcome-email draft and the #ops note about the 14 headphones. Grok still owes a reply on whether the headphones work for calls through a USB-C hub.",
+].join(" ");
+
 const persona = {
   sidekick:
-    "You are Sidekick, Shopify's built-in assistant, helping a brand-new merchant get their store running. You know Shopify deeply and can act in the admin. When the merchant wants to review payments, call showArtifact payments-plan and navigatePreview payments, then explain the plan in your own words: Shopify Payments setup has four parts (business details, identity, account security, payout bank account) and takes about 10 minutes. When they want to start Shopify Payments setup, navigate to payments-setup with wide true. Remaining setup tasks: payments, theme, domain, shipping, retail address, POS.",
+    "You are Sidekick, Shopify's built-in assistant, helping a merchant run an electronics store. You know Shopify deeply and can act in the admin. When the merchant wants to review payments, call showArtifact payments-plan and navigatePreview payments, then explain the plan in your own words: Shopify Payments setup has four parts (business details, identity, account security, payout bank account) and takes about 10 minutes. When they want to start Shopify Payments setup, navigate to payments-setup with wide true. Remaining setup tasks: payments, theme, domain, shipping, retail address, POS.",
   chief:
-    "You are the merchant's Chief of Staff inside Shopify. You turn a busy week into priorities. You already know this week: $184,600 in sales, 1,284 orders, 2.8% conversion. Sales are up 9%; orders are up 12%. Average order value fell 2.7% to $144. Best sellers: Cloud Headphones ($64,800, 342 orders) and Studio Desk Lamp ($38,400, 216 orders). When asked for best sellers, call showArtifact best-sellers and navigatePreview home-active.",
+    "You are the merchant's Chief of Staff inside this electronics store. Lead with how sales are actually doing, the few things worth doing today, and what the other sidekicks are already working on. When asked for best sellers, call showArtifact best-sellers and navigatePreview home-active.",
   ideas:
-    "You are Product ideas, a Shopify agent that turns store signals into product concepts. Suggest small, testable assortments. You can add a product with the addProduct tool.",
+    "You are Product ideas. You turn this store's carts and search into one testable product. You can add a product with the addProduct tool. The live draft is a $289 bundle: Studio ANC Headphones, the earbuds case, and a cable, meant to lift the $125 average order.",
   trends:
-    "You are Trends. You watch what shoppers are searching for. Gift sets are picking up this week. Offer one concrete action when it helps.",
+    "You are Trends. You watch search for this electronics catalog. Travel charger and desk setup searches are up 22% week over week. Headphones are flat in search even though they are 39% of revenue.",
   slack:
-    "You are Slackbot, connected to the merchant's Slack. Summarize team chatter and draft updates. You tightened the welcome email copy.",
+    "You are Slackbot, connected to the merchant's Slack. #ops flagged the three open orders and that the headphone bin is down to 14 units. The welcome email draft is ready.",
   grok:
-    "You are Grok bot, connected from X. Shoppers on X keep asking for smaller sizes. Be direct and curious.",
+    "You are Grok bot, connected from X. The launch thread has about 40 replies asking whether the Studio ANC Headphones work for calls through a USB-C hub, and the store has not answered.",
   muse:
-    "You are Muse, a creative partner. Offer directions, names, and campaign angles. Stay concrete.",
+    "You are Muse, a creative partner for this electronics store. The live direction is the headphone restock: one desk photo and the line “Back in stock. Ships tomorrow.” Leave the lamp out of it.",
   store:
-    "You are the Online store agent. You care about merchandising, delivery promises, and theme content. The lamp page needs clearer delivery times.",
-  agentic:
-    "You are Agentic storefronts. You watch agent-driven shopping. The lunch rush is pushing delivery times up.",
+    "You are the Online store agent. You look after the theme, product pages, and delivery promises. The Desk Lamp page still says 5–7 days while this week's ads say it ships this week.",
+  shop:
+    "You are the Shop app agent. Shop conversion is 1.6% against 2.7% on the online store. The Shop listing crops the headphone photo, and that is the first fix.",
   customers:
-    "You are the Customers agent. Repeat buyers want a loyalty perk. Speak in customer language, not jargon.",
+    "You are the Customers agent. 28% of orders are from people who have bought before. Second-order buyers ask for a longer warranty on the headphones, not a points program.",
   orders:
-    "You are the Orders agent. Two orders still need tracking updates. Be operational and specific.",
+    "You are the Orders agent. Be operational. Open orders right now: #1078 Danielle Hudson $369.99 paid and unfulfilled, #1077 Maya Chen $89 paid and unfulfilled, #1075 Priya Patel $58 unpaid and unfulfilled.",
   custom: "You are a custom Sidekick the merchant just created. Help them make progress in the Shopify admin.",
 };
 
@@ -416,13 +467,13 @@ const purposeFor: Record<string, string> = {
   grok: "Bring in what shoppers are asking on X.",
   muse: "Offer directions, names, and campaign angles.",
   store: "Look after merchandising, delivery promises, and theme content.",
-  agentic: "Watch agent-driven shopping and delivery times.",
+  shop: "Watch the Shop channel and the listings shoppers see there.",
   customers: "Speak for buyers and the perks they ask for.",
   orders: "Keep fulfillment moving and flag orders that need a tracking update.",
 };
 
 function connectionsFor(id: string): Connection[] {
-  const on = new Set(id === "slack" ? ["slack"] : id === "grok" ? ["x"] : id === "sidekick" ? ["shop", "admin"] : ["admin"]);
+  const on = new Set(id === "slack" ? ["slack"] : id === "grok" ? ["x"] : id === "shop" ? ["shop"] : id === "sidekick" ? ["shop", "admin"] : ["admin"]);
   return connectionChoices.map((item) => ({ ...item, on: on.has(item.id) }));
 }
 
@@ -438,11 +489,13 @@ function agent(
   return {
     unread: partial.unread ?? 0,
     installed: partial.installed ?? false,
-    persona: persona[partial.orb === "custom" ? "custom" : (partial.id as keyof typeof persona)] ?? persona.custom,
+    persona: `${persona[partial.orb === "custom" ? "custom" : (partial.id as keyof typeof persona)] ?? persona.custom} ${storeFacts}`,
     purpose: purpose ?? purposeFor[partial.id] ?? partial.preview,
     connections: connections ?? connectionsFor(partial.id),
     ...rest,
     orb: canonicalOrb(partial.orb),
+    orbFrom: partial.orbFrom ?? defaultOrbTint(partial.id, partial.orb)?.from,
+    orbTo: partial.orbTo ?? defaultOrbTint(partial.id, partial.orb)?.to,
   };
 }
 
@@ -460,7 +513,7 @@ export const catalog: Agent[] = [
     id: "ideas",
     name: "Product ideas",
     group: "favorites",
-    preview: "A starter bundle could work for first-time buyers.",
+    preview: "A $289 headphone bundle could lift the average order.",
     topic: "New assortment",
     placeholder: "Ask Product ideas…",
     orb: "ideas",
@@ -469,7 +522,7 @@ export const catalog: Agent[] = [
     id: "trends",
     name: "Trends",
     group: "favorites",
-    preview: "Searches for gift sets are picking up this week.",
+    preview: "Travel charger and desk setup searches are up 22%.",
     topic: "This week",
     placeholder: "Ask Trends…",
     orb: "trends",
@@ -478,7 +531,7 @@ export const catalog: Agent[] = [
     id: "grok",
     name: "Grok bot",
     group: "teams",
-    preview: "Shoppers on X keep asking for smaller sizes.",
+    preview: "X is asking if the headphones work through the hub.",
     topic: "From X",
     placeholder: "Ask Grok bot…",
     orb: "grok",
@@ -487,7 +540,7 @@ export const catalog: Agent[] = [
     id: "slack",
     name: "Slackbot",
     group: "teams",
-    preview: "I tightened the copy for your welcome email.",
+    preview: "Welcome email is ready, and #ops flagged 14 headphones left.",
     topic: "Team updates",
     placeholder: "Ask Slackbot…",
     orb: "slack",
@@ -496,7 +549,7 @@ export const catalog: Agent[] = [
     id: "muse",
     name: "Muse",
     group: "teams",
-    preview: "A quieter campaign could carry the lamp.",
+    preview: "Back in stock. Ships tomorrow.",
     topic: "Directions",
     placeholder: "Ask Muse…",
     orb: "muse",
@@ -505,25 +558,25 @@ export const catalog: Agent[] = [
     id: "store",
     name: "Online store",
     group: "channels",
-    preview: "Let’s clarify delivery times on the lamp page.",
+    preview: "The lamp page still says 5–7 days.",
     topic: "Storefront",
     placeholder: "Ask Online store…",
     orb: "store",
   }),
   agent({
-    id: "agentic",
-    name: "Agentic storefronts",
+    id: "shop",
+    name: "Shop app",
     group: "channels",
-    preview: "The lunch rush is pushing delivery times up.",
-    topic: "Agent traffic",
-    placeholder: "Ask Agentic storefronts…",
-    orb: "agentic",
+    preview: "Shop checkouts convert at 1.6%, behind the online store.",
+    topic: "Shop",
+    placeholder: "Ask Shop app…",
+    orb: "shop",
   }),
   agent({
     id: "customers",
     name: "Customers",
     group: "tools",
-    preview: "Repeat buyers are asking for a loyalty perk.",
+    preview: "Second orders are asking for a longer headphone warranty.",
     topic: "Buyers",
     placeholder: "Ask Customers…",
     orb: "customers",
@@ -532,7 +585,7 @@ export const catalog: Agent[] = [
     id: "orders",
     name: "Orders",
     group: "tools",
-    preview: "Two orders still need tracking updates.",
+    preview: "#1078 and #1077 are paid and still unfulfilled.",
     topic: "Fulfillment",
     placeholder: "Ask Orders…",
     orb: "orders",
@@ -812,6 +865,7 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
     cardsDismissed: [],
     lookbook: false,
     theme: null,
+    introPlayed: false,
   };
 }
 
@@ -822,24 +876,15 @@ function activeThread(agentId: string): Block[] {
         id: "c1",
         type: "text",
         role: "assistant",
-        text: "This week: $184,600 in sales, 1,284 orders and 2.8% conversion. Sales are up 9%; orders are up 12%.",
+        text: "The last 30 days are at $48,393, from 386 orders. Average order value slipped to $125 from $134. Today is the quiet part of that: $2,079 from 14 orders.\n\nThree things I’d do. End the sitewide 20% on the USB-C Power Bank and offer it only after a headphone is in the cart. Studio ANC Headphones have 14 left and they’re $18,640 of these 30 days, so the reorder has to leave before Monday’s ads. Three orders still need a hand: #1078 and #1077 are paid and unfulfilled, and #1075 from yesterday hasn’t been paid.\n\nThe other sidekicks are already on pieces of it. Product ideas is drafting a headphone, case, and cable bundle at $289. Online store is fixing the desk lamp page, which still says 5–7 days while the ads say this week. Orders has those three orders. Shop app is looking at why Shop checkouts convert at 1.6% against 2.7% on the online store.",
         typed: true,
       },
-      { id: "c2", type: "text", role: "user", text: "Why are sales growing slower than orders?" },
       {
-        id: "c3",
-        type: "text",
-        role: "assistant",
-        text: "Average order value fell 2.7% to $144. I’d check product mix and discounts before increasing spend.",
-      },
-      { id: "c4", type: "text", role: "user", text: "Show me our two best sellers. What should we improve?" },
-      { id: "c5", type: "sellers" },
-      {
-        id: "c6",
+        id: "c2",
         type: "chips",
         chips: [
-          { label: "Review in more detail", tone: "secondary" },
-          { label: "Confirm changes", tone: "primary" },
+          { label: "What should I do first?", tone: "primary" },
+          { label: "Show the best sellers", tone: "secondary" },
         ],
       },
     ];
@@ -861,40 +906,40 @@ function activeThread(agentId: string): Block[] {
 
 const activeGreetings: Record<string, { text: string; asks: [string, string] }> = {
   ideas: {
-    text: "I’ve been watching what first-time buyers put in their carts. A starter bundle — Cloud Headphones, a case, and a cable — could lift average order value without a discount. Want me to draft it?",
-    asks: ["Draft the starter bundle", "What else could we sell?"],
+    text: "Carts that skip the headphones are mostly a $49 power bank, which is why the average order is $125. A bundle of the Studio ANC Headphones, the earbuds case, and a cable at $289 would put the bank back in a supporting role. I can draft it.",
+    asks: ["Draft the $289 bundle", "What else could we sell?"],
   },
   trends: {
-    text: "Searches for gift sets are climbing this week, and shoppers keep pairing headphones with desk accessories. If we list a gift set now, we catch the holiday ramp early.",
-    asks: ["Which products fit a gift set?", "What’s driving the trend?"],
+    text: "Search is up 22% week over week for “travel charger” and “desk setup.” The power bank and the portable charger are catching it. Headphone search is flat, even though those 76 orders are $18,640 of the month.",
+    asks: ["Which products fit the search?", "What’s driving the trend?"],
   },
   grok: {
-    text: "Shoppers on X keep asking whether the headphones come in a smaller size. Most of it is in the replies to your launch post, so one clear answer there would land with everyone.",
+    text: "The headphone launch thread on X has about 40 replies asking if the Studio ANC works for calls when it’s plugged into a USB-C hub. Nobody from the store has answered. One reply there would cover it.",
     asks: ["Draft a reply for X", "Summarize what people are saying"],
   },
   slack: {
-    text: "Morning. I tightened the copy for your welcome email, and the team flagged two orders missing tracking in #ops. Want the draft or the rundown first?",
+    text: "In #ops this morning: #1078, #1077, and #1075 still need a hand, and the headphone bin is down to 14 units. The welcome email draft is ready whenever you want it.",
     asks: ["Show me the email draft", "What did the team flag?"],
   },
   muse: {
-    text: "I have a direction for the lamp: a quieter campaign. One photo at dusk, one line about shipping tomorrow, nothing else. Want to riff on it?",
+    text: "For the headphone restock: one photo of the Studio ANC on a desk, and the line “Back in stock. Ships tomorrow.” I’d leave the lamp out of this one.",
     asks: ["Give me three headlines", "Name the campaign"],
   },
   store: {
-    text: "The Studio Desk Lamp page says it ships in 5–7 days, but the ads promise this week. That mismatch is probably costing you checkouts. I can tighten the delivery copy.",
-    asks: ["Rewrite the delivery copy", "What else on the storefront needs work?"],
+    text: "The Desk Lamp page still says it ships in 5–7 days. The ads running this week say it ships this week. That gap is on the product page and in the cart. I can rewrite the delivery line.",
+    asks: ["Rewrite the delivery line", "What else on the storefront needs work?"],
   },
-  agentic: {
-    text: "Orders from AI shopping agents bunch up around lunch, and that rush is pushing delivery promises late. Capping same-day delivery at noon would keep the promises honest.",
-    asks: ["How would a noon cutoff work?", "What are agentic storefronts?"],
+  shop: {
+    text: "Shop brought in sessions and converted at 1.6% over the last 30 days. The online store converted at 2.7%. The Shop listing crops the headphone photo, so the grid shows the earcup and not the product. That’s the first fix.",
+    asks: ["Fix the Shop listing crop", "How does Shop compare to the online store?"],
   },
   customers: {
-    text: "Repeat buyers keep asking for a loyalty perk. The smallest useful test is a $10 thank-you after someone’s second order. Want me to sketch it?",
-    asks: ["Sketch the loyalty perk", "How do customer segments work?"],
+    text: "28% of this month’s orders are from people who’ve bought before. The ones on their second order keep asking for two years of warranty on the headphones, not a points program. That’s the smaller test.",
+    asks: ["Sketch the warranty offer", "Who is coming back?"],
   },
   orders: {
-    text: "Two orders from yesterday still need tracking numbers. Everything else shipped on time. Want me to open them?",
-    asks: ["Open the orders", "How do I add tracking to an order?"],
+    text: "Three orders need a hand. #1078 Danielle Hudson, $369.99, paid, headphones and accessories, not fulfilled. #1077 Maya Chen, $89, paid, desk lamp, not fulfilled. #1075 Priya Patel, $58, not paid and not fulfilled. Everything older than yesterday has shipped.",
+    asks: ["Open the orders", "Which one should I clear first?"],
   },
 };
 
@@ -903,8 +948,8 @@ export function activeState(storeName = "My Store"): PrototypeState {
   const installed = catalog.map((item) => ({
     ...item,
     installed: true,
-    preview: item.id === "chief" ? "Improving sales compared to orders" : item.preview,
-    topic: item.id === "chief" ? "Improve sales" : item.topic,
+    preview: item.id === "chief" ? "Last 30 days: $48,393" : item.preview,
+    topic: item.id === "chief" ? "Last 30 days" : item.topic,
   }));
   const threads: Record<string, Block[]> = { sidekick: base.threads.sidekick };
   for (const item of installed) threads[item.id] = activeThread(item.id);
@@ -1288,9 +1333,7 @@ export function runChip(state: PrototypeState, label: string) {
     return;
   }
   if (label === "Create my own sidekick") {
-    state.mode = "thread";
-    push(state, "sidekick", { id: id(state), type: "create" });
-    state.selectedAgentId = "sidekick";
+    state.mode = "create";
     return;
   }
   if (label === "Give me some examples") {
@@ -1316,7 +1359,7 @@ export function runChip(state: PrototypeState, label: string) {
         id: id(state),
         type: "text",
         role: "assistant",
-        text: `I’ll focus on ${focus}. This week is already moving: sales are ahead of orders, so I’ll watch average order value before anyone spends more. Ask me what to do next, or open the live store.`,
+        text: `I’ll focus on ${focus}. The last 30 days are $48,393 from 386 orders, and the average order slipped to $125. I’d end the power-bank discount, reorder the headphones, and clear #1078, #1077, and #1075. Ask me what to do first, or open the live store.`,
       },
       {
         id: id(state),
@@ -1340,17 +1383,29 @@ export function runChip(state: PrototypeState, label: string) {
       state.agents.push({ ...item, installed: true });
       if (!state.threads[item.id]) state.threads[item.id] = activeThread(item.id);
     }
-    patchAgent(state, "chief", { preview: "Improving sales compared to orders", topic: "Improve sales" });
+    patchAgent(state, "chief", { preview: "Last 30 days: $48,393", topic: "Last 30 days" });
     return;
   }
-  if (label === "What should I do next?") {
+  if (label === "What should I do next?" || label === "What should I do first?") {
     push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
     push(state, "chief", {
       id: id(state),
       type: "text",
       role: "assistant",
-      text: "Finish payout setup, then look at the two best sellers before adding spend. Headphones can carry a bundle. The lamp needs a clearer delivery promise.",
+      text: "Reorder the Studio ANC Headphones first. Fourteen units won’t cover Monday’s ads, and they’re $18,640 of this month. Then turn off the sitewide 20% on the USB-C Power Bank. Then clear #1078 and #1077, both paid and still unfulfilled.",
     });
+    return;
+  }
+  if (label === "Show the best sellers") {
+    push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
+    push(state, "chief", { id: id(state), type: "sellers" });
+    push(state, "chief", {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "Studio ANC Headphones are $18,640 from 76 orders. The USB-C Power Bank is next at $6,370 from 130 orders, mostly because of the 20% off.",
+    });
+    state.preview = "home-active";
     return;
   }
   if (label === "Review in more detail") {
@@ -1359,7 +1414,7 @@ export function runChip(state: PrototypeState, label: string) {
       id: id(state),
       type: "text",
       role: "assistant",
-      text: "Headphones convert when the case is in the first image. The lamp loses people on shipping: the page says 5–7 days and ads say this week. I’d make both pages say “ships tomorrow” and put the bundle price next to the headphones.",
+      text: "The headphones convert when the case is in the first image. The lamp loses people on shipping: the page says 5–7 days and the ads say this week. I’d make the lamp say “ships this week” and put the $289 bundle next to the headphones.",
     });
     state.preview = "products";
     return;
@@ -1370,7 +1425,7 @@ export function runChip(state: PrototypeState, label: string) {
       id: id(state),
       type: "text",
       role: "assistant",
-      text: "Confirmed. I’ll keep the bundle recommendation on Cloud Headphones and the delivery note on Studio Desk Lamp. Nothing is published until you edit the product.",
+      text: "Confirmed. I’ll keep the $289 bundle on the Studio ANC Headphones and the delivery note on the Desk Lamp. Nothing is published until you edit the product.",
     });
     patchAgent(state, "chief", { preview: "Bundle and delivery notes are confirmed." });
     state.preview = "home-active";
@@ -1412,7 +1467,7 @@ function scriptedReply(agentId: string, text: string, storeName: string): { text
   if (/best seller|headphones|desk lamp/.test(q)) {
     effects.push({ type: "artifact", name: "best-sellers" });
     return {
-      text: "Your best sellers over the last 30 days are Cloud Headphones and the Studio Desk Lamp. I’d bundle a case with the headphones and make the lamp’s delivery promise match the ads.",
+      text: "This month’s best sellers are the Studio ANC Headphones, $18,640 from 76 orders, and the USB-C Power Bank, $6,370 from 130 orders. I’d reorder the headphones and stop the sitewide discount on the bank.",
       effects,
     };
   }
@@ -1464,16 +1519,16 @@ function scriptedReply(agentId: string, text: string, storeName: string): { text
   }
   const fallback: Record<string, string> = {
     sidekick: `I can keep setting up ${storeName}. Ask me to review payments, choose a theme, set up a domain, review shipping, add a retail address, or order POS hardware.`,
-    chief: "Sales are up 9% and orders are up 12%, but average order value slipped to $144. I can pull the two best sellers or name the next decision.",
-    ideas: "A starter bundle for first-time buyers still looks right: headphones, case, and a cable. I can add it as a draft product.",
-    trends: "Gift-set searches are up this week. Smaller sizes are showing up in questions from X.",
-    slack: "The welcome email is tighter. I can summarize anything else the team parked in Slack.",
-    grok: "Shoppers on X keep asking for smaller sizes. Want a reply, or a product draft?",
-    muse: "Try a quieter campaign for the lamp: one photo, one sentence about shipping tomorrow.",
-    store: "The lamp page should say when it ships. I can open products if you want to edit it.",
-    agentic: "Agent traffic is bunching at lunch and delivery promises are slipping. I’d cap same-day orders at noon.",
-    customers: "Repeat buyers are asking for a loyalty perk. A $10 note after the second order is the smallest test.",
-    orders: "Two orders still need tracking. I can open orders in the preview.",
+    chief: "The last 30 days are $48,393 from 386 orders, and the average order slipped to $125. I’d reorder the headphones, end the power-bank discount, and clear the three open orders.",
+    ideas: "A $289 bundle of the Studio ANC Headphones, the earbuds case, and a cable is the draft I’d add. It puts the $49 power bank back in a supporting role.",
+    trends: "Travel charger and desk setup searches are up 22% this week. Headphone search is flat even though those orders are $18,640.",
+    slack: "The welcome email is drafted. #ops also flagged #1078, #1077, #1075, and 14 headphones left.",
+    grok: "X is waiting on whether the Studio ANC Headphones work for calls through a USB-C hub. I can draft that reply.",
+    muse: "The restock line is “Back in stock. Ships tomorrow.” One desk photo of the headphones, and leave the lamp out.",
+    store: "The Desk Lamp page should say it ships this week, matching the ads. I can open the product if you want to edit it.",
+    shop: "Shop converts at 1.6% against 2.7% on the online store. The listing crop on the headphones is the first fix.",
+    customers: "28% of orders are from returning buyers. The ask on the second order is a longer headphone warranty, not points.",
+    orders: "#1078 and #1077 are paid and unfulfilled. #1075 is unpaid. I can open orders in the preview.",
     custom: "Tell me what you want this sidekick to take off your plate.",
   };
   return { text: fallback[agentId] ?? (agentId.startsWith("custom-") ? fallback.custom : fallback.sidekick), effects };
@@ -1501,7 +1556,8 @@ export type Action =
   | { type: "toggle-purpose"; id: string }
   | { type: "add-catalog"; id: string }
   | { type: "create-agent"; name: string; purpose: string }
-  | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[] }
+  | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string }
+  | { type: "intro-seen" }
   | { type: "preview"; page: PreviewId; wide?: boolean }
   | { type: "product"; id: string }
   | { type: "update-product"; id: string; patch: Partial<Product> }
@@ -1762,16 +1818,16 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
         orb: "custom",
         installed: true,
       });
-      created.persona = `You are ${name}, a custom Shopify sidekick. Purpose: ${action.purpose || "help the merchant"}. ${persona.custom}`;
+      created.persona = `You are ${name}, a custom Shopify sidekick for this electronics store. Purpose: ${action.purpose || "help the merchant"}. ${persona.custom} ${storeFacts}`;
       next.agents = [...next.agents, created];
+      const job = action.purpose.trim().replace(/\.+$/, "");
+      const task = /^[A-Z][a-z]/.test(job) ? job.charAt(0).toLowerCase() + job.slice(1) : job;
       next.threads[slug] = [
         {
           id: id(next),
           type: "text",
           role: "assistant",
-          text: action.purpose.trim()
-            ? `I’m ${name}. I’ll ${action.purpose.trim().replace(/\.$/, "")}. What should we do first?`
-            : `I’m ${name}. Tell me what you want me to take on.`,
+          text: task ? `I’m ${name}. I’ll ${task}. What should we do first?` : `I’m ${name}. Tell me what you want me to take on.`,
           typed: true,
         },
       ];
@@ -1779,6 +1835,9 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       next.mode = "thread";
       return next;
     }
+    case "intro-seen":
+      next.introPlayed = true;
+      return next;
     case "edit-agent": {
       const current = next.agents.find((item) => item.id === action.id);
       if (!current) return state;
@@ -1792,6 +1851,8 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
         connections: action.connections.map((item) => ({ ...item })),
         placeholder,
         persona: `You are ${name}, a Shopify sidekick. Purpose: ${purpose}.`,
+        orbFrom: action.orbFrom,
+        orbTo: action.orbTo,
       });
       return next;
     }

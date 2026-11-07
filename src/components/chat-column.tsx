@@ -11,6 +11,8 @@ import {
   canonicalOrb,
   catalog,
   exemptAvatarAgents,
+  isVoiceOrb,
+  orbColorPresets,
   paymentSteps,
   purposes,
   sellers,
@@ -18,6 +20,7 @@ import {
   sidekickStage,
   voiceOrbIds,
   voiceOrbLabel,
+  voiceOrbTint,
   type Agent,
   type Block,
   type Connection,
@@ -53,6 +56,7 @@ export function ChatColumn({
   onSwitch,
   onAddAgent,
   onIntroduced,
+  onIntroFinished,
 }: {
   state: PrototypeState;
   liveSegments: LiveSegment[] | null;
@@ -66,7 +70,7 @@ export function ChatColumn({
   onStart: () => void;
   onAddCatalog: (id: string) => void;
   onCreate: (name: string, purpose: string) => void;
-  onEditAgent: (patch: { id: string; name: string; purpose: string; orb: OrbId; connections: Connection[] }) => void;
+  onEditAgent: (patch: { id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string }) => void;
   onConversations: (open: boolean) => void;
   onNewChat: () => void;
   onOpenConversation: (id: string) => void;
@@ -75,12 +79,13 @@ export function ChatColumn({
   onSwitch: (id: string) => void;
   onAddAgent: () => void;
   onIntroduced?: () => void;
+  onIntroFinished?: () => void;
 }) {
   const agent = selectedAgent(state);
   const purpose = state.selectedAgentId === "chief" && state.chiefPhase === "purpose" && state.mode === "thread";
   const listing = state.mode === "thread" && state.conversationsOpen;
-  const title = state.mode === "add" ? "Add a sidekick" : purpose ? "Chief of staff" : agent.name;
-  const topic = state.mode === "add" ? null : purpose ? "Set purpose" : agent.topic;
+  const title = state.mode === "add" ? "Add a sidekick" : state.mode === "create" ? "Create a sidekick" : purpose ? "Chief of staff" : agent.name;
+  const topic = state.mode === "add" || state.mode === "create" ? null : purpose ? "Set purpose" : agent.topic;
   const [editing, setEditing] = useState(false);
   const [typedDone, setTypedDone] = useState(() => new Set(typedOnce));
   const stage = sidekickStage(state);
@@ -97,8 +102,10 @@ export function ChatColumn({
   const writing = stage && beat === "title";
   const showThread = !stage || beat === "message";
   const introduced = useRef(onIntroduced);
+  const finished = useRef(onIntroFinished);
   useEffect(() => {
     introduced.current = onIntroduced;
+    finished.current = onIntroFinished;
   });
   const markTyped = useCallback((id: string) => {
     typedOnce.add(id);
@@ -126,7 +133,10 @@ export function ChatColumn({
                 <TitleIntro
                   motion={state.motion}
                   onReveal={() => introduced.current?.()}
-                  onDone={() => setBeat("message")}
+                  onDone={() => {
+                    setBeat("message");
+                    finished.current?.();
+                  }}
                 />
               ) : state.mode === "thread" && !purpose ? (
                 <button
@@ -186,6 +196,8 @@ export function ChatColumn({
           >
             {state.mode === "add" ? (
               <AddGrid onAdd={onAddCatalog} onChip={onChip} />
+            ) : state.mode === "create" ? (
+              <CreateForm onCreate={onCreate} onBack={() => onChip("Browse sidekicks")} />
             ) : purpose ? (
               <Purpose state={state} onPurpose={onPurpose} onStart={onStart} onChip={onChip} />
             ) : (
@@ -617,6 +629,7 @@ const pageSuggestions: Record<string, string[]> = {
 };
 
 export function suggestionsFor(state: PrototypeState) {
+  if (state.mode === "create") return [];
   if (state.mode === "add") return ["Tell me more about creating a sidekick", "Which sidekick should I add first?", "Create my own sidekick", "What can sidekicks do?"];
   if (sidekickStage(state)) return [];
   if (state.lookbook && !state.theme) return [];
@@ -694,7 +707,8 @@ export function Composer({
   const heard = useRef("");
   const showSuggestions = focused && !draft.trim() && !busy && !plusOpen && !switchOpen;
   const canSend = Boolean(draft.trim()) && !busy;
-  const placeholder = state.mode === "add" && !light ? "Ask Sidekick…" : focused || light ? `Work with ${agent.name}` : agent.placeholder;
+  const picking = state.mode === "add" || state.mode === "create";
+  const placeholder = picking && !light ? "Ask Sidekick…" : focused || light ? `Work with ${agent.name}` : agent.placeholder;
 
   useEffect(
     () => () => {
@@ -704,9 +718,9 @@ export function Composer({
     [],
   );
 
-  const liveAgentId = state.mode === "add" ? "sidekick" : agent.id;
-  const reactive = !exemptAvatarAgents.has(liveAgentId);
-  useOrbAudioPublish(liveAgentId, reactive && (listening || transcribing) && !voiceOpen ? (listening ? "listening" : "thinking") : null, () =>
+  const liveAgentId = state.mode === "add" || state.mode === "create" ? "sidekick" : agent.id;
+  const avatarAgent = state.mode === "add" || state.mode === "create" ? (state.agents.find((item) => item.id === "sidekick") ?? agent) : agent;
+  useOrbAudioPublish(liveAgentId, (listening || transcribing) && !voiceOpen ? (listening ? "listening" : "thinking") : null, () =>
     listening ? (recording.current?.level() ?? 0) : 0,
   );
 
@@ -901,11 +915,11 @@ export function Composer({
                   switchOpen ? "shadow-[0_0_0_3px_rgba(255,255,255,0.16)]" : ""
                 }`}
               >
-                <Orb id={state.mode === "add" ? (state.agents.find((item) => item.id === "sidekick")?.orb ?? "sidekick") : agent.orb} agentId={liveAgentId} size={32} />
+                <Orb id={avatarAgent.orb} agentId={liveAgentId} size={32} colorFrom={avatarAgent.orbFrom} colorTo={avatarAgent.orbTo} />
               </button>
             </Tip>
           ) : (
-            <Orb id={agent.orb} agentId={agent.id} size={light ? 20 : 32} />
+            <Orb id={agent.orb} agentId={agent.id} size={light ? 20 : 32} colorFrom={agent.orbFrom} colorTo={agent.orbTo} />
           )}
           {listening ? (
             <span ref={meter} className="ml-1.5 flex h-5 items-center gap-[3px] text-[12px] text-[#8e8f8b]" style={{ "--level": 0 } as React.CSSProperties}>
@@ -1122,7 +1136,7 @@ function SidekickSwitcher({
             onClick={() => onPick(item.id)}
             className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] hover:bg-white/[0.07]"
           >
-            <Orb id={item.orb} agentId={item.id} size={24} />
+            <Orb id={item.orb} agentId={item.id} size={24} colorFrom={item.orbFrom} colorTo={item.orbTo} />
             <span className="min-w-0 flex-1 truncate">{item.name}</span>
             {item.id === current ? <PIcon name="Check" size={16} /> : null}
           </button>
@@ -1191,7 +1205,15 @@ function PlusMenu({
               onClick={() => onInsert(sub === "skills" ? `/${label.toLowerCase().replace(/\s+/g, "-")} ` : `@${label} `)}
               className={row}
             >
-              {sub === "mention" ? <Orb id={agents.find((item) => item.name === label)?.orb ?? "sidekick"} agentId={agents.find((item) => item.name === label)?.id} size={18} /> : null}
+              {sub === "mention" ? (
+                <Orb
+                  id={agents.find((item) => item.name === label)?.orb ?? "sidekick"}
+                  agentId={agents.find((item) => item.name === label)?.id}
+                  size={18}
+                  colorFrom={agents.find((item) => item.name === label)?.orbFrom}
+                  colorTo={agents.find((item) => item.name === label)?.orbTo}
+                />
+              ) : null}
               <span className="truncate">{label}</span>
             </button>
           ))}
@@ -1475,7 +1497,8 @@ function Popover({
 
 function avatarChoices(agent: Agent): { id: OrbId; label: string }[] {
   if (exemptAvatarAgents.has(agent.id)) return [{ id: agent.orb, label: agent.name }];
-  return voiceOrbIds.map((id) => ({ id, label: voiceOrbLabel[id] }));
+  if (agent.group === "tools") return [{ id: "aura", label: voiceOrbLabel.aura }];
+  return voiceOrbIds.filter((id) => id !== "aura").map((id) => ({ id, label: voiceOrbLabel[id] }));
 }
 
 function EditSidekick({
@@ -1485,23 +1508,27 @@ function EditSidekick({
 }: {
   agent: Agent;
   onClose: () => void;
-  onSave: (patch: { name: string; purpose: string; orb: OrbId; connections: Connection[] }) => void;
+  onSave: (patch: { name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string }) => void;
 }) {
   const [name, setName] = useState(agent.name);
   const [purpose, setPurpose] = useState(agent.purpose);
   const [orb, setOrb] = useState<OrbId>(canonicalOrb(agent.orb));
+  const starting = isVoiceOrb(canonicalOrb(agent.orb)) ? voiceOrbTint[canonicalOrb(agent.orb) as keyof typeof voiceOrbTint] : voiceOrbTint.plasma;
+  const [colorFrom, setColorFrom] = useState(agent.orbFrom ?? starting.from);
+  const [colorTo, setColorTo] = useState(agent.orbTo ?? starting.to);
   const [connections, setConnections] = useState(agent.connections);
+  const voice = isVoiceOrb(orb);
   const field = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white outline-none placeholder:text-[#8e8f8b] focus:border-white/30";
   return createPortal(
     <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" role="presentation" onMouseDown={onClose}>
       <form
         role="dialog"
         aria-labelledby="edit-sidekick-title"
-        className="pop-in flex w-full max-w-[420px] flex-col gap-4 rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 text-white shadow-[0_24px_64px_rgba(0,0,0,0.45)]"
+        className="pop-in flex max-h-[min(720px,calc(100vh-48px))] w-full max-w-[420px] flex-col gap-4 overflow-y-auto rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 text-white shadow-[0_24px_64px_rgba(0,0,0,0.45)]"
         onMouseDown={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
-          onSave({ name, purpose, orb, connections });
+          onSave({ name, purpose, orb, connections, ...(voice ? { orbFrom: colorFrom, orbTo: colorTo } : {}) });
         }}
       >
         <div className="flex items-center justify-between gap-3">
@@ -1521,14 +1548,68 @@ function EditSidekick({
                 type="button"
                 aria-label={choice.label}
                 aria-pressed={orb === choice.id}
-                onClick={() => setOrb(choice.id)}
+                onClick={() => {
+                  if (choice.id === orb) return;
+                  setOrb(choice.id);
+                  if (isVoiceOrb(choice.id)) {
+                    const tint = voiceOrbTint[choice.id];
+                    setColorFrom(tint.from);
+                    setColorTo(tint.to);
+                  }
+                }}
                 className={`press rounded-full ${orb === choice.id ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-80 hover:opacity-100"}`}
               >
-                <Orb id={choice.id} size={36} />
+                <Orb id={choice.id} size={36} colorFrom={choice.id === orb && voice ? colorFrom : undefined} colorTo={choice.id === orb && voice ? colorTo : undefined} />
               </button>
             ))}
           </div>
         </fieldset>
+        {voice ? (
+          <fieldset>
+            <legend className="mb-2 text-[12px] text-[#8e8f8b]">Color</legend>
+            <div className="flex flex-wrap gap-2">
+              {orbColorPresets.map((preset) => {
+                const selected = colorFrom.toLowerCase() === preset.from && colorTo.toLowerCase() === preset.to;
+                return (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    aria-label={preset.name}
+                    aria-pressed={selected}
+                    onClick={() => {
+                      setColorFrom(preset.from);
+                      setColorTo(preset.to);
+                    }}
+                    className={`size-7 rounded-full ${selected ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : ""}`}
+                    style={{ background: `linear-gradient(135deg, ${preset.from}, ${preset.to})` }}
+                  />
+                );
+              })}
+            </div>
+            <div className="mt-3 flex gap-3">
+              <label className="flex items-center gap-2 text-[12px] text-[#8e8f8b]">
+                From
+                <input
+                  type="color"
+                  aria-label="Color from"
+                  value={colorFrom}
+                  onChange={(event) => setColorFrom(event.target.value)}
+                  className="h-7 w-9 cursor-pointer rounded-md border border-white/15 bg-transparent p-0.5"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-[12px] text-[#8e8f8b]">
+                To
+                <input
+                  type="color"
+                  aria-label="Color to"
+                  value={colorTo}
+                  onChange={(event) => setColorTo(event.target.value)}
+                  className="h-7 w-9 cursor-pointer rounded-md border border-white/15 bg-transparent p-0.5"
+                />
+              </label>
+            </div>
+          </fieldset>
+        ) : null}
         <label className="flex flex-col gap-1.5 text-[12px] text-[#8e8f8b]">
           Name
           <input value={name} onChange={(event) => setName(event.target.value)} className={field} />
@@ -1547,11 +1628,14 @@ function EditSidekick({
                   type="button"
                   role="switch"
                   aria-checked={item.on}
-                  aria-label={item.label}
+                  aria-label={`${item.label} ${item.on ? "on" : "off"}`}
                   onClick={() => setConnections((list) => list.map((entry) => (entry.id === item.id ? { ...entry, on: !entry.on } : entry)))}
-                  className={`press relative h-5 w-9 rounded-full transition-colors ${item.on ? "bg-[#5631f4]" : "bg-white/15"}`}
+                  className={`relative h-5 w-9 shrink-0 rounded-full ${item.on ? "bg-[#5631f4]" : "bg-white/15"}`}
                 >
-                  <span className={`absolute top-0.5 size-4 rounded-full bg-white transition-[translate] ${item.on ? "translate-x-4" : "translate-x-0.5"}`} />
+                  <span
+                    className="absolute top-0.5 size-4 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
+                    style={{ left: item.on ? 18 : 2, transition: "left 160ms ease" }}
+                  />
                 </button>
               </li>
             ))}
@@ -1677,31 +1761,49 @@ function BlockView({
       </div>
     );
   }
-  if (block.type === "create") return <CreateForm onCreate={onCreate} />;
+  if (block.type === "create") return <CreateForm onCreate={onCreate} onBack={() => onChip("Browse sidekicks")} />;
   return null;
 }
 
-function CreateForm({ onCreate }: { onCreate: (name: string, purpose: string) => void }) {
-  const [name, setName] = useState("");
-  const [purpose, setPurpose] = useState("");
+function CreateForm({ onCreate, onBack }: { onCreate: (name: string, purpose: string) => void; onBack: () => void }) {
+  const form = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState("");
+  function fieldValue(name: string) {
+    const field = form.current?.querySelector(`[name="${name}"]`);
+    return field instanceof HTMLElement && "value" in field && typeof field.value === "string" ? field.value.trim() : "";
+  }
   return (
-    <div className="rise my-2 max-w-[520px] rounded-[20px] border border-white/10 bg-[#171817] p-4">
-      <p className="mb-3 text-[15px]">Name the sidekick and give it a job.</p>
-      <s-stack gap="base">
-        <s-text-field label="Name" name="sidekick-name" value={name} onInput={(event) => setName(event.currentTarget.value)} />
-        <s-text-area
-          label="What should it take on?"
-          name="sidekick-purpose"
-          rows={3}
-          value={purpose}
-          onInput={(event) => setPurpose(event.currentTarget.value)}
-        />
-        <s-stack direction="inline">
-          <s-button variant="primary" onClick={() => onCreate(name, purpose)}>
-            Add sidekick
-          </s-button>
+    <div className="rise max-w-[520px]">
+      <p className="mb-4 text-[15px] leading-[1.4]">
+        Name the sidekick and tell it the job it should take on. It gets its own place on the left and its own conversation.
+      </p>
+      <div ref={form} className="rounded-[20px] border border-white/10 bg-[#171817] p-4">
+        <s-stack gap="base">
+          <s-text-field label="Name" name="sidekick-name" />
+          <s-text-area label="What should it take on?" name="sidekick-purpose" rows={3} />
+          {error ? <p className="text-[13px] text-[#ffb800]">{error}</p> : null}
+          <s-stack direction="inline" gap="small">
+            <s-button
+              variant="primary"
+              onClick={() => {
+                const name = fieldValue("sidekick-name");
+                const purpose = fieldValue("sidekick-purpose");
+                if (!name) {
+                  setError("Give the sidekick a name.");
+                  return;
+                }
+                setError("");
+                onCreate(name, purpose);
+              }}
+            >
+              Add sidekick
+            </s-button>
+            <s-button variant="secondary" onClick={onBack}>
+              Back
+            </s-button>
+          </s-stack>
         </s-stack>
-      </s-stack>
+      </div>
     </div>
   );
 }

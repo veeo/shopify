@@ -349,7 +349,7 @@ const Sphere = ({ state, speed, colorFrom, colorTo, reduced, levelRef, onReady }
   });
 
   return (
-    <mesh>
+    <mesh scale={1.14}>
       <icosahedronGeometry args={[1.2, 16]} />
       <shaderMaterial
         ref={matRef}
@@ -394,7 +394,7 @@ export const NebulaScene = ({
       frameloop={reduced || !active ? 'demand' : 'always'}
       camera={{ position: [0, 0, 3.6], fov: 45 }}
       gl={{ antialias: true, alpha: true }}
-      dpr={[1, 1.5]}
+      dpr={[1, 2]}
       resize={{ offsetSize: true }}
     >
       <Sphere

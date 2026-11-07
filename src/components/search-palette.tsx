@@ -246,7 +246,12 @@ export function SearchPalette({
                     className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left ${index === active ? "bg-[#f1f1f1]" : ""}`}
                   >
                     {item.orb ? (
-                      <Orb id={state.agents.find((agent) => agent.id === "sidekick")?.orb ?? "sidekick"} size={20} />
+                      <Orb
+                        id={state.agents.find((agent) => agent.id === "sidekick")?.orb ?? "sidekick"}
+                        size={20}
+                        colorFrom={state.agents.find((agent) => agent.id === "sidekick")?.orbFrom}
+                        colorTo={state.agents.find((agent) => agent.id === "sidekick")?.orbTo}
+                      />
                     ) : item.image ? (
                       <img src={item.image} alt="" className="size-5 shrink-0 rounded object-cover" />
                     ) : item.icon ? (

@@ -31,7 +31,7 @@ const bootMs = 1500;
 
 type Turn = { agentId: string; text: string; done: boolean; first: boolean };
 
-export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "setup" | "active" }) {
+export function AdminApp({ initialScenario = "active" }: { initialScenario?: "setup" | "active" }) {
   const [state, setState] = useState<PrototypeState>(() =>
     initialScenario === "active" ? activeState() : { ...setupState("My Store", "sidekick"), signedIn: true },
   );
@@ -193,6 +193,10 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
 
   function send(text: string, target?: string) {
     const current = state;
+    if (!target && text.trim() === "Create my own sidekick") {
+      dispatch({ type: "chip", label: "Create my own sidekick" });
+      return;
+    }
     const agentId = target ?? (current.mode === "add" ? "sidekick" : current.selectedAgentId);
     const thread = current.threads[agentId] ?? [];
     const transcript = thread.flatMap((block) => (block.type === "text" ? [{ role: block.role, content: block.text }] : []));
@@ -292,6 +296,7 @@ export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "set
           onDeleteConversation={(id) => dispatch({ type: "delete-conversation", id })}
           onRate={(id, value) => dispatch({ type: "rate", id, value })}
           onIntroduced={() => setRoom(true)}
+          onIntroFinished={() => dispatch({ type: "intro-seen" })}
         />
         </div>
       <PreviewColumn
