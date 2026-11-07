@@ -716,8 +716,7 @@ export function Composer({
 
   const liveAgentId = state.mode === "add" ? "sidekick" : agent.id;
   const avatarAgent = state.mode === "add" ? (state.agents.find((item) => item.id === "sidekick") ?? agent) : agent;
-  const reactive = !exemptAvatarAgents.has(liveAgentId);
-  useOrbAudioPublish(liveAgentId, reactive && (listening || transcribing) && !voiceOpen ? (listening ? "listening" : "thinking") : null, () =>
+  useOrbAudioPublish(liveAgentId, (listening || transcribing) && !voiceOpen ? (listening ? "listening" : "thinking") : null, () =>
     listening ? (recording.current?.level() ?? 0) : 0,
   );
 

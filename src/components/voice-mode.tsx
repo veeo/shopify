@@ -4,7 +4,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Orb } from "@/components/marks";
 import { useOrbAudioPublish } from "@/components/orb-audio";
 import { PIcon } from "@/components/polaris-icon";
-import { exemptAvatarAgents, type Agent } from "@/lib/prototype";
+import { type Agent } from "@/lib/prototype";
 import type { OrbState } from "@/voiceorbs/lib/orb-state";
 import { speak, speakable, startRecording, transcribeAudio, type Playback, type Recording } from "@/lib/voice";
 
@@ -36,7 +36,6 @@ export function VoiceMode({
   const [phase, setPhase] = useState<Phase>("starting");
   const [heard, setHeard] = useState("");
   const [problem, setProblem] = useState("");
-  const orb = useRef<HTMLSpanElement>(null);
   const recording = useRef<Recording | null>(null);
   const playback = useRef<Playback | null>(null);
   const waitingAfter = useRef<string | null>(null);
@@ -129,7 +128,6 @@ export function VoiceMode({
     const tick = () => {
       const now = performance.now();
       const level = recording.current?.level() ?? playback.current?.level() ?? 0;
-      if (exemptAvatarAgents.has(agent.id)) orb.current?.style.setProperty("scale", (1 + Math.min(level, 1) * 0.28).toFixed(3));
       if (recording.current) {
         if (level > 0.12) {
           spoke = true;
@@ -168,7 +166,6 @@ export function VoiceMode({
     }
   }
 
-  const exempt = exemptAvatarAgents.has(agent.id);
   const orbState: OrbState | null =
     phase === "starting"
       ? "connecting"
@@ -179,7 +176,7 @@ export function VoiceMode({
           : phase === "speaking"
             ? "speaking"
             : null;
-  useOrbAudioPublish(agent.id, exempt ? null : orbState, () => {
+  useOrbAudioPublish(agent.id, orbState, () => {
     if (phase === "listening") return recording.current?.level() ?? 0;
     if (phase === "speaking") return playback.current?.level() ?? -1;
     return 0;
@@ -197,9 +194,7 @@ export function VoiceMode({
         className="press relative grid size-14 shrink-0 place-items-center rounded-full"
       >
         {phase === "listening" ? <span className="absolute inset-0 animate-ping rounded-full bg-white/[0.06]" /> : null}
-        <span ref={orb} className="grid place-items-center transition-[scale] duration-100 ease-out">
-          <Orb id={agent.orb} agentId={agent.id} size={48} colorFrom={agent.orbFrom} colorTo={agent.orbTo} />
-        </span>
+        <Orb id={agent.orb} agentId={agent.id} size={48} colorFrom={agent.orbFrom} colorTo={agent.orbTo} />
       </button>
       <div className="min-w-0 flex-1" aria-live="polite">
         {phase === "unavailable" ? (

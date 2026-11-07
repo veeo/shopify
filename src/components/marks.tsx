@@ -48,11 +48,11 @@ export function Orb({
   }
   switch (resolved) {
     case "grok":
-      return <GrokBot size={size} state={audio.state} />;
+      return <GrokBot size={size} state={audio.state} levelRef={audio.levelRef} />;
     case "muse":
-      return <MuseBall size={size} state={audio.state} />;
+      return <MuseBall size={size} state={audio.state} levelRef={audio.levelRef} />;
     case "slack":
-      return <SlackOrb size={size} state={audio.state} />;
+      return <SlackOrb size={size} state={audio.state} levelRef={audio.levelRef} />;
     default:
       return <VoiceOrb id="plasma" size={size} state={audio.state} levelRef={audio.levelRef} colorFrom={colorFrom} colorTo={colorTo} />;
   }
