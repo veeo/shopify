@@ -84,8 +84,8 @@ export function ChatColumn({
   const agent = selectedAgent(state);
   const purpose = state.selectedAgentId === "chief" && state.chiefPhase === "purpose" && state.mode === "thread";
   const listing = state.mode === "thread" && state.conversationsOpen;
-  const title = state.mode === "add" ? "Add a sidekick" : purpose ? "Chief of staff" : agent.name;
-  const topic = state.mode === "add" ? null : purpose ? "Set purpose" : agent.topic;
+  const title = state.mode === "add" ? "Add a sidekick" : state.mode === "create" ? "Create a sidekick" : purpose ? "Chief of staff" : agent.name;
+  const topic = state.mode === "add" || state.mode === "create" ? null : purpose ? "Set purpose" : agent.topic;
   const [editing, setEditing] = useState(false);
   const [typedDone, setTypedDone] = useState(() => new Set(typedOnce));
   const stage = sidekickStage(state);
@@ -196,6 +196,8 @@ export function ChatColumn({
           >
             {state.mode === "add" ? (
               <AddGrid onAdd={onAddCatalog} onChip={onChip} />
+            ) : state.mode === "create" ? (
+              <CreateForm onCreate={onCreate} onBack={() => onChip("Browse sidekicks")} />
             ) : purpose ? (
               <Purpose state={state} onPurpose={onPurpose} onStart={onStart} onChip={onChip} />
             ) : (
@@ -627,6 +629,7 @@ const pageSuggestions: Record<string, string[]> = {
 };
 
 export function suggestionsFor(state: PrototypeState) {
+  if (state.mode === "create") return [];
   if (state.mode === "add") return ["Tell me more about creating a sidekick", "Which sidekick should I add first?", "Create my own sidekick", "What can sidekicks do?"];
   if (sidekickStage(state)) return [];
   if (state.lookbook && !state.theme) return [];
@@ -704,7 +707,8 @@ export function Composer({
   const heard = useRef("");
   const showSuggestions = focused && !draft.trim() && !busy && !plusOpen && !switchOpen;
   const canSend = Boolean(draft.trim()) && !busy;
-  const placeholder = state.mode === "add" && !light ? "Ask Sidekick…" : focused || light ? `Work with ${agent.name}` : agent.placeholder;
+  const picking = state.mode === "add" || state.mode === "create";
+  const placeholder = picking && !light ? "Ask Sidekick…" : focused || light ? `Work with ${agent.name}` : agent.placeholder;
 
   useEffect(
     () => () => {
@@ -714,8 +718,8 @@ export function Composer({
     [],
   );
 
-  const liveAgentId = state.mode === "add" ? "sidekick" : agent.id;
-  const avatarAgent = state.mode === "add" ? (state.agents.find((item) => item.id === "sidekick") ?? agent) : agent;
+  const liveAgentId = state.mode === "add" || state.mode === "create" ? "sidekick" : agent.id;
+  const avatarAgent = state.mode === "add" || state.mode === "create" ? (state.agents.find((item) => item.id === "sidekick") ?? agent) : agent;
   useOrbAudioPublish(liveAgentId, (listening || transcribing) && !voiceOpen ? (listening ? "listening" : "thinking") : null, () =>
     listening ? (recording.current?.level() ?? 0) : 0,
   );
@@ -1757,31 +1761,49 @@ function BlockView({
       </div>
     );
   }
-  if (block.type === "create") return <CreateForm onCreate={onCreate} />;
+  if (block.type === "create") return <CreateForm onCreate={onCreate} onBack={() => onChip("Browse sidekicks")} />;
   return null;
 }
 
-function CreateForm({ onCreate }: { onCreate: (name: string, purpose: string) => void }) {
-  const [name, setName] = useState("");
-  const [purpose, setPurpose] = useState("");
+function CreateForm({ onCreate, onBack }: { onCreate: (name: string, purpose: string) => void; onBack: () => void }) {
+  const form = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState("");
+  function fieldValue(name: string) {
+    const field = form.current?.querySelector(`[name="${name}"]`);
+    return field instanceof HTMLElement && "value" in field && typeof field.value === "string" ? field.value.trim() : "";
+  }
   return (
-    <div className="rise my-2 max-w-[520px] rounded-[20px] border border-white/10 bg-[#171817] p-4">
-      <p className="mb-3 text-[15px]">Name the sidekick and give it a job.</p>
-      <s-stack gap="base">
-        <s-text-field label="Name" name="sidekick-name" value={name} onInput={(event) => setName(event.currentTarget.value)} />
-        <s-text-area
-          label="What should it take on?"
-          name="sidekick-purpose"
-          rows={3}
-          value={purpose}
-          onInput={(event) => setPurpose(event.currentTarget.value)}
-        />
-        <s-stack direction="inline">
-          <s-button variant="primary" onClick={() => onCreate(name, purpose)}>
-            Add sidekick
-          </s-button>
+    <div className="rise max-w-[520px]">
+      <p className="mb-4 text-[15px] leading-[1.4]">
+        Name the sidekick and tell it the job it should take on. It gets its own place on the left and its own conversation.
+      </p>
+      <div ref={form} className="rounded-[20px] border border-white/10 bg-[#171817] p-4">
+        <s-stack gap="base">
+          <s-text-field label="Name" name="sidekick-name" />
+          <s-text-area label="What should it take on?" name="sidekick-purpose" rows={3} />
+          {error ? <p className="text-[13px] text-[#ffb800]">{error}</p> : null}
+          <s-stack direction="inline" gap="small">
+            <s-button
+              variant="primary"
+              onClick={() => {
+                const name = fieldValue("sidekick-name");
+                const purpose = fieldValue("sidekick-purpose");
+                if (!name) {
+                  setError("Give the sidekick a name.");
+                  return;
+                }
+                setError("");
+                onCreate(name, purpose);
+              }}
+            >
+              Add sidekick
+            </s-button>
+            <s-button variant="secondary" onClick={onBack}>
+              Back
+            </s-button>
+          </s-stack>
         </s-stack>
-      </s-stack>
+      </div>
     </div>
   );
 }

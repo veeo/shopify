@@ -193,6 +193,10 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
 
   function send(text: string, target?: string) {
     const current = state;
+    if (!target && text.trim() === "Create my own sidekick") {
+      dispatch({ type: "chip", label: "Create my own sidekick" });
+      return;
+    }
     const agentId = target ?? (current.mode === "add" ? "sidekick" : current.selectedAgentId);
     const thread = current.threads[agentId] ?? [];
     const transcript = thread.flatMap((block) => (block.type === "text" ? [{ role: block.role, content: block.text }] : []));

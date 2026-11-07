@@ -186,7 +186,7 @@ export type PrototypeState = {
   threads: Record<string, Block[]>;
   preview: PreviewId;
   previewWide: boolean;
-  mode: "thread" | "add";
+  mode: "thread" | "add" | "create";
   purposes: string[];
   chiefPhase: "absent" | "purpose" | "working";
   businessType: BusinessType;
@@ -1333,9 +1333,7 @@ export function runChip(state: PrototypeState, label: string) {
     return;
   }
   if (label === "Create my own sidekick") {
-    state.mode = "thread";
-    push(state, "sidekick", { id: id(state), type: "create" });
-    state.selectedAgentId = "sidekick";
+    state.mode = "create";
     return;
   }
   if (label === "Give me some examples") {
@@ -1820,16 +1818,16 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
         orb: "custom",
         installed: true,
       });
-      created.persona = `You are ${name}, a custom Shopify sidekick. Purpose: ${action.purpose || "help the merchant"}. ${persona.custom}`;
+      created.persona = `You are ${name}, a custom Shopify sidekick for this electronics store. Purpose: ${action.purpose || "help the merchant"}. ${persona.custom} ${storeFacts}`;
       next.agents = [...next.agents, created];
+      const job = action.purpose.trim().replace(/\.+$/, "");
+      const task = /^[A-Z][a-z]/.test(job) ? job.charAt(0).toLowerCase() + job.slice(1) : job;
       next.threads[slug] = [
         {
           id: id(next),
           type: "text",
           role: "assistant",
-          text: action.purpose.trim()
-            ? `I’m ${name}. I’ll ${action.purpose.trim().replace(/\.$/, "")}. What should we do first?`
-            : `I’m ${name}. Tell me what you want me to take on.`,
+          text: task ? `I’m ${name}. I’ll ${task}. What should we do first?` : `I’m ${name}. Tell me what you want me to take on.`,
           typed: true,
         },
       ];
