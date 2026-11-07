@@ -6,8 +6,7 @@ import type { OrbState } from "@/voiceorbs/lib/orb-state";
 /**
  * Grok eye placement, capsule shape, and liveliness are adapted from Bloub
  * (MIT) © 2026 Jérémy Perret — https://github.com/jeremy-prt/bloub
- * Slack is an original sphere. Its corner colors come from the
- * Silverside Slackbot still — https://www.silverside.ai/projects/slackbot
+ * Slackbot is the supplied mark: four corner colors on a cream circle, with eyes.
  */
 
 const RENDER = 144;
@@ -337,14 +336,6 @@ export function GrokBot({ size, state, levelRef }: { size: number; state?: OrbSt
   );
 }
 
-const SLACK_R = 67;
-const SLACK_COLORS = {
-  blue: "#4E86C0",
-  green: "#5A9468",
-  red: "#C43048",
-  gold: "#C9921C",
-};
-
 export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
   const id = useId().replace(/:/g, "");
   const host = useRef<HTMLSpanElement>(null);
@@ -355,60 +346,44 @@ export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbS
     const level = levelRef?.current ?? -1;
     const live = level >= 0 ? clamp(level) : 0;
     const voiced = level >= 0 && (state === "listening" || state === "speaking");
-    const driftX = reduced ? 0 : loopNoise(time, 9.2, 0.4) * 0.8;
-    const driftY = reduced ? 0 : loopNoise(time, 7.4, 1.2) * 0.7;
-    const scale = 1 + (voiced ? live * 0.02 : 0) + (reduced ? 0 : Math.sin(time / 3.6) * 0.004);
-    motion.current?.setAttribute(
-      "transform",
-      `translate(${round(CENTER + driftX)} ${round(CENTER + driftY)}) scale(${round(scale)}) translate(${-CENTER} ${-CENTER})`,
-    );
+    const scale = reduced ? 1 : 1 + Math.sin(time / 3.6) * 0.012 + (voiced ? live * 0.04 : 0);
+    motion.current?.setAttribute("transform", `translate(14 14) scale(${scale.toFixed(3)}) translate(-14 -14)`);
   });
 
   return (
-    <span ref={host} className="orb voice-slot" data-state={state ?? "idle"} style={slotStyle(size)} aria-hidden>
-      <span className="voice-orb-fit">
-        <svg viewBox={`0 0 ${RENDER} ${RENDER}`} width={RENDER} height={RENDER}>
-          <defs>
-            <clipPath id={`${id}-clip`}>
-              <circle cx={CENTER} cy={CENTER} r={SLACK_R} />
-            </clipPath>
-            <radialGradient id={`${id}-blue`} cx="22%" cy="22%" r="70%">
-              <stop offset="0%" stopColor={SLACK_COLORS.blue} />
-              <stop offset="46%" stopColor={SLACK_COLORS.blue} />
-              <stop offset="100%" stopColor={SLACK_COLORS.blue} stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id={`${id}-green`} cx="78%" cy="22%" r="70%">
-              <stop offset="0%" stopColor={SLACK_COLORS.green} />
-              <stop offset="46%" stopColor={SLACK_COLORS.green} />
-              <stop offset="100%" stopColor={SLACK_COLORS.green} stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id={`${id}-red`} cx="22%" cy="80%" r="70%">
-              <stop offset="0%" stopColor={SLACK_COLORS.red} />
-              <stop offset="46%" stopColor={SLACK_COLORS.red} />
-              <stop offset="100%" stopColor={SLACK_COLORS.red} stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id={`${id}-gold`} cx="80%" cy="78%" r="70%">
-              <stop offset="0%" stopColor={SLACK_COLORS.gold} />
-              <stop offset="46%" stopColor={SLACK_COLORS.gold} />
-              <stop offset="100%" stopColor={SLACK_COLORS.gold} stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id={`${id}-shade`} cx="34%" cy="28%" r="80%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.28" />
-              <stop offset="40%" stopColor="#ffffff" stopOpacity="0" />
-              <stop offset="100%" stopColor="#1c1018" stopOpacity="0.28" />
-            </radialGradient>
-          </defs>
-          <g ref={motion}>
-            <g clipPath={`url(#${id}-clip)`}>
-              <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={SLACK_COLORS.blue} />
-              <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={`url(#${id}-green)`} />
-              <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={`url(#${id}-red)`} />
-              <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={`url(#${id}-gold)`} />
-              <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={`url(#${id}-shade)`} />
+    <span ref={host} className="orb" data-state={state ?? "idle"} style={slotStyle(size)} aria-hidden>
+      <svg viewBox="0 0 28 28" width="100%" height="100%" style={{ display: "block" }}>
+        <defs>
+          <filter id={`${id}-shade`} x="0" y="0" width="28" height="28" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+            <feFlood floodOpacity="0" result="BackgroundImageFix" />
+            <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+            <feOffset />
+            <feGaussianBlur stdDeviation="2" />
+            <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
+            <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.3 0" />
+            <feBlend mode="normal" in2="shape" result="effect1_innerShadow" />
+          </filter>
+          <clipPath id={`${id}-clip`}>
+            <rect width="28" height="28" rx="14" />
+          </clipPath>
+        </defs>
+        <g filter={`url(#${id}-shade)`}>
+          <g clipPath={`url(#${id}-clip)`}>
+            <g ref={motion}>
+              <rect width="28" height="28" rx="14" fill="#FAFAF8" />
+              <circle cy="28" r="13" fill="#E2076A" />
+              <circle cx="28" cy="28" r="13" fill="#FCC005" />
+              <circle r="13" fill="#02B3FF" />
+              <circle cx="28" r="13" fill="#43B65A" />
+              <path d="M11.5 14C11.5 15.933 9.933 17.5 8 17.5C6.067 17.5 4.5 15.933 4.5 14C4.5 12.067 6.067 10.5 8 10.5C9.933 10.5 11.5 12.067 11.5 14Z" fill="black" stroke="white" />
+              <path d="M23.5 14C23.5 15.933 21.933 17.5 20 17.5C18.067 17.5 16.5 15.933 16.5 14C16.5 12.067 18.067 10.5 20 10.5C21.933 10.5 23.5 12.067 23.5 14Z" fill="black" stroke="white" />
+              <circle cx="9" cy="13" r="1" fill="white" />
+              <circle cx="21" cy="13" r="1" fill="white" />
             </g>
           </g>
-        </svg>
-      </span>
+        </g>
+      </svg>
     </span>
   );
 }
