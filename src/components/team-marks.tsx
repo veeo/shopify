@@ -96,6 +96,8 @@ type Expression = { gaze: Gaze; split: number; eyes: [EyeCfg, EyeCfg] };
 const EYE_SPLIT = 15.46;
 const EYE_W = 0.186;
 const EYE_H = 0.412;
+/** A little larger than the Bloub rest size, still the same capsule shape. */
+const EYE_SCALE = 1.22;
 const REST_GAZE: Gaze = { yaw: 28.49, pitch: 28.62, roll: -13 };
 
 const eye = (w: number, h: number, tilt = 0, open = 1): EyeCfg => ({ w, h, tilt, open });
@@ -273,7 +275,7 @@ function grokFrame(t: number, state: OrbState | undefined, level: number, reduce
     const cy = -pose.b * sp + pose.d * cp;
     const k = blinkScale(Math.min(life.lid, cfg.open));
     return {
-      d: capsulePath(cfg.w * GROK_R, cfg.h * GROK_R),
+      d: capsulePath(cfg.w * GROK_R * EYE_SCALE, cfg.h * GROK_R * EYE_SCALE),
       transform: `matrix(${round(ax)} ${round(ay * k)} ${round(cx)} ${round(cy * k)} ${round(CENTER + pose.x)} ${round(CENTER + pose.y)})`,
       opacity: clamp(pose.depth / 0.12),
     };
