@@ -349,7 +349,7 @@ const Sphere = ({ state, speed, colorFrom, colorTo, reduced, levelRef, onReady }
   });
 
   return (
-    <mesh>
+    <mesh scale={1.14}>
       <icosahedronGeometry args={[1.2, 16]} />
       <shaderMaterial
         ref={matRef}

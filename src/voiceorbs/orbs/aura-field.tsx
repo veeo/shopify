@@ -32,7 +32,7 @@ interface AuraParams extends Record<string, number> {
 }
 
 const AURA_TABLE: Record<OrbState, AuraParams> = {
-  idle: { speed: 10, scale: 0.24, thick: 0.05, warp: 0.055, brightLo: 1, brightHi: 1, shimmer: 0, sweepRate: 0.6, desat: 0 },
+  idle: { speed: 42, scale: 0.24, thick: 0.05, warp: 0.1, brightLo: 1, brightHi: 1.2, shimmer: 0.45, sweepRate: 1.35, desat: 0 },
   connecting: { speed: 14, scale: 0.22, thick: 0.045, warp: 0.04, brightLo: 0.9, brightHi: 0.9, shimmer: 1, sweepRate: 1.3, desat: 0 },
   listening: { speed: 20, scale: 0.3, thick: 0.058, warp: 0.1, brightLo: 1.5, brightHi: 2, shimmer: 0, sweepRate: 0.8, desat: 0 },
   thinking: { speed: 30, scale: 0.27, thick: 0.05, warp: 0.14, brightLo: 0.5, brightHi: 2.5, shimmer: 0.6, sweepRate: 2.8, desat: 0 },
@@ -108,6 +108,7 @@ const FRAG = `
 precision highp float;
 
 uniform float uRes;
+uniform float uBleed;
 uniform float uPhase;
 uniform float uSweep;
 uniform float uRadius;
@@ -135,11 +136,13 @@ float noise(vec2 p) {
 }
 
 void main() {
-  // Draw the ring at the same diameter as the filled spheres in an avatar slot.
-  vec2 p = (gl_FragCoord.xy * 2.0 - uRes) / uRes * 0.64;
+  // The canvas is larger than the avatar circle. uBleed maps the ring onto that
+  // circle, and the extra margin is where the glow falls off.
+  vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / uRes;
+  vec2 p = uv * uBleed * 0.64;
   float r = length(p);
-  float edge = 1.0 - smoothstep(0.8, 1.0, r);
-  if (edge <= 0.0) {
+  float edge = 1.0 - smoothstep(0.9, 1.02, length(uv));
+  if (edge <= 0.001) {
     gl_FragColor = vec4(0.0);
     return;
   }
@@ -194,8 +197,12 @@ interface GlHandle {
   loc: Record<string, WebGLUniformLocation | null>;
 }
 
+/** Canvas is this many times the avatar slot, so glow can leave the circle. */
+const AURA_BLEED = 1.85;
+
 const UNIFORMS = [
   'uRes',
+  'uBleed',
   'uPhase',
   'uSweep',
   'uRadius',
@@ -375,7 +382,7 @@ export const AuraField = ({
     gl.useProgram(program);
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const px = Math.max(1, Math.round(size * dpr));
+    const px = Math.max(1, Math.round(size * AURA_BLEED * dpr));
     canvas.width = px;
     canvas.height = px;
     gl.viewport(0, 0, px, px);
@@ -391,6 +398,7 @@ export const AuraField = ({
     const loc: Record<string, WebGLUniformLocation | null> = {};
     for (const name of UNIFORMS) loc[name] = gl.getUniformLocation(program, name);
     gl.uniform1f(loc.uRes, px);
+    gl.uniform1f(loc.uBleed, AURA_BLEED);
     glRef.current = { gl, loc };
     drawRef.current(frameRef.current);
 
@@ -443,7 +451,17 @@ export const AuraField = ({
     >
       <div ref={shakeRef} aria-hidden style={{ position: 'absolute', inset: 0 }}>
         {showCanvas ? (
-          <canvas ref={canvasRef} style={{ width: size, height: size, display: 'block' }} />
+          <canvas
+            ref={canvasRef}
+            style={{
+              position: 'absolute',
+              width: size * AURA_BLEED,
+              height: size * AURA_BLEED,
+              left: (size - size * AURA_BLEED) / 2,
+              top: (size - size * AURA_BLEED) / 2,
+              display: 'block',
+            }}
+          />
         ) : (
           <div ref={fallbackRef} style={{ position: 'absolute', inset: 0 }}>
             <div ref={brandLayerRef} style={fallbackRing(colorFrom, colorTo, size)} />

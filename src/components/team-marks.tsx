@@ -172,16 +172,30 @@ const BLINKS: number[] = (() => {
   return out;
 })();
 
-function blinkLid(t: number) {
-  const duration = 0.18;
-  for (let i = 0; i < BLINKS.length; i += 1) {
-    const start = BLINKS[i];
+function blinkLid(t: number, blinks: number[] = BLINKS, duration = 0.18, close = 0.45) {
+  for (let i = 0; i < blinks.length; i += 1) {
+    const start = blinks[i];
     if (t < start) break;
     const k = (t - start) / duration;
-    if (k >= 0 && k <= 1) return k < 0.45 ? 1 - k / 0.45 : (k - 0.45) / 0.55;
+    if (k >= 0 && k <= 1) return k < close ? 1 - k / close : (k - close) / (1 - close);
   }
   return 1;
 }
+
+const SLACK_BLINKS: number[] = (() => {
+  const random = createRng(0x51ac);
+  const out: number[] = [];
+  let t = 1.8;
+  while (t < 900) {
+    out.push(t);
+    t += 2.4 + random() * 3.2;
+    if (random() < 0.24) {
+      out.push(t);
+      t += 0.26;
+    }
+  }
+  return out;
+})();
 
 function blinkScale(lid: number) {
   return 0.06 + 0.94 * clamp(lid);
@@ -336,10 +350,17 @@ export function GrokBot({ size, state, levelRef }: { size: number; state?: OrbSt
   );
 }
 
+function slackEyeTransform(cx: number, lid: number) {
+  const squash = (0.14 + 0.86 * lid).toFixed(3);
+  return `translate(${cx} 14) scale(1 ${squash}) translate(${-cx} -14)`;
+}
+
 export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
   const id = useId().replace(/:/g, "");
   const host = useRef<HTMLSpanElement>(null);
   const motion = useRef<SVGGElement>(null);
+  const leftEye = useRef<SVGGElement>(null);
+  const rightEye = useRef<SVGGElement>(null);
 
   useMascotLoop(host, (time) => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -347,7 +368,10 @@ export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbS
     const live = level >= 0 ? clamp(level) : 0;
     const voiced = level >= 0 && (state === "listening" || state === "speaking");
     const scale = reduced ? 1 : 1 + Math.sin(time / 3.6) * 0.012 + (voiced ? live * 0.04 : 0);
+    const lid = reduced ? 1 : blinkLid(time, SLACK_BLINKS, 0.16, 0.36);
     motion.current?.setAttribute("transform", `translate(14 14) scale(${scale.toFixed(3)}) translate(-14 -14)`);
+    leftEye.current?.setAttribute("transform", slackEyeTransform(8, lid));
+    rightEye.current?.setAttribute("transform", slackEyeTransform(20, lid));
   });
 
   return (
@@ -376,10 +400,14 @@ export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbS
               <circle cx="28" cy="28" r="13" fill="#FCC005" />
               <circle r="13" fill="#02B3FF" />
               <circle cx="28" r="13" fill="#43B65A" />
-              <path d="M11.5 14C11.5 15.933 9.933 17.5 8 17.5C6.067 17.5 4.5 15.933 4.5 14C4.5 12.067 6.067 10.5 8 10.5C9.933 10.5 11.5 12.067 11.5 14Z" fill="black" stroke="white" />
-              <path d="M23.5 14C23.5 15.933 21.933 17.5 20 17.5C18.067 17.5 16.5 15.933 16.5 14C16.5 12.067 18.067 10.5 20 10.5C21.933 10.5 23.5 12.067 23.5 14Z" fill="black" stroke="white" />
-              <circle cx="9" cy="13" r="1" fill="white" />
-              <circle cx="21" cy="13" r="1" fill="white" />
+              <g ref={leftEye}>
+                <path d="M11.5 14C11.5 15.933 9.933 17.5 8 17.5C6.067 17.5 4.5 15.933 4.5 14C4.5 12.067 6.067 10.5 8 10.5C9.933 10.5 11.5 12.067 11.5 14Z" fill="black" stroke="white" />
+                <circle cx="9" cy="13" r="1" fill="white" />
+              </g>
+              <g ref={rightEye}>
+                <path d="M23.5 14C23.5 15.933 21.933 17.5 20 17.5C18.067 17.5 16.5 15.933 16.5 14C16.5 12.067 18.067 10.5 20 10.5C21.933 10.5 23.5 12.067 23.5 14Z" fill="black" stroke="white" />
+                <circle cx="21" cy="13" r="1" fill="white" />
+              </g>
             </g>
           </g>
         </g>

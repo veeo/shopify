@@ -627,6 +627,7 @@ body {
     left: 0;
     width: var(--render);
     height: var(--render);
+    overflow: visible;
     transform: scale(var(--fit));
     transform-origin: top left;
     pointer-events: none;
