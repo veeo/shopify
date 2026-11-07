@@ -804,7 +804,7 @@ function Analytics({ state, nav }: Props) {
         </Card>
         <Card className="flex h-32 flex-col">
           <CardTitle dotted>Total sales by product</CardTitle>
-          <span className="m-auto text-center text-[11px] text-[#616161]">{active ? "Cloud Headphones · $899.97" : "No data for this date range"}</span>
+          <span className="m-auto text-center text-[11px] text-[#616161]">{active ? "Studio ANC Headphones · $899.97" : "No data for this date range"}</span>
         </Card>
       </div>
       <Card className="flex flex-col gap-2">

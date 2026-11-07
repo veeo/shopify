@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, type CSSProperties, type RefObject } from "react";
+import { useEffect, useId, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 import type { OrbState } from "@/voiceorbs/lib/orb-state";
 
 /**
@@ -416,6 +416,72 @@ export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbS
   );
 }
 
+
+function MarkFrame({ size, children }: { size: number; children: ReactNode }) {
+  return (
+    <span className="orb" style={slotStyle(size)} aria-hidden>
+      <svg viewBox="0 0 28 28" width="100%" height="100%" style={{ display: "block" }}>
+        {children}
+      </svg>
+    </span>
+  );
+}
+
+function markShade(id: string, alpha: string) {
+  return (
+    <filter id={id} x="0" y="0" width="28" height="28" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+      <feFlood floodOpacity="0" result="BackgroundImageFix" />
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+      <feOffset />
+      <feGaussianBlur stdDeviation="2" />
+      <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
+      <feColorMatrix type="matrix" values={`0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 ${alpha} 0`} />
+      <feBlend mode="normal" in2="shape" />
+    </filter>
+  );
+}
+
+export function OnlineStoreMark({ size }: { size: number }) {
+  const id = useId().replace(/:/g, "");
+  return (
+    <MarkFrame size={size}>
+      <defs>
+        {markShade(`${id}-shade`, "0.4")}
+        <clipPath id={`${id}-clip`}>
+          <rect width="16" height="16" fill="white" transform="translate(6 6)" />
+        </clipPath>
+      </defs>
+      <g filter={`url(#${id}-shade)`}>
+        <rect width="28" height="28" rx="14" fill="#00C900" />
+        <g clipPath={`url(#${id}-clip)`}>
+          <path
+            d="M20.6674 14C20.6674 17.6822 17.6824 20.6672 14.0002 20.6672M20.6674 14C20.6674 10.3178 17.6824 7.33276 14.0002 7.33276M20.6674 14H16.6671M14.0002 20.6672C10.318 20.6672 7.33301 17.6822 7.33301 14M14.0002 20.6672C12.2882 18.8696 11.3333 16.4823 11.3333 14M14.0002 20.6672C15.7122 18.8696 16.6671 16.4823 16.6671 14M14.0002 7.33276C12.2882 9.13034 11.3333 11.5176 11.3333 14M14.0002 7.33276C15.7122 9.13034 16.6671 11.5176 16.6671 14M14.0002 7.33276C10.318 7.33276 7.33301 10.3178 7.33301 14M16.6671 14H11.3333M11.3333 14H7.33301"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            stroke="black"
+          />
+        </g>
+      </g>
+    </MarkFrame>
+  );
+}
+
+export function ShopAppMark({ size }: { size: number }) {
+  const id = useId().replace(/:/g, "");
+  return (
+    <MarkFrame size={size}>
+      <defs>{markShade(`${id}-shade`, "0.2")}</defs>
+      <g filter={`url(#${id}-shade)`}>
+        <rect width="28" height="28" rx="14" fill="#5433EB" />
+        <path
+          d="M12.7826 7.87476C11.3917 7.87476 10.0889 8.30132 9.15351 8.91663C9.08984 8.9583 9.06782 9.04411 9.10696 9.11029L10.2359 11.0396C10.2775 11.1082 10.3656 11.1327 10.4342 11.0911C11.1444 10.6621 11.9574 10.439 12.7875 10.4439C15.0232 10.4439 16.6664 12.0226 16.6664 14.1088C16.6664 15.8861 15.3514 17.2025 13.6837 17.2025C12.3247 17.2025 11.3819 16.4107 11.3819 15.2929C11.3819 14.653 11.6537 14.1284 12.3614 13.7582C12.4349 13.719 12.4618 13.6283 12.4178 13.5572L11.3525 11.753C11.3183 11.6941 11.2448 11.6672 11.1786 11.6917C9.751 12.2212 8.74951 13.4959 8.74951 15.2071C8.74951 17.7958 10.8088 19.7276 13.6813 19.7276C17.0361 19.7276 19.4481 17.4012 19.4481 14.0647C19.4481 10.488 16.6419 7.87476 12.7826 7.87476Z"
+          fill="white"
+        />
+      </g>
+    </MarkFrame>
+  );
+}
 
 export function MuseBall({ size, state, levelRef }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
   const host = useRef<HTMLSpanElement>(null);

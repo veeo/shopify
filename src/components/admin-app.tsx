@@ -31,7 +31,7 @@ const bootMs = 1500;
 
 type Turn = { agentId: string; text: string; done: boolean; first: boolean };
 
-export function AdminApp({ initialScenario = "setup" }: { initialScenario?: "setup" | "active" }) {
+export function AdminApp({ initialScenario = "active" }: { initialScenario?: "setup" | "active" }) {
   const [state, setState] = useState<PrototypeState>(() =>
     initialScenario === "active" ? activeState() : { ...setupState("My Store", "sidekick"), signedIn: true },
   );

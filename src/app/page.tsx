@@ -7,5 +7,5 @@ export default async function Page({
 }) {
   const params = await searchParams;
   const scenario = Array.isArray(params.scenario) ? params.scenario[0] : params.scenario;
-  return <AdminApp initialScenario={scenario === "active" ? "active" : "setup"} />;
+  return <AdminApp initialScenario={scenario === "setup" ? "setup" : "active"} />;
 }

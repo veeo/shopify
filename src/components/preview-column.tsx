@@ -781,7 +781,7 @@ function DomainArt() {
 /* Home · active store */
 
 const ranges = {
-  today: { label: "Today", sales: 1842.5, sessions: 612, orders: 14, conversion: 2.3, scale: 0.55 },
+  today: { label: "Today", sales: 2078.51, sessions: 612, orders: 14, conversion: 2.3, scale: 0.55 },
   week: { label: "Last 7 days", sales: 11284.9, sessions: 3410, orders: 92, conversion: 2.6, scale: 0.8 },
   month: { label: "Last 30 days", sales: 48392.5, sessions: 14280, orders: 386, conversion: 2.7, scale: 1 },
 } as const;
