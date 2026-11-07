@@ -426,7 +426,8 @@ export function MuseBall({ size, state, levelRef }: { size: number; state?: OrbS
     const level = levelRef?.current ?? -1;
     const live = level >= 0 ? clamp(level) : 0;
     const voiced = level >= 0 && (state === "listening" || state === "speaking");
-    const scale = reduced ? 1 : 1 + Math.sin(time * 1.2) * 0.012 + (voiced ? live * 0.04 : 0);
+    const fill = 1.16;
+    const scale = reduced ? fill : fill + Math.sin(time * 1.2) * 0.012 + (voiced ? live * 0.04 : 0);
     if (image.current) image.current.style.transform = `scale(${scale.toFixed(3)})`;
   });
 
