@@ -7,7 +7,7 @@ import type { OrbState } from "@/voiceorbs/lib/orb-state";
  * Grok eye placement, capsule shape, and liveliness are adapted from Bloub
  * (MIT) © 2026 Jérémy Perret — https://github.com/jeremy-prt/bloub
  * Muse fur is a shell shader adapted from Muse Pet — https://github.com/sophiamyang/muse-pet
- * Slack is an original sphere. Its corner colors and pale face come from the
+ * Slack is an original sphere. Its corner colors come from the
  * Silverside Slackbot still — https://www.silverside.ai/projects/slackbot
  */
 
@@ -310,9 +310,9 @@ export function GrokBot({ size, state, levelRef }: { size: number; state?: OrbSt
         <svg viewBox={`0 0 ${RENDER} ${RENDER}`} width={RENDER} height={RENDER}>
           <defs>
             <radialGradient id={`${id}-body`} cx="34%" cy="28%" r="78%">
-              <stop offset="0%" stopColor="#242428" />
-              <stop offset="46%" stopColor="#0c0c0e" />
-              <stop offset="100%" stopColor="#050506" />
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="48%" stopColor="#f3f3f5" />
+              <stop offset="100%" stopColor="#c8c8ce" />
             </radialGradient>
           </defs>
           <g ref={rig} transform={first.rig}>
@@ -325,7 +325,7 @@ export function GrokBot({ size, state, levelRef }: { size: number; state?: OrbSt
                 }}
                 d={eyeFrame.d}
                 transform={eyeFrame.transform}
-                fill="#ffffff"
+                fill="#1a1a1e"
                 opacity={eyeFrame.opacity}
               />
             ))}
@@ -342,30 +342,18 @@ const SLACK_COLORS = {
   green: "#5A9468",
   red: "#C43048",
   gold: "#C9921C",
-  face: "#D4B4D0",
 };
 
 export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
   const id = useId().replace(/:/g, "");
   const host = useRef<HTMLSpanElement>(null);
   const motion = useRef<SVGGElement>(null);
-  const left = useRef<SVGGElement>(null);
-  const right = useRef<SVGGElement>(null);
 
   useMascotLoop(host, (time) => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const level = levelRef?.current ?? -1;
     const live = level >= 0 ? clamp(level) : 0;
     const voiced = level >= 0 && (state === "listening" || state === "speaking");
-    const lid = blinkScale(reduced ? 1 : blinkLid(time + 1.7));
-    const lookX = reduced ? 0 : loopNoise(time, 6.4, 0.8) * 3.2 + (voiced ? live * 2 : 0);
-    const lookY = reduced ? 0 : loopNoise(time, 8.1, 1.6) * 2.4 - (voiced ? live * 3 : 0);
-    const open = voiced ? 1 + live * 0.08 : 1;
-    const place = (node: SVGGElement | null, x: number) => {
-      node?.setAttribute("transform", `translate(${round(x + lookX)} ${round(62 + lookY)}) scale(1 ${round(lid * open)})`);
-    };
-    place(left.current, 57);
-    place(right.current, 87);
     const driftX = reduced ? 0 : loopNoise(time, 9.2, 0.4) * 0.8;
     const driftY = reduced ? 0 : loopNoise(time, 7.4, 1.2) * 0.7;
     const scale = 1 + (voiced ? live * 0.02 : 0) + (reduced ? 0 : Math.sin(time / 3.6) * 0.004);
@@ -383,30 +371,25 @@ export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbS
             <clipPath id={`${id}-clip`}>
               <circle cx={CENTER} cy={CENTER} r={SLACK_R} />
             </clipPath>
-            <radialGradient id={`${id}-blue`} cx="16%" cy="16%" r="52%">
+            <radialGradient id={`${id}-blue`} cx="22%" cy="22%" r="70%">
               <stop offset="0%" stopColor={SLACK_COLORS.blue} />
-              <stop offset="62%" stopColor={SLACK_COLORS.blue} />
+              <stop offset="46%" stopColor={SLACK_COLORS.blue} />
               <stop offset="100%" stopColor={SLACK_COLORS.blue} stopOpacity="0" />
             </radialGradient>
-            <radialGradient id={`${id}-green`} cx="84%" cy="16%" r="52%">
+            <radialGradient id={`${id}-green`} cx="78%" cy="22%" r="70%">
               <stop offset="0%" stopColor={SLACK_COLORS.green} />
-              <stop offset="62%" stopColor={SLACK_COLORS.green} />
+              <stop offset="46%" stopColor={SLACK_COLORS.green} />
               <stop offset="100%" stopColor={SLACK_COLORS.green} stopOpacity="0" />
             </radialGradient>
-            <radialGradient id={`${id}-red`} cx="16%" cy="86%" r="54%">
+            <radialGradient id={`${id}-red`} cx="22%" cy="80%" r="70%">
               <stop offset="0%" stopColor={SLACK_COLORS.red} />
-              <stop offset="60%" stopColor={SLACK_COLORS.red} />
+              <stop offset="46%" stopColor={SLACK_COLORS.red} />
               <stop offset="100%" stopColor={SLACK_COLORS.red} stopOpacity="0" />
             </radialGradient>
-            <radialGradient id={`${id}-gold`} cx="86%" cy="84%" r="54%">
+            <radialGradient id={`${id}-gold`} cx="80%" cy="78%" r="70%">
               <stop offset="0%" stopColor={SLACK_COLORS.gold} />
-              <stop offset="60%" stopColor={SLACK_COLORS.gold} />
+              <stop offset="46%" stopColor={SLACK_COLORS.gold} />
               <stop offset="100%" stopColor={SLACK_COLORS.gold} stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id={`${id}-face`} cx="50%" cy="46%" r="36%">
-              <stop offset="0%" stopColor={SLACK_COLORS.face} />
-              <stop offset="68%" stopColor={SLACK_COLORS.face} stopOpacity="0.94" />
-              <stop offset="100%" stopColor={SLACK_COLORS.face} stopOpacity="0" />
             </radialGradient>
             <radialGradient id={`${id}-shade`} cx="34%" cy="28%" r="80%">
               <stop offset="0%" stopColor="#ffffff" stopOpacity="0.28" />
@@ -416,21 +399,11 @@ export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbS
           </defs>
           <g ref={motion}>
             <g clipPath={`url(#${id}-clip)`}>
-              <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={SLACK_COLORS.face} />
-              <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={`url(#${id}-blue)`} />
+              <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={SLACK_COLORS.blue} />
               <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={`url(#${id}-green)`} />
               <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={`url(#${id}-red)`} />
               <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={`url(#${id}-gold)`} />
-              <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={`url(#${id}-face)`} />
               <circle cx={CENTER} cy={CENTER} r={SLACK_R} fill={`url(#${id}-shade)`} />
-            </g>
-            <g ref={left} transform="translate(57 62)">
-              <ellipse rx="11.5" ry="13" fill="#1a1218" />
-              <ellipse cx="-3.1" cy="-4.2" rx="3.1" ry="2.2" fill="#ffffff" opacity="0.92" />
-            </g>
-            <g ref={right} transform="translate(87 62)">
-              <ellipse rx="11.5" ry="13" fill="#1a1218" />
-              <ellipse cx="-3.1" cy="-4.2" rx="3.1" ry="2.2" fill="#ffffff" opacity="0.92" />
             </g>
           </g>
         </svg>
@@ -450,7 +423,7 @@ varying float vShell;
 void main() {
   vec3 n = normalize(aPos);
   float breathe = 1.0 + sin(uTime * 1.25) * 0.01 + uLevel * 0.025;
-  float radius = (0.72 + uShell * 0.16) * breathe;
+  float radius = (0.76 + uShell * 0.08) * breathe;
   vN = n;
   vShell = uShell;
   gl_Position = vec4(n.xy * radius, n.z * radius * 0.2, 1.0);
@@ -492,18 +465,18 @@ float noise(vec3 p) {
 void main() {
   vec3 n = normalize(vN);
   if (n.z < 0.0) n = -n;
-  vec2 faceUv = (n.xy - vec2(0.0, -0.02)) / vec2(0.58, 0.50);
-  float face = smoothstep(1.02, 0.72, length(faceUv)) * smoothstep(0.05, 0.45, n.z);
-  float strand = noise(n * vec3(8.5, 12.0, 8.5) + vec3(0.0, uTime * 0.22, uLevel));
-  float fringe = smoothstep(0.96, 0.38, face);
-  if (face > 0.45 && vShell > 0.03 + fringe * 0.72) discard;
-  if (face < 0.45 && vShell > 0.04 && strand < vShell * 0.9) discard;
+  vec2 faceUv = (n.xy - vec2(0.0, 0.06)) / vec2(0.46, 0.40);
+  float face = smoothstep(1.05, 0.7, length(faceUv)) * smoothstep(0.05, 0.45, n.z);
+  float strand = noise(n * vec3(5.5, 7.0, 5.5) + vec3(0.0, uTime * 0.22, uLevel));
+  float fringe = smoothstep(0.98, 0.45, face);
+  if (face > 0.5 && vShell > 0.02 + fringe * 0.55) discard;
+  if (face < 0.5 && vShell > 0.2 && strand < 0.42 + vShell * 0.4) discard;
   float pile = clamp(vShell * 0.75 + strand * 0.35 + n.y * 0.18 + 0.12, 0.0, 1.0);
   vec3 fur = mix(uRoot, uTip, pile);
   vec3 light = normalize(vec3(-0.32, 0.58, 0.78));
   float ndl = clamp(dot(n, light), 0.0, 1.0);
   float rim = pow(1.0 - clamp(n.z, 0.0, 1.0), 1.6);
-  vec3 col = fur * (0.38 + 0.78 * ndl + uLevel * 0.1) + uTip * rim * (0.22 + vShell * 0.35);
+  vec3 col = fur * (0.72 + 0.28 * ndl + uLevel * 0.04) + uTip * rim * 0.06;
   vec3 skin = uFace * (0.82 + 0.18 * ndl);
   col = mix(col, skin, face * (1.0 - smoothstep(0.0, 0.2, vShell)));
   float alpha = mix(1.0, 0.42 + 0.58 * strand, smoothstep(0.0, 0.25, vShell));
@@ -591,10 +564,10 @@ export function MuseBall({ size, state, levelRef }: { size: number; state?: OrbS
       `translate(${round(CENTER + swayX)} ${round(CENTER + swayY)}) scale(${round(breathe)}) translate(${-CENTER} ${-CENTER})`,
     );
     const place = (node: SVGGElement | null, x: number) => {
-      node?.setAttribute("transform", `translate(${round(x + lookX)} ${round(70 + lookY)}) scale(${round(1 + (voiced ? live * 0.12 : 0))} ${round(lid)})`);
+      node?.setAttribute("transform", `translate(${round(x + lookX)} ${round(66 + lookY)}) scale(${round(1 + (voiced ? live * 0.12 : 0))} ${round(lid)})`);
     };
-    place(left.current, 61);
-    place(right.current, 83);
+    place(left.current, 64);
+    place(right.current, 80);
   });
 
   useEffect(() => {
@@ -632,9 +605,9 @@ export function MuseBall({ size, state, levelRef }: { size: number; state?: OrbS
     const setColor = (name: string, hex: number) => {
       gl.uniform3f(gl.getUniformLocation(program, name), ((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255);
     };
-    setColor("uRoot", 0x6e432c);
-    setColor("uTip", 0xc9956a);
-    setColor("uFace", 0xf3d9c8);
+    setColor("uRoot", 0xe7d5c4);
+    setColor("uTip", 0xfffaf6);
+    setColor("uFace", 0xfff4ea);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.enable(gl.CULL_FACE);
@@ -668,17 +641,20 @@ export function MuseBall({ size, state, levelRef }: { size: number; state?: OrbS
               </radialGradient>
             </defs>
             <g ref={face}>
-              <ellipse cx="52" cy="80" rx="12" ry="8" fill={`url(#${blushId}-blush)`} />
-              <ellipse cx="92" cy="80" rx="12" ry="8" fill={`url(#${blushId}-blush)`} />
-              <g ref={left} transform="translate(61 70)">
-                <circle r="5.4" fill="#0b0908" />
-                <circle cx="1.7" cy="-1.8" r="1.35" fill="#ffffff" />
+              <ellipse cx="58" cy="74" rx="8" ry="5.5" fill={`url(#${blushId}-blush)`} />
+              <ellipse cx="86" cy="74" rx="8" ry="5.5" fill={`url(#${blushId}-blush)`} />
+              <g ref={left} transform="translate(64 66)">
+                <ellipse rx="3.1" ry="3.6" fill="#2a2422" />
               </g>
-              <g ref={right} transform="translate(83 70)">
-                <circle r="5.4" fill="#0b0908" />
-                <circle cx="1.7" cy="-1.8" r="1.35" fill="#ffffff" />
+              <g ref={right} transform="translate(80 66)">
+                <ellipse rx="3.1" ry="3.6" fill="#2a2422" />
               </g>
-              <path d="M66 84c3.2 4.2 8.8 4.2 12 0" fill="none" stroke="#1e1814" strokeWidth="2.4" strokeLinecap="round" />
+              <path d="M68 78c1.6 2.2 6.4 2.2 8 0" fill="none" stroke="#3a312c" strokeWidth="1.7" strokeLinecap="round" />
+              <g fill="#fff7f1">
+                <ellipse cx="66" cy="92" rx="8" ry="10" transform="rotate(-18 66 92)" />
+                <ellipse cx="78" cy="92" rx="8" ry="10" transform="rotate(18 78 92)" />
+              </g>
+              <path d="M72 86c1.2 3.2 2.4 5.2 0 8" fill="none" stroke="#e4d3c4" strokeWidth="1.4" strokeLinecap="round" />
             </g>
           </svg>
         </span>
