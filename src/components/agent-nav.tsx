@@ -49,14 +49,9 @@ export function AgentNav({
   const agents = visibleAgents(state);
   const [menu, setMenu] = useState<"account" | "store" | null>(null);
   const collapsed = !navOpen;
-  const showHidden = state.scenario === "active" || state.agents.some((item) => item.installed && item.group === "hidden");
   const visibleGroups = groups
     .map((group) => ({ ...group, items: agents.filter((item) => item.group === group.id) }))
-    .filter((group) => {
-      if (group.id !== "hidden") return group.items.length > 0;
-      if (collapsed && group.items.length === 0) return false;
-      return showHidden;
-    });
+    .filter((group) => group.items.length > 0);
   const navRef = useRef<HTMLElement>(null);
   const placed = useRef(new Map<string, { left: number; top: number }>());
   const skipSlide = useRef(true);
@@ -247,9 +242,6 @@ export function AgentNav({
                   </span>
                 );
               })}
-              {group.id === "hidden" && group.items.length === 0 && !collapsed ? (
-                <p className="px-2.5 text-[12px] text-[#737572]">Nothing hidden</p>
-              ) : null}
             </div>
           </div>
         ))}
