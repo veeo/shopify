@@ -6,7 +6,6 @@ import type { OrbState } from "@/voiceorbs/lib/orb-state";
 /**
  * Grok eye placement, capsule shape, and liveliness are adapted from Bloub
  * (MIT) © 2026 Jérémy Perret — https://github.com/jeremy-prt/bloub
- * Muse fur is a shell shader adapted from Muse Pet — https://github.com/sophiamyang/muse-pet
  * Slack is an original sphere. Its corner colors come from the
  * Silverside Slackbot still — https://www.silverside.ai/projects/slackbot
  */
@@ -412,253 +411,29 @@ export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbS
   );
 }
 
-const MUSE_VERT = `
-precision mediump float;
-attribute vec3 aPos;
-uniform float uShell;
-uniform float uTime;
-uniform float uLevel;
-varying vec3 vN;
-varying float vShell;
-void main() {
-  vec3 n = normalize(aPos);
-  float breathe = 1.0 + sin(uTime * 1.25) * 0.01 + uLevel * 0.025;
-  float radius = (0.76 + uShell * 0.08) * breathe;
-  vN = n;
-  vShell = uShell;
-  gl_Position = vec4(n.xy * radius, n.z * radius * 0.2, 1.0);
-}
-`;
-
-const MUSE_FRAG = `
-precision mediump float;
-varying vec3 vN;
-varying float vShell;
-uniform float uTime;
-uniform float uLevel;
-uniform vec3 uRoot;
-uniform vec3 uTip;
-uniform vec3 uFace;
-float hash(vec3 p) {
-  p = fract(p * 0.3183099 + vec3(0.11, 0.17, 0.13));
-  p *= 17.0;
-  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-}
-float noise(vec3 p) {
-  vec3 i = floor(p);
-  vec3 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  float n000 = hash(i);
-  float n100 = hash(i + vec3(1.0, 0.0, 0.0));
-  float n010 = hash(i + vec3(0.0, 1.0, 0.0));
-  float n110 = hash(i + vec3(1.0, 1.0, 0.0));
-  float n001 = hash(i + vec3(0.0, 0.0, 1.0));
-  float n101 = hash(i + vec3(1.0, 0.0, 1.0));
-  float n011 = hash(i + vec3(0.0, 1.0, 1.0));
-  float n111 = hash(i + vec3(1.0, 1.0, 1.0));
-  float nx00 = mix(n000, n100, f.x);
-  float nx10 = mix(n010, n110, f.x);
-  float nx01 = mix(n001, n101, f.x);
-  float nx11 = mix(n011, n111, f.x);
-  return mix(mix(nx00, nx10, f.y), mix(nx01, nx11, f.y), f.z);
-}
-void main() {
-  vec3 n = normalize(vN);
-  if (n.z < 0.0) n = -n;
-  vec2 faceUv = (n.xy - vec2(0.0, 0.06)) / vec2(0.46, 0.40);
-  float face = smoothstep(1.05, 0.7, length(faceUv)) * smoothstep(0.05, 0.45, n.z);
-  float strand = noise(n * vec3(5.5, 7.0, 5.5) + vec3(0.0, uTime * 0.22, uLevel));
-  float fringe = smoothstep(0.98, 0.45, face);
-  if (face > 0.5 && vShell > 0.02 + fringe * 0.55) discard;
-  if (face < 0.5 && vShell > 0.2 && strand < 0.42 + vShell * 0.4) discard;
-  float pile = clamp(vShell * 0.75 + strand * 0.35 + n.y * 0.18 + 0.12, 0.0, 1.0);
-  vec3 fur = mix(uRoot, uTip, pile);
-  vec3 light = normalize(vec3(-0.32, 0.58, 0.78));
-  float ndl = clamp(dot(n, light), 0.0, 1.0);
-  float rim = pow(1.0 - clamp(n.z, 0.0, 1.0), 1.6);
-  vec3 col = fur * (0.72 + 0.28 * ndl + uLevel * 0.04) + uTip * rim * 0.06;
-  vec3 skin = uFace * (0.82 + 0.18 * ndl);
-  col = mix(col, skin, face * (1.0 - smoothstep(0.0, 0.2, vShell)));
-  float alpha = mix(1.0, 0.42 + 0.58 * strand, smoothstep(0.0, 0.25, vShell));
-  if (face > 0.65 && vShell < 0.08) alpha = 1.0;
-  gl_FragColor = vec4(col * alpha, alpha);
-}
-`;
-
-function museGeometry() {
-  const lat = 18;
-  const lon = 24;
-  const positions: number[] = [];
-  const indices: number[] = [];
-  for (let y = 0; y <= lat; y += 1) {
-    const phi = (y / lat) * Math.PI;
-    for (let x = 0; x <= lon; x += 1) {
-      const theta = (x / lon) * TAU;
-      positions.push(Math.sin(phi) * Math.cos(theta), Math.cos(phi), Math.sin(phi) * Math.sin(theta));
-    }
-  }
-  for (let y = 0; y < lat; y += 1) {
-    for (let x = 0; x < lon; x += 1) {
-      const a = y * (lon + 1) + x;
-      const b = a + lon + 1;
-      indices.push(a, b, a + 1, a + 1, b, b + 1);
-    }
-  }
-  return { positions: new Float32Array(positions), indices: new Uint16Array(indices) };
-}
-
-function compile(gl: WebGLRenderingContext, type: number, source: string) {
-  const shader = gl.createShader(type);
-  if (!shader) return null;
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.error(gl.getShaderInfoLog(shader));
-    gl.deleteShader(shader);
-    return null;
-  }
-  return shader;
-}
-
-type MuseScene = {
-  gl: WebGLRenderingContext;
-  shell: WebGLUniformLocation | null;
-  time: WebGLUniformLocation | null;
-  level: WebGLUniformLocation | null;
-  count: number;
-};
 
 export function MuseBall({ size, state, levelRef }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
-  const blushId = useId().replace(/:/g, "");
   const host = useRef<HTMLSpanElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scene = useRef<MuseScene | null>(null);
-  const face = useRef<SVGGElement>(null);
-  const left = useRef<SVGGElement>(null);
-  const right = useRef<SVGGElement>(null);
+  const image = useRef<HTMLImageElement>(null);
 
   useMascotLoop(host, (time) => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const level = levelRef?.current ?? -1;
     const live = level >= 0 ? clamp(level) : 0;
     const voiced = level >= 0 && (state === "listening" || state === "speaking");
-    const fur = scene.current;
-    if (fur && !fur.gl.isContextLost()) {
-      const { gl } = fur;
-      gl.uniform1f(fur.time, reduced ? 0 : time);
-      gl.uniform1f(fur.level, voiced ? live : 0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-      for (let i = 0; i < 12; i += 1) {
-        gl.uniform1f(fur.shell, i / 11);
-        gl.drawElements(gl.TRIANGLES, fur.count, gl.UNSIGNED_SHORT, 0);
-      }
-    }
-    const lid = blinkScale(reduced ? 1 : blinkLid(time + 3.1));
-    const lookX = reduced ? 0 : loopNoise(time, 5.8, 2.2) * 1.6;
-    const lookY = reduced ? 0 : loopNoise(time, 7.2, 0.5) * 1.2 - (voiced ? live * 1.4 : 0);
-    const swayX = reduced ? 0 : Math.sin(time * 1.2) * 1.1;
-    const swayY = reduced ? 0 : Math.cos(time * 0.9) * 0.8;
-    const breathe = 1 + (reduced ? 0 : Math.sin(time * 1.25) * 0.01) + (voiced ? live * 0.025 : 0);
-    face.current?.setAttribute(
-      "transform",
-      `translate(${round(CENTER + swayX)} ${round(CENTER + swayY)}) scale(${round(breathe)}) translate(${-CENTER} ${-CENTER})`,
-    );
-    const place = (node: SVGGElement | null, x: number) => {
-      node?.setAttribute("transform", `translate(${round(x + lookX)} ${round(66 + lookY)}) scale(${round(1 + (voiced ? live * 0.12 : 0))} ${round(lid)})`);
-    };
-    place(left.current, 64);
-    place(right.current, 80);
+    const scale = reduced ? 1 : 1 + Math.sin(time * 1.2) * 0.012 + (voiced ? live * 0.04 : 0);
+    if (image.current) image.current.style.transform = `scale(${scale.toFixed(3)})`;
   });
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: true, antialias: true });
-    if (!gl) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = RENDER * dpr;
-    canvas.height = RENDER * dpr;
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    const vert = compile(gl, gl.VERTEX_SHADER, MUSE_VERT);
-    const frag = compile(gl, gl.FRAGMENT_SHADER, MUSE_FRAG);
-    if (!vert || !frag) return;
-    const program = gl.createProgram();
-    if (!program) return;
-    gl.attachShader(program, vert);
-    gl.attachShader(program, frag);
-    gl.bindAttribLocation(program, 0, "aPos");
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error(gl.getProgramInfoLog(program));
-      return;
-    }
-    gl.useProgram(program);
-    const geo = museGeometry();
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, geo.positions, gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-    const index = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geo.indices, gl.STATIC_DRAW);
-    const setColor = (name: string, hex: number) => {
-      gl.uniform3f(gl.getUniformLocation(program, name), ((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255);
-    };
-    setColor("uRoot", 0xe7d5c4);
-    setColor("uTip", 0xfffaf6);
-    setColor("uFace", 0xfff4ea);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    gl.enable(gl.CULL_FACE);
-    gl.clearColor(0, 0, 0, 0);
-    scene.current = {
-      gl,
-      shell: gl.getUniformLocation(program, "uShell"),
-      time: gl.getUniformLocation(program, "uTime"),
-      level: gl.getUniformLocation(program, "uLevel"),
-      count: geo.indices.length,
-    };
-    return () => {
-      scene.current = null;
-      gl.deleteProgram(program);
-      gl.deleteBuffer(buffer);
-      gl.deleteBuffer(index);
-    };
-  }, []);
-
   return (
-    <span ref={host} className="orb voice-slot" data-state={state ?? "idle"} style={slotStyle(size)} aria-hidden>
-      <span className="voice-orb-fit">
-        <span style={{ position: "relative", display: "block", width: RENDER, height: RENDER }}>
-          <canvas ref={canvasRef} width={RENDER} height={RENDER} style={{ display: "block", width: RENDER, height: RENDER }} />
-          <svg viewBox={`0 0 ${RENDER} ${RENDER}`} width={RENDER} height={RENDER} style={{ position: "absolute", inset: 0 }}>
-            <defs>
-              <radialGradient id={`${blushId}-blush`} cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="rgba(240,138,138,0.8)" />
-                <stop offset="55%" stopColor="rgba(240,138,138,0.35)" />
-                <stop offset="100%" stopColor="rgba(240,138,138,0)" />
-              </radialGradient>
-            </defs>
-            <g ref={face}>
-              <ellipse cx="58" cy="74" rx="8" ry="5.5" fill={`url(#${blushId}-blush)`} />
-              <ellipse cx="86" cy="74" rx="8" ry="5.5" fill={`url(#${blushId}-blush)`} />
-              <g ref={left} transform="translate(64 66)">
-                <ellipse rx="3.1" ry="3.6" fill="#2a2422" />
-              </g>
-              <g ref={right} transform="translate(80 66)">
-                <ellipse rx="3.1" ry="3.6" fill="#2a2422" />
-              </g>
-              <path d="M68 78c1.6 2.2 6.4 2.2 8 0" fill="none" stroke="#3a312c" strokeWidth="1.7" strokeLinecap="round" />
-              <g fill="#fff7f1">
-                <ellipse cx="66" cy="92" rx="8" ry="10" transform="rotate(-18 66 92)" />
-                <ellipse cx="78" cy="92" rx="8" ry="10" transform="rotate(18 78 92)" />
-              </g>
-              <path d="M72 86c1.2 3.2 2.4 5.2 0 8" fill="none" stroke="#e4d3c4" strokeWidth="1.4" strokeLinecap="round" />
-            </g>
-          </svg>
-        </span>
-      </span>
+    <span ref={host} className="orb" data-state={state ?? "idle"} style={slotStyle(size)} aria-hidden>
+      <img
+        ref={image}
+        src="/assets/muse.png"
+        alt=""
+        draggable={false}
+        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transformOrigin: "center" }}
+      />
     </span>
   );
 }
