@@ -1,4 +1,4 @@
-import { findNav, navFor, previewPages, type PreviewId } from "@/lib/admin-nav";
+import { channelNav, findNav, mainNav, navFor, pageMeta, previewPages, settingsNav, type PreviewId } from "@/lib/admin-nav";
 
 export { previewPages, type PreviewId };
 
@@ -1097,6 +1097,60 @@ function learnMore() {
 
 const workPages = new Set<PreviewId>(["products", "product", "payments-setup", "shipping", "domain", "address", "online-store", "pos", "orders"]);
 
+const showVerb = /\b(show|open|pull up|bring up|display)\b|\blet me see\b|\blook at\b|\b(see|view) (my|the|our)\b/i;
+
+function mentions(text: string, label: string) {
+  const escaped = label.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|\\b)${escaped}\\b`, "i").test(text);
+}
+
+function showLine(page: PreviewId, top = false) {
+  if (page === "products" && top) {
+    return "Products are open. Studio ANC Headphones lead the last 30 days at $18,640 from 76 orders. The USB-C Power Bank is next at $6,370.";
+  }
+  if (page === "products") return "Products are open. The headphones are $18,640 of the last 30 days, and the power bank is next.";
+  if (page === "orders") return "Orders are open. #1078 and #1077 are paid and still unfulfilled, and #1075 hasn’t been paid.";
+  if (page === "home-active") return "Home is open. The last 30 days are $48,393 from 386 orders.";
+  if (page === "customers") return "Customers are open. 28% of this month’s orders are from people who have bought before.";
+  if (page === "analytics") return "Analytics is open. Today is $2,079 from 14 orders.";
+  return `${pageMeta(page).title} is open.`;
+}
+
+/** A request to look at a page that already exists in the admin. The right pane should grow. */
+export function askedAdminPage(text: string): { page: PreviewId; line: string } | null {
+  if (!showVerb.test(text)) return null;
+  const q = text.toLowerCase();
+  if (/top products|best[- ]?sellers?|best[- ]?selling/.test(q)) return { page: "products", line: showLine("products", true) };
+  if (/online store|storefront/.test(q)) return { page: "online-store", line: showLine("online-store") };
+  if (/live store|\bdashboard\b|\bhome\b/.test(q)) return { page: "home-active", line: showLine("home-active") };
+  if (/point of sale|\bpos\b/.test(q)) return { page: "pos", line: showLine("pos") };
+  const entries: { label: string; page: PreviewId }[] = [];
+  for (const item of [...mainNav, ...channelNav]) {
+    if (item.page !== "home") entries.push({ label: item.label, page: item.page });
+    for (const child of item.children ?? []) {
+      if (/^(pages|settings|posts|files|menus|reports)$/i.test(child.label)) continue;
+      entries.push({ label: child.label, page: child.page });
+    }
+  }
+  for (const row of settingsNav) entries.push({ label: row.label, page: row.page });
+  entries.sort((a, b) => b.label.length - a.label.length);
+  for (const entry of entries) {
+    if (!mentions(q, entry.label)) continue;
+    return { page: entry.page, line: showLine(entry.page) };
+  }
+  if (/\bproducts?\b|\bcatalog\b/.test(q)) return { page: "products", line: showLine("products") };
+  if (/\borders\b/.test(q)) return { page: "orders", line: showLine("orders") };
+  return null;
+}
+
+/** Show requests open that admin page in the large pane, whichever agent answered. */
+export function focusAskedPage(text: string, effects: Effect[]): Effect[] {
+  const asked = askedAdminPage(text);
+  if (!asked) return effects;
+  const rest = effects.filter((effect) => effect.type !== "navigate" && effect.type !== "focus");
+  return [...rest, { type: "navigate", page: asked.page, wide: true }];
+}
+
 /** The Sidekick opening. Exact phrases from the first chips, plus the same words typed. */
 const themeChoice: Record<string, string> = {
   Horizon: "Horizon it is. Clear, and ready for a catalog. Tell me the first thing you sell and I'll put it on this page.",
@@ -1377,7 +1431,7 @@ export function runChip(state: PrototypeState, label: string) {
   if (label === "Show the live store") {
     state.scenario = "active";
     state.preview = "home-active";
-    state.previewWide = false;
+    state.previewWide = true;
     const missing = catalog.filter((item) => !state.agents.some((agent) => agent.id === item.id && agent.installed));
     for (const item of missing) {
       state.agents.push({ ...item, installed: true });
@@ -1405,7 +1459,8 @@ export function runChip(state: PrototypeState, label: string) {
       role: "assistant",
       text: "Studio ANC Headphones are $18,640 from 76 orders. The USB-C Power Bank is next at $6,370 from 130 orders, mostly because of the 20% off.",
     });
-    state.preview = "home-active";
+    state.preview = "products";
+    state.previewWide = true;
     return;
   }
   if (label === "Review in more detail") {
@@ -1417,6 +1472,7 @@ export function runChip(state: PrototypeState, label: string) {
       text: "The headphones convert when the case is in the first image. The lamp loses people on shipping: the page says 5–7 days and the ads say this week. I’d make the lamp say “ships this week” and put the $289 bundle next to the headphones.",
     });
     state.preview = "products";
+    state.previewWide = true;
     return;
   }
   if (label === "Confirm changes") {
@@ -1442,10 +1498,13 @@ export function runChip(state: PrototypeState, label: string) {
 
 export function scriptedTurn(agentId: string, text: string, storeName: string, arrival: Arrival = "tasks") {
   const turn = scriptedReply(agentId, text, storeName);
-  return arrival === "sidekick" && agentId === "sidekick" ? presentForSidekick(turn, text, storeName) : turn;
+  const presented = arrival === "sidekick" && agentId === "sidekick" ? presentForSidekick(turn, text, storeName) : turn;
+  return { text: presented.text, effects: focusAskedPage(text, presented.effects) };
 }
 
 function scriptedReply(agentId: string, text: string, storeName: string): { text: string; effects: Effect[] } {
+  const asked = askedAdminPage(text);
+  if (asked) return { text: asked.line, effects: [{ type: "navigate", page: asked.page, wide: true }] };
   const q = text.toLowerCase();
   const effects: Effect[] = [];
   if (/review payment|shopify payment|payout/.test(q)) {
