@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { type CSSProperties, type ReactNode, type RefObject } from "react";
 import { useOrbAudio } from "@/components/orb-audio";
 import { useReducedMotion } from "@/voiceorbs/lib/use-reduced-motion";
 import { CrystalOrb, IridescenceOrb, StrandsOrb } from "@/voiceorbs/orbs/canvas-orbs";
@@ -38,23 +38,21 @@ export function Orb({
   colorFrom,
   colorTo,
   presence = "rest",
-  hot = false,
 }: {
   id: OrbId;
   size?: number;
   agentId?: string;
   colorFrom?: string;
   colorTo?: string;
-  /** Rest or the selected agent's calmer live state. Audio and hover override this. */
+  /** Rest, or selected. Speaking and listening come from audio and keep the same circle. */
   presence?: "rest" | "selected";
-  /** Row hover, when the pointer is on the row rather than the orb itself. */
+  /** Kept so a row can mark the pointer without changing the orb. */
   hot?: boolean;
 }) {
   const resolved = canonicalOrb(id);
   const audio = useOrbAudio(agentId);
-  const [hover, setHover] = useState(false);
   const reduced = useReducedMotion();
-  const state: OrbState = audio.state ?? (hover || hot ? "hover" : presence === "selected" ? "selected" : "idle");
+  const state: OrbState = audio.state ?? (presence === "selected" ? "selected" : "idle");
   const look = ORB_LOOK[presenceFor(state, reduced)];
   const body = isVoiceOrb(resolved) ? (
     <VoiceOrb id={resolved} size={size} state={state} levelRef={audio.levelRef} colorFrom={colorFrom} colorTo={colorTo} />
@@ -65,31 +63,14 @@ export function Orb({
     <span
       className="orb-host"
       data-orb-state={state}
-      onPointerEnter={() => setHover(true)}
-      onPointerLeave={(event) => {
-        setHover(false);
-        event.currentTarget.dataset.px = "0";
-        event.currentTarget.dataset.py = "0";
-        event.currentTarget.style.setProperty("--tilt-x", "0deg");
-        event.currentTarget.style.setProperty("--tilt-y", "0deg");
-      }}
-      onPointerMove={(event) => {
-        if (reduced) return;
-        const box = event.currentTarget.getBoundingClientRect();
-        const x = (event.clientX - box.left) / box.width - 0.5;
-        const y = (event.clientY - box.top) / box.height - 0.5;
-        event.currentTarget.dataset.px = x.toFixed(3);
-        event.currentTarget.dataset.py = y.toFixed(3);
-        event.currentTarget.style.setProperty("--tilt-x", `${(-y * 8).toFixed(2)}deg`);
-        event.currentTarget.style.setProperty("--tilt-y", `${(x * 8).toFixed(2)}deg`);
-      }}
       style={{
         display: "grid",
         width: size,
         height: size,
-        transform: `scale(${look.scale}) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg))`,
+        overflow: "visible",
+        transform: `scale(${look.scale})`,
+        transformOrigin: "center",
         transition: "transform 180ms cubic-bezier(0.2, 0.8, 0, 1)",
-        transformStyle: "preserve-3d",
       }}
     >
       {body}

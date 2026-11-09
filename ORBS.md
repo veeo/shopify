@@ -24,23 +24,23 @@ Values are the shared baseline. Audio adds on top of listening and speaking: a f
 | State | Intensity | Speed | Glow | Scale | Enters |
 | --- | --- | --- | --- | --- | --- |
 | Rest | 0.16 | 0.35 | 0.10 | 1.00 | 5 /s |
-| Hover | 0.42 | 0.75 | 0.20 | 1.04 | 16 /s |
-| Selected | 0.28 | 0.50 | 0.14 | 1.00 | 8 /s |
-| Listening | 0.70 | 1.00 | 0.18 | 1.02 | 14 /s |
+| Hover | 0.16 | 0.35 | 0.10 | 1.00 | 5 /s |
+| Selected | 0.16 | 0.35 | 0.10 | 1.00 | 5 /s |
+| Listening | 0.70 | 1.00 | 0.18 | 1.00 | 14 /s |
 | Thinking | 0.40 | 0.60 | 0.12 | 1.00 | 8 /s |
-| Speaking | 0.78 | 1.10 | 0.20 | 1.02 | 14 /s |
+| Speaking | 0.78 | 1.10 | 0.20 | 1.00 | 14 /s |
 | Reduced motion | 0.04 | 0 | 0.06 | 1.00 | 8 /s |
 
-States blend. They do not snap. Hover wins over selected. Listening, thinking, and speaking win over hover. Only the selected agent receives the microphone or the reply audio. The microphone opens when dictation or voice mode starts.
+States blend. They do not snap. Hover and selected keep the same motion as rest: the circle does not grow, speed up, or tilt. Listening, thinking, and speaking are the reaction, and the silhouette stays inside the circle. Only the selected agent receives the microphone or the reply audio. The microphone opens when dictation or voice mode starts.
 
-Resting orbs draw, then hold that frame. Offscreen orbs and hidden tabs pause. Hover, selected, and voice keep rendering.
+Visible orbs keep their idle motion, all at the same pace. Offscreen orbs and hidden tabs pause. Reduced motion holds a frame.
 
 ## How each style reacts
 
 - **Plasma** flows faster and the colors distort more as the level rises.
 - **Nebula** swells its surface displacement.
 - **Mercury** deepens its ripples and contour.
-- **Twisted sphere** raises noise density, noise strength, and twist.
+- **Twisted sphere** speeds the twist. The silhouette stays inside the circle.
 - **Aura Field** opens the ring. Tools use this style.
 - **Crystal** crackles a brighter electric rim and speeds the dust. Dust leans toward the pointer. From [Crystalized Ball](https://reactbits.dev/animations/crystalized-ball).
 - **Strands** flares the spectral ribbons inside a frosted shell. From [Strands](https://reactbits.dev/backgrounds/strands).

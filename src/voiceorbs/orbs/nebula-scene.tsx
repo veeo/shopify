@@ -198,8 +198,8 @@ const STATE_KEYS = [
 
 const DISTORT: Record<OrbState, number> = {
   idle: 0.3,
-  hover: 0.4,
-  selected: 0.34,
+  hover: 0.3,
+  selected: 0.3,
   connecting: 0.3,
   listening: 0.48,
   thinking: 0.46,
@@ -210,8 +210,8 @@ const DISTORT: Record<OrbState, number> = {
 
 const FREQ: Record<OrbState, number> = {
   idle: 1,
-  hover: 1.05,
-  selected: 1.02,
+  hover: 1,
+  selected: 1,
   connecting: 1,
   listening: 1.15,
   thinking: 0.85,
@@ -357,7 +357,7 @@ const Sphere = ({ state, speed, colorFrom, colorTo, reduced, levelRef, onReady }
   });
 
   return (
-    <mesh scale={1.14}>
+    <mesh scale={1.18}>
       <icosahedronGeometry args={[1.2, 16]} />
       <shaderMaterial
         ref={matRef}
@@ -390,7 +390,7 @@ export const NebulaScene = ({
   const invalidateRef = useRef<() => void>(() => {});
   const reduced = useReducedMotion();
   const [active, setActive] = useState(true);
-  const engaged = state !== 'idle' && state !== 'disabled';
+  const engaged = state !== 'disabled';
 
   useEffect(() => {
     const canvas = canvasRef.current;
