@@ -63,11 +63,13 @@ type PlasmaTune = {
 };
 
 const TUNE: Record<OrbState, PlasmaTune> = {
-  idle: { flow: 0.3, distortion: 0.42, swirl: 0.26, grain: 0.06, outer: 0.2, inner: 0.2, beat: 0, beatRate: 0.3, error: 0 },
+  idle: { flow: 0.3, distortion: 0.42, swirl: 0.26, grain: 0.06, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
+  hover: { flow: 0.55, distortion: 0.5, swirl: 0.36, grain: 0.08, outer: 0.14, inner: 0.28, beat: 0, beatRate: 0.3, error: 0 },
+  selected: { flow: 0.4, distortion: 0.46, swirl: 0.3, grain: 0.07, outer: 0.1, inner: 0.18, beat: 0, beatRate: 0.3, error: 0 },
   connecting: { flow: 0.4, distortion: 0.4, swirl: 0.4, grain: 0.08, outer: 0.1, inner: 0.1, beat: 0.6, beatRate: 0.28, error: 0 },
-  listening: { flow: 0.6, distortion: 0.44, swirl: 0.22, grain: 0.12, outer: 1, inner: 0.15, beat: 0, beatRate: 0.3, error: 0 },
-  thinking: { flow: 0.7, distortion: 0.35, swirl: 0.78, grain: 0.1, outer: 0.1, inner: 0.1, beat: 1, beatRate: 0.5, error: 0 },
-  speaking: { flow: 1.2, distortion: 0.55, swirl: 0.34, grain: 0.18, outer: 0.3, inner: 1, beat: 0, beatRate: 0.3, error: 0 },
+  listening: { flow: 0.85, distortion: 0.5, swirl: 0.32, grain: 0.1, outer: 0.16, inner: 0.95, beat: 0, beatRate: 0.3, error: 0 },
+  thinking: { flow: 0.7, distortion: 0.35, swirl: 0.78, grain: 0.1, outer: 0.08, inner: 0.35, beat: 0.4, beatRate: 0.45, error: 0 },
+  speaking: { flow: 1.35, distortion: 0.58, swirl: 0.4, grain: 0.14, outer: 0.16, inner: 1, beat: 0, beatRate: 0.3, error: 0 },
   error: { flow: 1.7, distortion: 0.85, swirl: 0.55, grain: 0.2, outer: 0.2, inner: 0.2, beat: 0, beatRate: 0.3, error: 1 },
   disabled: { flow: 0, distortion: 0.4, swirl: 0.2, grain: 0.04, outer: 0, inner: 0, beat: 0, beatRate: 0.3, error: 0 },
 };
@@ -127,7 +129,7 @@ export const PlasmaOrb = ({
     const wave = frame.reduced ? 0.5 : 0.5 - 0.5 * Math.cos(clock.beat * TAU);
     const inner = level * tune.inner + wave * tune.beat * 0.4;
     const outer = level * tune.outer + wave * tune.beat * 0.3;
-    clock.shader += step * (tune.flow + inner * 0.9);
+    clock.shader += step * (tune.flow * (1 + level * 1.35) + inner * 0.9);
     const errorMix = clamp01(tune.error);
     const palette = livePalette(colorFrom, colorTo, errorMix);
     const from = rgbToHex(mixRgb(hexToRgb(colorFrom), hexToRgb(ERROR_COLOR_FROM), errorMix));
@@ -145,9 +147,9 @@ export const PlasmaOrb = ({
     Reflect.set(mount, 'currentFrame', BASE_FRAME + clock.shader * 1000);
     mount.setUniforms({
       u_colors: palette.map(toShaderColor),
-      u_distortion: clamp01(tune.distortion + inner * 0.4),
-      u_swirl: clamp01(tune.swirl + inner * 0.15 + wave * tune.beat * 0.15),
-      u_grainMixer: tune.grain,
+      u_distortion: clamp01(tune.distortion + inner * 0.55 + level * 0.12),
+      u_swirl: clamp01(tune.swirl + inner * 0.28 + wave * tune.beat * 0.1),
+      u_grainMixer: clamp01(tune.grain + level * 0.08),
     });
   };
 
@@ -198,7 +200,7 @@ export const PlasmaOrb = ({
         borderRadius: '50%',
         opacity: state === 'disabled' ? 0.5 : 1,
         filter: state === 'disabled' ? 'grayscale(0.85)' : 'grayscale(0)',
-        scale: 'calc(1 + var(--orb-outer, 0) * 0.07)',
+        scale: 'calc(1 + var(--orb-outer, 0) * 0.025)',
         transition: 'opacity 0.6s ease-out, filter 0.6s ease-out',
       }}
     >
@@ -207,8 +209,8 @@ export const PlasmaOrb = ({
           position: 'absolute',
           inset: 0,
           borderRadius: '50%',
-          boxShadow: `0 ${-size * 0.06}px ${size * 0.3}px calc(var(--orb-outer, 0) * ${size * 0.05}px) color-mix(in oklab, ${liveFrom} 55%, transparent), 0 ${size * 0.06}px ${size * 0.3}px calc(var(--orb-outer, 0) * ${size * 0.05}px) color-mix(in oklab, ${liveTo} 55%, transparent)`,
-          opacity: 'calc(0.35 + var(--orb-outer, 0) * 0.6 + var(--orb-level, 0) * 0.05)',
+          boxShadow: `0 0 ${size * 0.1}px color-mix(in oklab, ${liveFrom} 28%, transparent), 0 0 ${size * 0.14}px color-mix(in oklab, ${liveTo} 18%, transparent)`,
+          opacity: 'calc(0.12 + var(--orb-outer, 0) * 0.28)',
         }}
       />
       <div

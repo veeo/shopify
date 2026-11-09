@@ -1,0 +1,48 @@
+# Sidekick orbs
+
+Every orb, including the branded marks, uses one presence model. A style may add its own surface reaction, but it does not invent a separate size, hover, or audio rule.
+
+## Sizes
+
+The slot is a fixed box. Scale and glow happen inside it, with `transform`, so the layout does not move. Glow stays within 12% of the diameter (`ORB_GLOW_MARGIN`).
+
+| Context | Diameter |
+| --- | --- |
+| Nav list | 31px |
+| Composer | 32px |
+| Editor picker | 36px |
+| Add-a-sidekick card and voice mode | 48px |
+| Boot | 56px |
+| Mention, command palette, menu | 18 / 20 / 24px |
+
+Voice styles are drawn at 144px and scaled into the slot, so the detail holds at 31px.
+
+## States
+
+Values are the shared baseline. Audio adds on top of listening and speaking: a fast attack (rate 22) and a release that settles in about half a second (rate 6.5). Quiet input is boosted. Loud input is compressed. If the browser's speech engine has no samples, listening and speaking use an irregular syllable envelope on the orb itself.
+
+| State | Intensity | Speed | Glow | Scale | Enters |
+| --- | --- | --- | --- | --- | --- |
+| Rest | 0.16 | 0.35 | 0.10 | 1.00 | 5 /s |
+| Hover | 0.42 | 0.75 | 0.20 | 1.04 | 16 /s |
+| Selected | 0.28 | 0.50 | 0.14 | 1.00 | 8 /s |
+| Listening | 0.70 | 1.00 | 0.18 | 1.02 | 14 /s |
+| Thinking | 0.40 | 0.60 | 0.12 | 1.00 | 8 /s |
+| Speaking | 0.78 | 1.10 | 0.20 | 1.02 | 14 /s |
+| Reduced motion | 0.04 | 0 | 0.06 | 1.00 | 8 /s |
+
+States blend. They do not snap. Hover wins over selected. Listening, thinking, and speaking win over hover. Only the selected agent receives the microphone or the reply audio. The microphone opens when dictation or voice mode starts.
+
+Resting orbs draw, then hold that frame. Offscreen orbs and hidden tabs pause. Hover, selected, and voice keep rendering.
+
+## How each style reacts
+
+- **Plasma** flows faster and the colors distort more as the level rises.
+- **Nebula** swells its surface displacement.
+- **Mercury** deepens its ripples and contour.
+- **Twisted sphere** raises noise density, noise strength, and twist.
+- **Aura Field** opens the ring. Tools use this style.
+- **Crystal** crackles a brighter electric rim and speeds the dust. Dust leans toward the pointer. From [Crystalized Ball](https://reactbits.dev/animations/crystalized-ball).
+- **Strands** flares the spectral ribbons inside a frosted shell. From [Strands](https://reactbits.dev/backgrounds/strands).
+- **Iridescence** sweeps the thin-film bands faster and richer. From [Iridescence](https://reactbits.dev/animations/iridescence).
+- **Grok Bot, Slackbot, and Muse** keep their artwork. The mark squashes and stretches with the level. Grok and Slackbot answer with their eyes. Neither grows a mouth.

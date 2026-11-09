@@ -7,7 +7,7 @@ export type BusinessType = (typeof businessTypes)[number];
 
 export type AgentGroup = "favorites" | "teams" | "channels" | "tools" | "hidden";
 
-export const voiceOrbIds = ["plasma", "nebula", "mercury", "twist", "aura"] as const;
+export const voiceOrbIds = ["plasma", "nebula", "mercury", "twist", "aura", "crystal", "strands", "iridescence"] as const;
 export type VoiceOrbId = (typeof voiceOrbIds)[number];
 
 export type OrbId =
@@ -35,6 +35,9 @@ export const voiceOrbLabel: Record<VoiceOrbId, string> = {
   mercury: "Mercury Orb",
   twist: "Twisted Colorful Sphere",
   aura: "Aura Field",
+  crystal: "Crystal",
+  strands: "Strands",
+  iridescence: "Iridescence",
 };
 
 /** Gallery defaults. Twist's pair keeps the original cosine palette until a sidekick picks another. */
@@ -44,6 +47,9 @@ export const voiceOrbTint: Record<VoiceOrbId, { from: string; to: string }> = {
   mercury: { from: "#cbd5e1", to: "#a5b4fc" },
   twist: { from: "#22d3ee", to: "#f472b6" },
   aura: { from: "#34d399", to: "#60a5fa" },
+  crystal: { from: "#7dd3fc", to: "#e0f2fe" },
+  strands: { from: "#fb7185", to: "#38bdf8" },
+  iridescence: { from: "#f472b6", to: "#a78bfa" },
 };
 
 /** The same gradient pairs the VoiceOrbs gallery offers. */
@@ -72,7 +78,7 @@ const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
   orders: "aura",
   finance: "aura",
   analytics: "aura",
-  custom: "nebula",
+  custom: "iridescence",
   particles: "twist",
   dither: "plasma",
   grain: "twist",
@@ -571,7 +577,7 @@ export const catalog: Agent[] = [
     preview: "Travel charger and desk setup searches are up 22%.",
     topic: "This week",
     placeholder: "Ask Trends…",
-    orb: "trends",
+    orb: "strands",
   }),
   agent({
     id: "campaigns",
@@ -580,7 +586,7 @@ export const catalog: Agent[] = [
     preview: "Monday’s ads still say the lamp ships this week.",
     topic: "This week’s ads",
     placeholder: "Ask Campaigns…",
-    orb: "nebula",
+    orb: "crystal",
   }),
   agent({
     id: "grok",

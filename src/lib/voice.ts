@@ -1,8 +1,8 @@
 /** VoiceOrbs gallery loudness: voice-band energy, 0 silent through 1 loud. */
 const VOICE_MIN_HZ = 85;
 const VOICE_MAX_HZ = 3800;
-const LEVEL_FLOOR = 0.14;
-const LEVEL_RANGE = 0.62;
+const LEVEL_FLOOR = 0.03;
+const LEVEL_RANGE = 0.45;
 const PEAK_WEIGHT = 0.35;
 
 function voiceLevel(analyser: AnalyserNode, bins: Uint8Array) {
@@ -21,7 +21,9 @@ function voiceLevel(analyser: AnalyserNode, bins: Uint8Array) {
   }
   const average = sum / (hi - lo) / 255;
   const energy = (1 - PEAK_WEIGHT) * average + PEAK_WEIGHT * (peak / 255);
-  return Math.min(1, Math.max(0, (energy - LEVEL_FLOOR) / LEVEL_RANGE));
+  const shaped = Math.min(1, Math.max(0, (energy - LEVEL_FLOOR) / LEVEL_RANGE));
+  // Quiet speech still reads. Loud speech compresses instead of clipping the orb.
+  return Math.pow(shaped, 0.62);
 }
 
 export type Recording = {

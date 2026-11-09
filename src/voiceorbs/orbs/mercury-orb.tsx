@@ -57,11 +57,13 @@ type MercuryTune = {
 };
 
 const TUNE: Record<OrbState, MercuryTune> = {
-  idle: { flow: 0.32, repetition: 2.4, distortion: 0.08, contour: 0.42, softness: 0.26, outer: 0.25, inner: 0.2, beat: 0, beatRate: 0.3, error: 0 },
+  idle: { flow: 0.32, repetition: 2.4, distortion: 0.08, contour: 0.42, softness: 0.26, outer: 0.08, inner: 0.15, beat: 0, beatRate: 0.3, error: 0 },
+  hover: { flow: 0.5, repetition: 2.5, distortion: 0.16, contour: 0.5, softness: 0.2, outer: 0.12, inner: 0.3, beat: 0, beatRate: 0.3, error: 0 },
+  selected: { flow: 0.4, repetition: 2.45, distortion: 0.12, contour: 0.46, softness: 0.22, outer: 0.1, inner: 0.2, beat: 0, beatRate: 0.3, error: 0 },
   connecting: { flow: 0.4, repetition: 2.2, distortion: 0.1, contour: 0.36, softness: 0.3, outer: 0.1, inner: 0.1, beat: 0.6, beatRate: 0.28, error: 0 },
-  listening: { flow: 0.75, repetition: 2.6, distortion: 0.1, contour: 0.48, softness: 0.16, outer: 1, inner: 0.2, beat: 0, beatRate: 0.3, error: 0 },
-  thinking: { flow: 0.6, repetition: 3, distortion: 0.22, contour: 0.55, softness: 0.22, outer: 0.1, inner: 0.1, beat: 1, beatRate: 0.55, error: 0 },
-  speaking: { flow: 1.15, repetition: 2.8, distortion: 0.16, contour: 0.52, softness: 0.14, outer: 0.3, inner: 1, beat: 0, beatRate: 0.3, error: 0 },
+  listening: { flow: 0.9, repetition: 2.7, distortion: 0.18, contour: 0.55, softness: 0.12, outer: 0.14, inner: 0.95, beat: 0, beatRate: 0.3, error: 0 },
+  thinking: { flow: 0.6, repetition: 3, distortion: 0.22, contour: 0.55, softness: 0.22, outer: 0.08, inner: 0.35, beat: 0.45, beatRate: 0.5, error: 0 },
+  speaking: { flow: 1.2, repetition: 2.9, distortion: 0.22, contour: 0.62, softness: 0.1, outer: 0.14, inner: 1, beat: 0, beatRate: 0.3, error: 0 },
   error: { flow: 1.6, repetition: 3.6, distortion: 0.55, contour: 0.9, softness: 0.08, outer: 0.2, inner: 0.2, beat: 0, beatRate: 0.3, error: 1 },
   disabled: { flow: 0, repetition: 2, distortion: 0.04, contour: 0.25, softness: 0.4, outer: 0, inner: 0, beat: 0, beatRate: 0.3, error: 0 },
 };
@@ -129,7 +131,7 @@ export const MercuryOrb = ({
     const wave = frame.reduced ? 0.5 : 0.5 - 0.5 * Math.cos(clock.beat * TAU);
     const inner = level * tune.inner + wave * tune.beat * 0.4;
     const outer = level * tune.outer + wave * tune.beat * 0.3;
-    clock.shader += step * (tune.flow + inner * 0.6);
+    clock.shader += step * (tune.flow * (1 + level * 0.8) + inner * 0.6);
     clock.repetition = frame.reduced
       ? tune.repetition
       : approach(clock.repetition, tune.repetition, REPETITION_RATE, frame.dt);
@@ -152,8 +154,8 @@ export const MercuryOrb = ({
       u_colorTint: toShaderColor(hexToRgb(colors.tint)),
       u_repetition: clock.repetition,
       u_softness: tune.softness,
-      u_distortion: clamp01(tune.distortion + inner * 0.4),
-      u_contour: clamp01(tune.contour + inner * 0.3 + wave * tune.beat * 0.2),
+      u_distortion: clamp01(tune.distortion + inner * 0.7),
+      u_contour: clamp01(tune.contour + inner * 0.45 + wave * tune.beat * 0.12),
       u_shiftRed: 0.3 + errorMix * 0.3,
       u_shiftBlue: 0.3 - errorMix * 0.3,
     });
@@ -206,7 +208,7 @@ export const MercuryOrb = ({
         borderRadius: '50%',
         opacity: state === 'disabled' ? 0.5 : 1,
         filter: state === 'disabled' ? 'grayscale(0.85)' : 'grayscale(0)',
-        scale: 'calc(1 + var(--orb-outer, 0) * 0.06)',
+        scale: 'calc(1 + var(--orb-outer, 0) * 0.02)',
         transition: 'opacity 0.6s ease-out, filter 0.6s ease-out',
       }}
     >
@@ -215,8 +217,8 @@ export const MercuryOrb = ({
           position: 'absolute',
           inset: 0,
           borderRadius: '50%',
-          boxShadow: `0 ${-size * 0.05}px ${size * 0.28}px calc(var(--orb-outer, 0) * ${size * 0.04}px) color-mix(in oklab, ${liveFrom} 50%, transparent), 0 ${size * 0.05}px ${size * 0.28}px calc(var(--orb-outer, 0) * ${size * 0.04}px) color-mix(in oklab, ${liveTo} 50%, transparent)`,
-          opacity: 'calc(0.3 + var(--orb-outer, 0) * 0.6 + var(--orb-level, 0) * 0.1)',
+          boxShadow: `0 0 ${size * 0.1}px color-mix(in oklab, ${liveTo} 35%, transparent)`,
+          opacity: 'calc(0.1 + var(--orb-outer, 0) * 0.25)',
         }}
       />
       <div

@@ -13,8 +13,8 @@ import {
 import { observeActivity } from './use-in-view';
 import { prefersReducedMotion, subscribeReducedMotion } from './use-reduced-motion';
 
-export const LEVEL_ATTACK_RATE = 14;
-export const LEVEL_RELEASE_RATE = 4;
+export const LEVEL_ATTACK_RATE = 22;
+export const LEVEL_RELEASE_RATE = 6.5;
 export const MAX_FRAME_DT = 0.1;
 
 export interface OrbFrame {
@@ -100,8 +100,9 @@ export const useOrbAnimator = (
       frame.reduced = reduced;
       frame.state = opts.state;
       opts.onFrame?.(frame);
-      const idle = reduced && isSettled(mix.weights, opts.state) && frame.level < 0.001;
-      if (active && !idle) raf = requestAnimationFrame(tick);
+      const resting = opts.state === 'idle' || opts.state === 'disabled';
+      const held = (reduced || resting) && isSettled(mix.weights, opts.state) && frame.time > 0.8 && !hasLive;
+      if (active && !held) raf = requestAnimationFrame(tick);
       else last = null;
     };
 

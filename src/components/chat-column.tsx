@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChipButton, Orb } from "@/components/marks";
+import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Markdown } from "@/components/markdown";
 import { useOrbAudioPublish } from "@/components/orb-audio";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
@@ -720,8 +721,10 @@ export function Composer({
 
   const liveAgentId = state.mode === "add" || state.mode === "create" ? "sidekick" : agent.id;
   const avatarAgent = state.mode === "add" || state.mode === "create" ? (state.agents.find((item) => item.id === "sidekick") ?? agent) : agent;
-  useOrbAudioPublish(liveAgentId, (listening || transcribing) && !voiceOpen ? (listening ? "listening" : "thinking") : null, () =>
-    listening ? (recording.current?.level() ?? 0) : 0,
+  useOrbAudioPublish(
+    liveAgentId,
+    voiceOpen ? null : listening ? "listening" : transcribing || busy ? "thinking" : null,
+    () => (listening ? (recording.current?.level() ?? 0) : 0),
   );
 
   useEffect(() => {
@@ -915,11 +918,11 @@ export function Composer({
                   switchOpen ? "shadow-[0_0_0_3px_rgba(255,255,255,0.16)]" : ""
                 }`}
               >
-                <Orb id={avatarAgent.orb} agentId={liveAgentId} size={32} colorFrom={avatarAgent.orbFrom} colorTo={avatarAgent.orbTo} />
+                <Orb id={avatarAgent.orb} agentId={liveAgentId} size={ORB_SIZE.composer} presence="selected" colorFrom={avatarAgent.orbFrom} colorTo={avatarAgent.orbTo} />
               </button>
             </Tip>
           ) : (
-            <Orb id={agent.orb} agentId={agent.id} size={light ? 20 : 32} colorFrom={agent.orbFrom} colorTo={agent.orbTo} />
+            <Orb id={agent.orb} agentId={agent.id} size={ORB_SIZE.composer} presence="selected" colorFrom={agent.orbFrom} colorTo={agent.orbTo} />
           )}
           {listening ? (
             <span ref={meter} className="ml-1.5 flex h-5 items-center gap-[3px] text-[12px] text-[#8e8f8b]" style={{ "--level": 0 } as React.CSSProperties}>
@@ -1559,7 +1562,13 @@ function EditSidekick({
                 }}
                 className={`press rounded-full ${orb === choice.id ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-80 hover:opacity-100"}`}
               >
-                <Orb id={choice.id} size={36} colorFrom={choice.id === orb && voice ? colorFrom : undefined} colorTo={choice.id === orb && voice ? colorTo : undefined} />
+                <Orb
+                  id={choice.id}
+                  size={ORB_SIZE.editor}
+                  presence={orb === choice.id ? "selected" : "rest"}
+                  colorFrom={choice.id === orb && voice ? colorFrom : undefined}
+                  colorTo={choice.id === orb && voice ? colorTo : undefined}
+                />
               </button>
             ))}
           </div>
@@ -1856,7 +1865,7 @@ function AddGrid({ onAdd, onChip }: { onAdd: (id: string) => void; onChip: (labe
                     className="rise flex flex-col gap-4 rounded-3xl bg-[#1a1b1a] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-colors duration-150 hover:bg-[#1f201f]"
                     style={{ animationDelay: `${index * 40}ms`, animationFillMode: "backwards" }}
                   >
-                    <Orb id={card.orb} size={48} agentId={card.id} colorFrom={card.orbFrom} colorTo={card.orbTo} />
+                    <Orb id={card.orb} size={ORB_SIZE.card} agentId={card.id} colorFrom={card.orbFrom} colorTo={card.orbTo} />
                     <div className="min-h-[92px]">
                       <p className="text-[15px] leading-[1.4]">{card.name}</p>
                       <p className="text-[13px] leading-[1.4] text-[#9a9a9a]">{addCopy[card.id]}</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
-import type { OrbState } from "@/voiceorbs/lib/orb-state";
+import { speechEnvelope, type OrbState } from "@/voiceorbs/lib/orb-state";
 
 /**
  * Grok eye placement, capsule shape, and liveliness are adapted from Bloub
@@ -252,9 +252,16 @@ function capsulePath(w: number, h: number) {
 
 const GROK_R = 67;
 
+function mascotDrive(state: OrbState | undefined, level: number, time: number) {
+  if (state === "listening" || state === "speaking") return level >= 0 ? clamp(level) : speechEnvelope(time);
+  if (state === "thinking" || state === "connecting") return 0.2 + 0.12 * Math.sin(time * 2.4);
+  if (state === "hover") return 0.22;
+  return 0;
+}
+
 function grokFrame(t: number, state: OrbState | undefined, level: number, reduced: boolean) {
-  const live = level >= 0 ? clamp(level) : 0;
-  const voiced = level >= 0 && (state === "listening" || state === "speaking");
+  const live = reduced ? 0 : mascotDrive(state, level, t);
+  const voiced = live > 0.02 && (state === "listening" || state === "speaking" || state === "thinking");
   let expression = grokExpression(reduced ? 0 : t);
   if (!reduced && (state === "thinking" || state === "connecting")) expression = blendExpression(expression, GROK_EXPRESSIONS.attentif, 0.45);
   if (voiced) {
@@ -293,8 +300,10 @@ function grokFrame(t: number, state: OrbState | undefined, level: number, reduce
       opacity: clamp(pose.depth / 0.12),
     };
   });
-  const breath = life.breath * (1 + (voiced ? live * 0.012 : 0));
-  const rig = `translate(${round(CENTER + life.driftX * GROK_R)} ${round(CENTER + life.driftY * GROK_R)}) scale(${round(breath)}) translate(${-CENTER} ${-CENTER})`;
+  const breath = life.breath;
+  const sx = breath * (1 + (reduced ? 0 : live * 0.07));
+  const sy = breath * (1 - (reduced ? 0 : live * 0.05));
+  const rig = `translate(${round(CENTER + life.driftX * GROK_R)} ${round(CENTER + life.driftY * GROK_R)}) scale(${round(sx)} ${round(sy)}) translate(${-CENTER} ${-CENTER})`;
   return { eyes, rig };
 }
 
@@ -350,9 +359,9 @@ export function GrokBot({ size, state, levelRef }: { size: number; state?: OrbSt
   );
 }
 
-function slackEyeTransform(cx: number, lid: number) {
+function slackEyeTransform(cx: number, lid: number, widen = 1) {
   const squash = (0.14 + 0.86 * lid).toFixed(3);
-  return `translate(${cx} 14) scale(1 ${squash}) translate(${-cx} -14)`;
+  return `translate(${cx} 14) scale(${widen.toFixed(3)} ${squash}) translate(${-cx} -14)`;
 }
 
 export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
@@ -364,14 +373,14 @@ export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbS
 
   useMascotLoop(host, (time) => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const level = levelRef?.current ?? -1;
-    const live = level >= 0 ? clamp(level) : 0;
-    const voiced = level >= 0 && (state === "listening" || state === "speaking");
-    const scale = reduced ? 1 : 1 + Math.sin(time / 3.6) * 0.012 + (voiced ? live * 0.04 : 0);
+    const drive = reduced ? 0 : mascotDrive(state, levelRef?.current ?? -1, time);
+    const sx = 1 + Math.sin(time / 3.6) * 0.012 + drive * 0.07;
+    const sy = 1 + Math.sin(time / 3.6) * 0.012 - drive * 0.05;
     const lid = reduced ? 1 : blinkLid(time, SLACK_BLINKS, 0.16, 0.36);
-    motion.current?.setAttribute("transform", `translate(14 14) scale(${scale.toFixed(3)}) translate(-14 -14)`);
-    leftEye.current?.setAttribute("transform", slackEyeTransform(8, lid));
-    rightEye.current?.setAttribute("transform", slackEyeTransform(20, lid));
+    const widen = 1 + drive * 0.08;
+    motion.current?.setAttribute("transform", `translate(14 14) scale(${sx.toFixed(3)} ${sy.toFixed(3)}) translate(-14 -14)`);
+    leftEye.current?.setAttribute("transform", slackEyeTransform(8, lid, widen));
+    rightEye.current?.setAttribute("transform", slackEyeTransform(20, lid, widen));
   });
 
   return (
@@ -554,12 +563,11 @@ export function MuseBall({ size, state, levelRef }: { size: number; state?: OrbS
 
   useMascotLoop(host, (time) => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const level = levelRef?.current ?? -1;
-    const live = level >= 0 ? clamp(level) : 0;
-    const voiced = level >= 0 && (state === "listening" || state === "speaking");
+    const drive = reduced ? 0 : mascotDrive(state, levelRef?.current ?? -1, time);
     const fill = 1.16;
-    const scale = reduced ? fill : fill + Math.sin(time * 1.2) * 0.012 + (voiced ? live * 0.04 : 0);
-    if (image.current) image.current.style.transform = `scale(${scale.toFixed(3)})`;
+    const sx = fill * (1 + (reduced ? 0 : Math.sin(time * 1.2) * 0.012 + drive * 0.06));
+    const sy = fill * (1 - (reduced ? 0 : drive * 0.045));
+    if (image.current) image.current.style.transform = `scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
   });
 
   return (

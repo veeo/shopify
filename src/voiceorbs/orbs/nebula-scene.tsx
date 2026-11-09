@@ -109,7 +109,7 @@ vec3 surfacePoint(vec3 p, float amp){
 }
 
 void main(){
-  float amp = uDistort * 0.55 + uAudio * 0.3;
+  float amp = uDistort * 0.55 + uAudio * 0.62;
   float radius = length(position);
   vec3 dir = normalize(position);
   float noise = fieldNoise(position);
@@ -186,6 +186,8 @@ void main(){
 
 const STATE_KEYS = [
   'idle',
+  'hover',
+  'selected',
   'connecting',
   'listening',
   'thinking',
@@ -196,30 +198,36 @@ const STATE_KEYS = [
 
 const DISTORT: Record<OrbState, number> = {
   idle: 0.3,
+  hover: 0.4,
+  selected: 0.34,
   connecting: 0.3,
-  listening: 0.34,
+  listening: 0.48,
   thinking: 0.46,
-  speaking: 0.38,
+  speaking: 0.52,
   error: 0.34,
   disabled: 0.24,
 };
 
 const FREQ: Record<OrbState, number> = {
   idle: 1,
+  hover: 1.05,
+  selected: 1.02,
   connecting: 1,
-  listening: 1,
+  listening: 1.15,
   thinking: 0.85,
-  speaking: 1.1,
+  speaking: 1.2,
   error: 1.25,
   disabled: 0.9,
 };
 
 const RESPONSE: Record<OrbState, number> = {
   idle: 8,
+  hover: 12,
+  selected: 8,
   connecting: 8,
-  listening: 14,
+  listening: 16,
   thinking: 8,
-  speaking: 10,
+  speaking: 12,
   error: 8,
   disabled: 8,
 };
@@ -379,8 +387,10 @@ export const NebulaScene = ({
   onReady,
 }: NebulaSceneProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const invalidateRef = useRef<() => void>(() => {});
   const reduced = useReducedMotion();
   const [active, setActive] = useState(true);
+  const engaged = state !== 'idle' && state !== 'disabled';
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -388,14 +398,22 @@ export const NebulaScene = ({
     return observeActivity(canvas, setActive);
   }, []);
 
+  useEffect(() => {
+    invalidateRef.current();
+  }, [engaged, state, colorFrom, colorTo]);
+
   return (
     <Canvas
       ref={canvasRef}
-      frameloop={reduced || !active ? 'demand' : 'always'}
+      frameloop={reduced || !active || !engaged ? 'demand' : 'always'}
       camera={{ position: [0, 0, 3.6], fov: 45 }}
       gl={{ antialias: true, alpha: true }}
-      dpr={[1, 2]}
+      dpr={[1, 1.5]}
       resize={{ offsetSize: true }}
+      onCreated={({ invalidate }) => {
+        invalidateRef.current = invalidate;
+        invalidate();
+      }}
     >
       <Sphere
         state={state}
