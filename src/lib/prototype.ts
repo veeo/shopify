@@ -37,7 +37,7 @@ export const voiceOrbLabel: Record<VoiceOrbId, string> = {
   mercury: "Mercury Orb",
   twist: "Twisted Colorful Sphere",
   aura: "Aura Field",
-  crystal: "Crystal",
+  crystal: "Crystalized Ball",
   strands: "Strands",
   iridescence: "Iridescence",
 };
@@ -49,7 +49,7 @@ export const voiceOrbTint: Record<VoiceOrbId, { from: string; to: string }> = {
   mercury: { from: "#cbd5e1", to: "#a5b4fc" },
   twist: { from: "#22d3ee", to: "#f472b6" },
   aura: { from: "#34d399", to: "#60a5fa" },
-  crystal: { from: "#7dd3fc", to: "#e0f2fe" },
+  crystal: { from: "#ffffff", to: "#d4d4d8" },
   strands: { from: "#fb7185", to: "#38bdf8" },
   iridescence: { from: "#f472b6", to: "#a78bfa" },
 };
@@ -100,7 +100,6 @@ const reuseTint: Record<string, { from: string; to: string }> = {
   orders: { from: "#22d3ee", to: "#2563eb" },
   finance: { from: "#fbbf24", to: "#b45309" },
   analytics: { from: "#34d399", to: "#059669" },
-  campaigns: { from: "#fb7185", to: "#fbbf24" },
   custom: { from: "#4f46e5", to: "#ec4899" },
 };
 
@@ -614,7 +613,7 @@ export const catalog: Agent[] = [
     preview: "Monday’s ads still say the lamp ships this week.",
     topic: "This week’s ads",
     placeholder: "Ask Campaigns…",
-    orb: "nebula",
+    orb: "crystal",
   }),
   agent({
     id: "grok",

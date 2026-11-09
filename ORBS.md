@@ -42,7 +42,7 @@ Visible orbs keep their idle motion, all at the same pace. Offscreen orbs and hi
 - **Mercury** deepens its ripples and contour.
 - **Twisted sphere** keeps the original twist. Chief of staff uses this style. Talking speeds it.
 - **Aura Field** is the tool ring. It sits inside the circle and brightens when talking. The ring does not grow.
-- **Crystal** crackles a brighter electric rim and speeds the dust. Dust leans toward the pointer. From [Crystalized Ball](https://reactbits.dev/animations/crystalized-ball).
+- **Crystalized Ball** is the Campaigns orb. The glass circle matches the other orbs. The electric rim and dust can extend past that circle, and nothing clips them. From [Crystalized Ball](https://reactbits.dev/animations/crystalized-ball).
 - **Strands** flares the spectral ribbons inside a frosted shell. From [Strands](https://reactbits.dev/backgrounds/strands).
 - **Iridescence** sweeps the thin-film bands faster and richer. From [Iridescence](https://reactbits.dev/animations/iridescence).
 - **Grok Bot, Slackbot, and Muse** keep their artwork. The mark squashes and stretches with the level. Grok and Slackbot answer with their eyes. Neither grows a mouth.
