@@ -40,8 +40,8 @@ Visible orbs keep their idle motion, all at the same pace. Offscreen orbs and hi
 - **Plasma** flows faster and the colors distort more as the level rises.
 - **Nebula** swells its surface displacement.
 - **Mercury** deepens its ripples and contour.
-- **Twisted sphere** speeds the twist. The silhouette stays inside the circle.
-- **Aura Field** opens the ring. Tools use this style.
+- **Twisted sphere** keeps the original twist. Chief of staff uses this style. Talking speeds it.
+- **Aura Field** is the tool ring. It sits inside the circle and brightens when talking. The ring does not grow.
 - **Crystal** crackles a brighter electric rim and speeds the dust. Dust leans toward the pointer. From [Crystalized Ball](https://reactbits.dev/animations/crystalized-ball).
 - **Strands** flares the spectral ribbons inside a frosted shell. From [Strands](https://reactbits.dev/backgrounds/strands).
 - **Iridescence** sweeps the thin-film bands faster and richer. From [Iridescence](https://reactbits.dev/animations/iridescence).

@@ -96,12 +96,11 @@ const VERTEX = `
   }
   void main() {
     float t = uTime * uSpeed;
-    float raw = pnoise((normal + t) * uNoiseDensity, vec3(10.0)) * uNoiseStrength;
-    float distortion = clamp(raw, -0.03, 0.03);
+    float distortion = pnoise((normal + t) * uNoiseDensity, vec3(10.0)) * uNoiseStrength;
     vec3 pos = position + (normal * distortion);
     float angle = sin(uv.y * uFrequency + t) * uAmplitude;
     pos = rotation3dY(angle) * pos;
-    vDistort = raw;
+    vDistort = distortion;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
   }
 `;
@@ -127,8 +126,8 @@ const FRAGMENT = `
 
 const STATE_RATE: Record<OrbState, number> = {
   idle: 1,
-  hover: 1,
-  selected: 1,
+  hover: 1.2,
+  selected: 1.08,
   connecting: 1.15,
   listening: 1.45,
   thinking: 1.15,
@@ -185,17 +184,17 @@ function TwistMesh({
     const tint = tintRef.current;
     elapsed.current += Math.min(delta, 0.1);
     material.uniforms.uTime.value = elapsed.current;
-    material.uniforms.uSpeed.value = 0.45 * rate * (1 + 0.8 * kick);
-    material.uniforms.uNoiseDensity.value = 1.5 + 0.35 * kick;
-    material.uniforms.uNoiseStrength.value = 0.08 + 0.12 * kick;
-    material.uniforms.uAmplitude.value = 1.4 + 1.2 * kick;
+    material.uniforms.uSpeed.value = 0.2 * rate * (1 + 1.1 * kick);
+    material.uniforms.uNoiseDensity.value = 1.5 + 0.8 * kick;
+    material.uniforms.uNoiseStrength.value = 0.16 + 0.55 * kick;
+    material.uniforms.uAmplitude.value = 4.5 + 7 * kick;
     material.uniforms.uFrom.value.copy(tint.from);
     material.uniforms.uTo.value.copy(tint.to);
     material.uniforms.uCustom.value = tint.custom;
   });
 
   return (
-    <mesh scale={1.82}>
+    <mesh scale={1.66}>
       <icosahedronGeometry args={[1, 64]} />
       <shaderMaterial
         ref={matRef}

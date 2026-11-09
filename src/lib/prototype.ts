@@ -100,6 +100,7 @@ const reuseTint: Record<string, { from: string; to: string }> = {
   orders: { from: "#22d3ee", to: "#2563eb" },
   finance: { from: "#fbbf24", to: "#b45309" },
   analytics: { from: "#34d399", to: "#059669" },
+  campaigns: { from: "#fb7185", to: "#fbbf24" },
   custom: { from: "#4f46e5", to: "#ec4899" },
 };
 
@@ -604,7 +605,7 @@ export const catalog: Agent[] = [
     preview: "Travel charger and desk setup searches are up 22%.",
     topic: "This week",
     placeholder: "Ask Trends…",
-    orb: "strands",
+    orb: "mercury",
   }),
   agent({
     id: "campaigns",
@@ -613,7 +614,7 @@ export const catalog: Agent[] = [
     preview: "Monday’s ads still say the lamp ships this week.",
     topic: "This week’s ads",
     placeholder: "Ask Campaigns…",
-    orb: "crystal",
+    orb: "nebula",
   }),
   agent({
     id: "grok",
@@ -1876,7 +1877,17 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
       next.menuStyle = action.style;
       return next;
     case "select": {
-      if (!next.agents.some((item) => item.id === action.id && item.installed)) return state;
+      const installed = next.agents.some((item) => item.id === action.id && item.installed);
+      if (!installed) {
+        if (!hiddenSidekicks.has(action.id)) return state;
+        const source = catalog.find((item) => item.id === action.id);
+        if (!source) return state;
+        const revealed = { ...source, installed: true, unread: 0 };
+        next.agents = next.agents.some((item) => item.id === action.id)
+          ? next.agents.map((item) => (item.id === action.id ? revealed : item))
+          : [...next.agents, revealed];
+        if (!next.threads[action.id]?.length) next.threads[action.id] = activeThread(action.id);
+      }
       next.selectedAgentId = action.id;
       next.mode = "thread";
       next.searchOpen = false;

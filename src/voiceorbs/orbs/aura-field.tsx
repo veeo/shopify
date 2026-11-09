@@ -32,13 +32,13 @@ interface AuraParams extends Record<string, number> {
 }
 
 const AURA_TABLE: Record<OrbState, AuraParams> = {
-  idle: { speed: 28, scale: 0.35, thick: 0.05, warp: 0.04, brightLo: 0.9, brightHi: 1.05, shimmer: 0.35, sweepRate: 0.7, desat: 0 },
-  hover: { speed: 28, scale: 0.35, thick: 0.05, warp: 0.04, brightLo: 0.9, brightHi: 1.05, shimmer: 0.35, sweepRate: 0.7, desat: 0 },
-  selected: { speed: 28, scale: 0.35, thick: 0.05, warp: 0.04, brightLo: 0.9, brightHi: 1.05, shimmer: 0.35, sweepRate: 0.7, desat: 0 },
+  idle: { speed: 12, scale: 0.26, thick: 0.045, warp: 0.03, brightLo: 0.75, brightHi: 0.9, shimmer: 0.2, sweepRate: 0.28, desat: 0 },
+  hover: { speed: 12, scale: 0.26, thick: 0.045, warp: 0.03, brightLo: 0.75, brightHi: 0.9, shimmer: 0.2, sweepRate: 0.28, desat: 0 },
+  selected: { speed: 12, scale: 0.26, thick: 0.045, warp: 0.03, brightLo: 0.75, brightHi: 0.9, shimmer: 0.2, sweepRate: 0.28, desat: 0 },
   connecting: { speed: 14, scale: 0.22, thick: 0.045, warp: 0.04, brightLo: 0.9, brightHi: 0.9, shimmer: 1, sweepRate: 1.3, desat: 0 },
-  listening: { speed: 48, scale: 0.35, thick: 0.06, warp: 0.06, brightLo: 1.3, brightHi: 1.9, shimmer: 0, sweepRate: 0.9, desat: 0 },
-  thinking: { speed: 22, scale: 0.35, thick: 0.05, warp: 0.05, brightLo: 0.55, brightHi: 1.8, shimmer: 0.5, sweepRate: 1.6, desat: 0 },
-  speaking: { speed: 56, scale: 0.35, thick: 0.06, warp: 0.06, brightLo: 1.35, brightHi: 1.9, shimmer: 0, sweepRate: 1.1, desat: 0 },
+  listening: { speed: 40, scale: 0.26, thick: 0.05, warp: 0.05, brightLo: 1.2, brightHi: 1.7, shimmer: 0, sweepRate: 0.7, desat: 0 },
+  thinking: { speed: 18, scale: 0.26, thick: 0.045, warp: 0.04, brightLo: 0.55, brightHi: 1.5, shimmer: 0.35, sweepRate: 0.9, desat: 0 },
+  speaking: { speed: 44, scale: 0.26, thick: 0.05, warp: 0.05, brightLo: 1.25, brightHi: 1.7, shimmer: 0, sweepRate: 0.85, desat: 0 },
   error: { speed: 25, scale: 0.24, thick: 0.058, warp: 0.18, brightLo: 1.4, brightHi: 1.4, shimmer: 0, sweepRate: 0.6, desat: 0 },
   disabled: { speed: 0, scale: 0.2, thick: 0.04, warp: 0.05, brightLo: 0.5, brightHi: 0.5, shimmer: 0, sweepRate: 0, desat: 0.85 },
 };
