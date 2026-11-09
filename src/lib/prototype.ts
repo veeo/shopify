@@ -9,7 +9,7 @@ export type BusinessType = (typeof businessTypes)[number];
 
 export type AgentGroup = "favorites" | "teams" | "channels" | "tools" | "hidden";
 
-export const voiceOrbIds = ["plasma", "nebula", "mercury", "twist", "aura", "crystal", "strands", "iridescence"] as const;
+export const voiceOrbIds = ["plasma", "mercury", "twist", "aura", "marble", "strands"] as const;
 export type VoiceOrbId = (typeof voiceOrbIds)[number];
 
 export type OrbId =
@@ -32,41 +32,46 @@ export type OrbId =
   | "custom";
 
 export const voiceOrbLabel: Record<VoiceOrbId, string> = {
-  plasma: "Plasma Orb",
-  nebula: "Nebula Orb",
-  mercury: "Mercury Orb",
+  plasma: "Plasma",
+  mercury: "Mercury",
   twist: "Twisted Colorful Sphere",
   aura: "Aura Field",
-  crystal: "Crystalized Ball",
-  strands: "Strands",
-  iridescence: "Iridescence",
+  marble: "Marble",
+  strands: "Fluid",
 };
 
 /** Gallery defaults. Twist's pair keeps the original cosine palette until a sidekick picks another. */
 export const voiceOrbTint: Record<VoiceOrbId, { from: string; to: string }> = {
   plasma: { from: "#7c3aed", to: "#06b6d4" },
-  nebula: { from: "#8b5cf6", to: "#22d3ee" },
   mercury: { from: "#cbd5e1", to: "#a5b4fc" },
   twist: { from: "#22d3ee", to: "#f472b6" },
   aura: { from: "#34d399", to: "#60a5fa" },
-  crystal: { from: "#ffffff", to: "#d4d4d8" },
-  strands: { from: "#fb7185", to: "#38bdf8" },
-  iridescence: { from: "#f472b6", to: "#a78bfa" },
+  marble: { from: "#1d4ed8", to: "#fb7185" },
+  strands: { from: "#38bdf8", to: "#fb7185" },
 };
 
-/** The same gradient pairs the VoiceOrbs gallery offers. */
-export const orbColorPresets: { name: string; from: string; to: string }[] = [
-  { name: "Iris", from: "#818cf8", to: "#22d3ee" },
-  { name: "Orchid", from: "#8b5cf6", to: "#d946ef" },
-  { name: "Aurora", from: "#22d3ee", to: "#34d399" },
-  { name: "Sunset", from: "#fbbf24", to: "#f43f5e" },
-  { name: "Cosmic", from: "#fc466b", to: "#3f5efb" },
-  { name: "Neon", from: "#22d3ee", to: "#d946ef" },
-  { name: "Metal", from: "#94a3b8", to: "#e2e8f0" },
-  { name: "Magma", from: "#f43f5e", to: "#fb923c" },
-  { name: "Gold", from: "#b45309", to: "#fde68a" },
-  { name: "Nebula", from: "#4f46e5", to: "#ec4899" },
-];
+/** One color for the editor. The second stop is derived so the orb keeps depth. */
+export const orbSwatches = [
+  { name: "Violet", color: "#7c3aed" },
+  { name: "Cyan", color: "#06b6d4" },
+  { name: "Emerald", color: "#10b981" },
+  { name: "Amber", color: "#f59e0b" },
+  { name: "Rose", color: "#f43f5e" },
+  { name: "Slate", color: "#94a3b8" },
+] as const;
+
+/** The color the person picked, plus a lighter stop so the orb still has depth. */
+export function orbColorPair(hex: string): { from: string; to: string } {
+  const clean = hex.replace("#", "");
+  const full = clean.length === 3 ? [...clean].map((part) => part + part).join("") : clean.padStart(6, "0").slice(0, 6);
+  const value = Number.parseInt(full, 16);
+  if (Number.isNaN(value)) return { from: "#7c3aed", to: "#c4b5fd" };
+  const channels = [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  const lift = [0.42, 0.28, 0.5];
+  const to = channels.map((channel, index) => Math.round(channel + (255 - channel) * lift[index]));
+  const hexOf = (rgb: number[]) => `#${rgb.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+  return { from: hexOf(channels), to: hexOf(to) };
+}
 
 /** Branded marks stay out of the generic orb picker. */
 export const exemptAvatarAgents = new Set(["slack", "grok", "muse", "claude", "gemini", "store", "shop", "pos", "agentic"]);
@@ -87,11 +92,14 @@ const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
   orders: "aura",
   finance: "aura",
   analytics: "aura",
-  custom: "iridescence",
+  custom: "plasma",
   particles: "twist",
   dither: "plasma",
   grain: "twist",
   gooey: "aura",
+  nebula: "marble",
+  crystal: "marble",
+  iridescence: "plasma",
 };
 
 /** Reused styles get a different gradient so two sidekicks don't look identical. */
@@ -613,7 +621,7 @@ export const catalog: Agent[] = [
     preview: "Monday’s ads still say the lamp ships this week.",
     topic: "This week’s ads",
     placeholder: "Ask Campaigns…",
-    orb: "crystal",
+    orb: "marble",
   }),
   agent({
     id: "grok",

@@ -3,13 +3,12 @@
 import { type CSSProperties, type ReactNode, type RefObject } from "react";
 import { useOrbAudio } from "@/components/orb-audio";
 import { useReducedMotion } from "@/voiceorbs/lib/use-reduced-motion";
-import { CrystalOrb, IridescenceOrb, StrandsOrb } from "@/voiceorbs/orbs/canvas-orbs";
 import { ORB_LOOK, presenceFor } from "@/voiceorbs/lib/orb-model";
 import { canonicalOrb, isVoiceOrb, type OrbId, type VoiceOrbId } from "@/lib/prototype";
 import { AgenticMark, ClaudeMark, GeminiMark, GrokBot, MuseBall, OnlineStoreMark, PosMark, ShopAppMark, SlackOrb } from "@/components/team-marks";
 import { AuraField } from "@/voiceorbs/orbs/aura-field";
+import { FluidOrb, MarbleOrb } from "@/voiceorbs/orbs/glass-orbs";
 import { MercuryOrb } from "@/voiceorbs/orbs/mercury-orb";
-import { NebulaOrb } from "@/voiceorbs/orbs/nebula-orb";
 import { PlasmaOrb } from "@/voiceorbs/orbs/plasma-orb";
 import { TwistSphere } from "@/voiceorbs/orbs/twist-sphere";
 import type { OrbState } from "@/voiceorbs/lib/orb-state";
@@ -135,9 +134,6 @@ function VoiceOrb({
   };
   let node: ReactNode;
   switch (id) {
-    case "nebula":
-      node = <NebulaOrb {...props} />;
-      break;
     case "mercury":
       node = <MercuryOrb {...props} />;
       break;
@@ -147,14 +143,11 @@ function VoiceOrb({
     case "aura":
       node = <AuraField {...props} />;
       break;
-    case "crystal":
-      node = <CrystalOrb {...props} />;
+    case "marble":
+      node = <MarbleOrb {...props} />;
       break;
     case "strands":
-      node = <StrandsOrb {...props} />;
-      break;
-    case "iridescence":
-      node = <IridescenceOrb {...props} />;
+      node = <FluidOrb {...props} />;
       break;
     default:
       node = <PlasmaOrb {...props} />;

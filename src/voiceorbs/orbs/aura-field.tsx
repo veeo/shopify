@@ -13,6 +13,7 @@ import {
   type OrbProps,
   type OrbState,
 } from '@/voiceorbs/lib/orb-state';
+import { useOnScreen } from '@/voiceorbs/lib/use-in-view';
 import { useOrbAnimator, type OrbFrame } from '@/voiceorbs/lib/use-orb-animator';
 import { useReducedMotion } from '@/voiceorbs/lib/use-reduced-motion';
 import { useWebGLSupport } from '@/voiceorbs/lib/use-webgl-support';
@@ -150,29 +151,35 @@ void main() {
   float a = atan(p.y, p.x);
 
   vec3 acc = vec3(0.0);
-  for (int i = 0; i < 3; i++) {
+  float ball = 0.56;
+  float z = sqrt(max(0.0, ball * ball - r * r));
+  float shell = smoothstep(ball + 0.045, ball - 0.01, r);
+  vec3 pos = vec3(p, z) / max(ball, 0.001);
+  for (int i = 0; i < 5; i++) {
     float fi = float(i);
-    float ph = uPhase * (1.0 + 0.35 * fi) + fi * 2.1;
-    float amp1 = 0.6 + 0.8 * noise(vec2(ph * 0.35, fi * 7.3));
-    float amp2 = 0.4 + 0.8 * noise(vec2(fi * 3.9, ph * 0.28 + 4.0));
-    float n = 0.5 * amp1 * sin(3.0 * a + ph * 1.3)
-      + 0.32 * amp2 * sin(5.0 * a - ph * 1.7 + fi * 2.0)
-      + 0.22 * sin(2.0 * a + ph * 0.8 + fi);
-    n *= 0.5;
-    float rr = min(uRadius * (1.0 + n * uWarp * 2.2) + (fi - 1.0) * uThick * 0.9, 0.64);
-    float d = abs(r - rr);
-    float w = uThick * (0.8 + 0.6 * abs(n));
-    float band = exp(-(d * d) / (w * w));
-    float bloom = exp(-d / (w * 2.6));
-    float hue = 0.5 + 0.5 * sin(a + uPhase * 0.3 + fi * 1.4 + n * 3.0);
-    vec3 c = mix(uFrom, uTo, smoothstep(0.1, 0.9, hue));
-    float layer = i == 1 ? 1.0 : 0.55;
-    acc += c * (band * 1.0 + bloom * 0.28) * layer;
-    acc += mix(c, vec3(1.0), 0.45) * pow(band, 6.0) * 0.35 * layer;
+    float sp = 0.58 + fi * 0.41;
+    float ph = uPhase * sp + fi * 2.2;
+    vec3 axis = normalize(vec3(
+      sin(ph * 0.83 + fi * 1.7),
+      cos(ph * 0.57 + fi * 0.9),
+      sin(ph * 0.41 + fi * 2.5)
+    ));
+    float lat = dot(pos, axis);
+    float w = 0.11 + uThick * 1.4 + uWarp * 0.4;
+    float ribbon = exp(-(lat * lat) / (w * w));
+    vec3 side = pos - axis * lat;
+    float arc = abs(mod(atan(side.y, side.x) - ph * (0.65 + 0.11 * fi) + 3.14159, 6.28318) - 3.14159);
+    float window = smoothstep(2.7, 0.05, arc);
+    float strand = ribbon * window * shell;
+    vec3 c = mix(uFrom, uTo, fract(fi * 0.37 + 0.5 * noise(vec2(ph * 0.2, fi * 3.1))));
+    acc += c * strand * (0.45 + 0.7 * (z / ball));
+    acc += mix(c, vec3(1.0), 0.5) * pow(strand, 3.0) * 0.4;
   }
-
-  float hollow = smoothstep(uRadius * 0.25, uRadius * 0.95, r);
-  acc *= mix(0.1, 1.0, hollow);
+  acc += mix(uFrom, uTo, 0.45) * shell * (0.28 + 0.34 * (z / ball));
+  float fres = pow(1.0 - clamp(z / ball, 0.0, 1.0), 2.1) * shell;
+  acc += vec3(1.0) * fres * 0.28;
+  float spec = pow(clamp(1.0 - length((p - vec2(-0.08, 0.1)) / 0.16), 0.0, 1.0), 3.0) * shell;
+  acc += vec3(1.0) * spec * 0.55;
 
   float sweep = pow(0.5 + 0.5 * cos(a - uSweep), 6.0);
   float sweep2 = pow(0.5 + 0.5 * cos(a - uSweep * 0.7 + 2.6), 10.0);
@@ -218,12 +225,10 @@ const UNIFORMS = [
 
 const fallbackRing = (from: string, to: string, size: number): CSSProperties => ({
   position: 'absolute',
-  inset: '14%',
+  inset: 0,
   borderRadius: '50%',
-  background: `conic-gradient(from 0deg, ${from}, ${to}, ${from}, ${to}, ${from})`,
-  WebkitMask: 'radial-gradient(closest-side, transparent 72%, #000 80%, #000 88%, transparent 100%)',
-  mask: 'radial-gradient(closest-side, transparent 72%, #000 80%, #000 88%, transparent 100%)',
-  filter: `blur(${Math.max(1, Math.round(size * 0.012))}px) drop-shadow(0 0 ${Math.round(size * 0.06)}px ${to})`,
+  background: `radial-gradient(circle at 32% 28%, #fff 0%, ${from} 26%, ${to} 68%, #111 100%)`,
+  boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.28), 0 0 ${Math.round(size * 0.08)}px ${to}`,
 });
 
 export const AuraField = ({
@@ -251,17 +256,20 @@ export const AuraField = ({
     spring: { x: AURA_TABLE[state].scale, v: 0 },
   });
   const [lost, setLost] = useState(false);
+  const [painted, setPainted] = useState(false);
   const support = useWebGLSupport();
+  const { ref: screenRef, on: onScreen } = useOnScreen();
   const reduced = useReducedMotion();
-  const showCanvas = support === true && !lost;
+  const showCanvas = support === true && onScreen && !lost;
 
   const setRefs = useCallback(
     (node: HTMLDivElement | null) => {
       hostRef.current = node;
+      screenRef(node);
       if (typeof ref === 'function') ref(node);
       else if (ref) ref.current = node;
     },
-    [ref],
+    [ref, screenRef],
   );
 
 
@@ -401,7 +409,9 @@ export const AuraField = ({
     gl.uniform1f(loc.uRes, px);
     gl.uniform1f(loc.uBleed, AURA_BLEED);
     glRef.current = { gl, loc };
+    gl.clear(gl.COLOR_BUFFER_BIT);
     drawRef.current(frameRef.current);
+    setPainted(true);
 
     const onLost = (event: Event) => {
       event.preventDefault();
@@ -415,6 +425,7 @@ export const AuraField = ({
       glRef.current = null;
       gl.deleteBuffer(buffer);
       dropResources();
+      setPainted(false);
     };
   }, [size, showCanvas, frameRef]);
 
@@ -461,9 +472,11 @@ export const AuraField = ({
               left: (size - size * AURA_BLEED) / 2,
               top: (size - size * AURA_BLEED) / 2,
               display: 'block',
+              background: 'transparent',
+              opacity: painted ? 1 : 0,
             }}
           />
-        ) : (
+        ) : support === false || lost ? (
           <div ref={fallbackRef} style={{ position: 'absolute', inset: 0 }}>
             <div ref={brandLayerRef} style={fallbackRing(colorFrom, colorTo, size)} />
             <div
@@ -471,7 +484,7 @@ export const AuraField = ({
               style={{ ...fallbackRing(ERROR_COLOR_FROM, ERROR_COLOR_TO, size), opacity: 0 }}
             />
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

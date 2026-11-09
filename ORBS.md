@@ -37,12 +37,10 @@ Visible orbs keep their idle motion, all at the same pace. Offscreen orbs and hi
 
 ## How each style reacts
 
-- **Plasma** flows faster and the colors distort more as the level rises.
-- **Nebula** swells its surface displacement.
-- **Mercury** deepens its ripples and contour.
+- **Plasma** is the Product ideas orb. The colors stay separated, a glass highlight sits on the sphere, and the flow is a step faster than before. Talking still speeds it further.
+- **Mercury** is the Trends orb. The ripples and contour deepen with the level, and the idle flow is a step faster.
 - **Twisted sphere** keeps the original twist. Chief of staff uses this style. Talking speeds it.
-- **Aura Field** is the tool ring. It sits inside the circle and brightens when talking. The ring does not grow.
-- **Crystalized Ball** is the Campaigns orb. The glass circle matches the other orbs. The electric rim and dust can extend past that circle, and nothing clips them. From [Crystalized Ball](https://reactbits.dev/animations/crystalized-ball).
-- **Strands** flares the spectral ribbons inside a frosted shell. From [Strands](https://reactbits.dev/backgrounds/strands).
-- **Iridescence** sweeps the thin-film bands faster and richer. From [Iridescence](https://reactbits.dev/animations/iridescence).
+- **Aura Field** is the tool orb. Several strands move on their own and together stay inside a sphere. Talking brightens them. The sphere does not grow.
+- **Marble** is the Campaigns orb. A glass sphere with colored veins and a moving highlight. It stays inside the same circle as the others.
+- **Fluid** is the soft glass orb. Four colors drift independently inside the sphere, closer to the Siri orb than to spectral lines.
 - **Grok Bot, Slackbot, and Muse** keep their artwork. The mark squashes and stretches with the level. Grok and Slackbot answer with their eyes. Neither grows a mouth.
