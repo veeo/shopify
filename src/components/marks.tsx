@@ -3,7 +3,7 @@
 import { type CSSProperties, type ReactNode, type RefObject } from "react";
 import { useOrbAudio } from "@/components/orb-audio";
 import { canonicalOrb, isVoiceOrb, type OrbId, type VoiceOrbId } from "@/lib/prototype";
-import { GrokBot, MuseBall, OnlineStoreMark, ShopAppMark, SlackOrb } from "@/components/team-marks";
+import { AgenticMark, ClaudeMark, GeminiMark, GrokBot, MuseBall, OnlineStoreMark, PosMark, ShopAppMark, SlackOrb } from "@/components/team-marks";
 import { AuraField } from "@/voiceorbs/orbs/aura-field";
 import { MercuryOrb } from "@/voiceorbs/orbs/mercury-orb";
 import { NebulaOrb } from "@/voiceorbs/orbs/nebula-orb";
@@ -57,6 +57,14 @@ export function Orb({
       return <OnlineStoreMark size={size} />;
     case "shop":
       return <ShopAppMark size={size} />;
+    case "claude":
+      return <ClaudeMark size={size} />;
+    case "gemini":
+      return <GeminiMark size={size} />;
+    case "pos":
+      return <PosMark size={size} />;
+    case "agentic":
+      return <AgenticMark size={size} />;
     default:
       return <VoiceOrb id="plasma" size={size} state={audio.state} levelRef={audio.levelRef} colorFrom={colorFrom} colorTo={colorTo} />;
   }

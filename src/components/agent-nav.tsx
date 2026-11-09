@@ -9,7 +9,7 @@ import { visibleAgents, type AgentGroup, type PrototypeState } from "@/lib/proto
 
 const groups: { id: AgentGroup; label: string | null }[] = [
   { id: "favorites", label: null },
-  { id: "teams", label: "Teams" },
+  { id: "teams", label: "Team" },
   { id: "channels", label: "Channels" },
   { id: "tools", label: "Tools" },
   { id: "hidden", label: "Hidden" },

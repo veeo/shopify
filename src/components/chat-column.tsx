@@ -1808,49 +1808,72 @@ function CreateForm({ onCreate, onBack }: { onCreate: (name: string, purpose: st
   );
 }
 
+const addSections: { label: string; ids: string[] }[] = [
+  { label: "Recommended", ids: ["chief", "ideas", "trends", "campaigns"] },
+  { label: "Team", ids: ["grok", "slack", "claude", "gemini"] },
+  { label: "Channels", ids: ["store", "shop", "pos", "agentic"] },
+  { label: "Tools", ids: ["customers", "orders", "finance", "analytics"] },
+];
+
 const addCopy: Record<string, string> = {
-  chief: "Organize your priorities, coordinate tasks, and keep your day moving.",
-  ideas: "Explore fresh product concepts and turn promising ideas into plans.",
-  trends: "Spot emerging trends and understand what they mean for you.",
-  slack: "Connect Slack to summarize chats and share key team updates.",
-  grok: "Bring Grok into your workspace to explore questions and ideas.",
-  muse: "Find creative inspiration, explore new directions, and develop your ideas.",
+  chief: "Organize the week, name the few things that matter, and keep the other sidekicks moving.",
+  ideas: "Turn carts and search into one product worth trying.",
+  trends: "Watch what shoppers are searching for and name the next move.",
+  campaigns: "Line up ads, restocks, and the story the store is telling.",
+  slack: "Connect Slack for #ops, drafts, and what the team flagged.",
+  grok: "Connect Grok for what shoppers are asking on X.",
+  claude: "Connect Claude to draft emails, product copy, and replies.",
+  gemini: "Connect Google’s Gemini for search and Shopping ads.",
+  store: "The online store: theme, product pages, and delivery promises.",
+  shop: "The Shop channel and the listings shoppers see there.",
+  pos: "Point of Sale for the counter, pickup, and in-person sales.",
+  agentic: "Agentic storefronts, where shopping agents find and buy.",
+  customers: "Buyers, repeat orders, and what they ask for next.",
+  orders: "Fulfillment, payment, and the orders that still need a hand.",
+  finance: "Payouts, fees, and what is on the way to the bank.",
+  analytics: "Sales, sessions, and conversion for the period that’s open.",
 };
 
 function AddGrid({ onAdd, onChip }: { onAdd: (id: string) => void; onChip: (label: string) => void }) {
-  const cards = catalog.filter((item) => item.id in addCopy);
   return (
     <div className="max-w-[720px]">
-      <p className="mb-4 max-w-[560px] text-[15px] leading-[1.4] text-white">
-        Sidekicks are AI agents that get things done for you. Choose one below or create your own.
+      <p className="mb-5 max-w-[560px] text-[15px] leading-[1.4] text-white">
+        Sidekicks are AI agents that get things done for you. Start with a recommended one, connect a team bot, or add a channel or tool.
       </p>
-      <p className="mb-3 flex items-center gap-0.5 text-[15px] text-[#8e8f8b]">
-        Recommended <PIcon name="ChevronDown" size={20} />
-      </p>
-      <div className="grid grid-cols-3 gap-3">
-        {cards.map((card, index) => {
-          const connect = card.group === "teams";
-          return (
-            <article
-              key={card.id}
-              className="rise flex flex-col gap-4 rounded-3xl bg-[#1a1b1a] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-colors duration-150 hover:bg-[#1f201f]"
-              style={{ animationDelay: `${index * 40}ms`, animationFillMode: "backwards" }}
-            >
-              <Orb id={card.orb} size={48} />
-              <div className="min-h-[92px]">
-                <p className="text-[15px] leading-[1.4]">{card.name}</p>
-                <p className="text-[13px] leading-[1.4] text-[#9a9a9a]">{addCopy[card.id]}</p>
-              </div>
-              <div className="mt-auto">
-                <s-button inlineSize="fill" onClick={() => onAdd(card.id)}>
-                  {connect ? "Connect" : "Add"}
-                </s-button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
+      {addSections.map((section) => {
+        const cards = section.ids.flatMap((id) => catalog.filter((item) => item.id === id));
+        return (
+          <section key={section.label} className="mb-6">
+            <p className="mb-3 flex items-center gap-0.5 text-[15px] text-[#8e8f8b]">
+              {section.label} <PIcon name="ChevronDown" size={20} />
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              {cards.map((card, index) => {
+                const connect = card.group === "teams";
+                return (
+                  <article
+                    key={card.id}
+                    className="rise flex flex-col gap-4 rounded-3xl bg-[#1a1b1a] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-colors duration-150 hover:bg-[#1f201f]"
+                    style={{ animationDelay: `${index * 40}ms`, animationFillMode: "backwards" }}
+                  >
+                    <Orb id={card.orb} size={48} agentId={card.id} colorFrom={card.orbFrom} colorTo={card.orbTo} />
+                    <div className="min-h-[92px]">
+                      <p className="text-[15px] leading-[1.4]">{card.name}</p>
+                      <p className="text-[13px] leading-[1.4] text-[#9a9a9a]">{addCopy[card.id]}</p>
+                    </div>
+                    <div className="mt-auto">
+                      <s-button inlineSize="fill" onClick={() => onAdd(card.id)}>
+                        {connect ? "Connect" : "Add"}
+                      </s-button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+      <div className="flex flex-wrap gap-2">
         <ChipButton label="Tell me more about creating a sidekick" tone="secondary" onClick={() => onChip("Tell me more about creating a sidekick")} />
         <ChipButton label="Create my own sidekick" tone="primary" onClick={() => onChip("Create my own sidekick")} />
       </div>
