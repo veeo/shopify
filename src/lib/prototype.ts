@@ -71,6 +71,13 @@ export const orbColorPresets: { name: string; from: string; to: string }[] = [
 /** Branded marks stay out of the generic orb picker. */
 export const exemptAvatarAgents = new Set(["slack", "grok", "muse", "claude", "gemini", "store", "shop", "pos", "agentic"]);
 
+/** Sidekicks that stay out of the nav, the switcher, mentions, and the add list. */
+export const hiddenSidekicks = new Set(["muse", "claude", "gemini", "pos", "agentic"]);
+
+export function isListedSidekick(id: string) {
+  return !hiddenSidekicks.has(id);
+}
+
 const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
   sidekick: "twist",
   chief: "twist",
@@ -1111,7 +1118,7 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
 
 export function activeState(storeName = "My Store"): PrototypeState {
   const base = setupState(storeName, "tasks");
-  const installed = catalog.filter((item) => item.id !== "muse").map((item) => ({
+  const installed = catalog.filter((item) => isListedSidekick(item.id)).map((item) => ({
     ...item,
     installed: true,
     preview: item.id === "chief" ? "Last 30 days: $48,393" : item.preview,
@@ -1136,10 +1143,11 @@ export function activeState(storeName = "My Store"): PrototypeState {
 
 export function visibleAgents(state: PrototypeState) {
   const query = state.search.trim().toLowerCase();
-  return state.agents.filter((item) => item.installed && item.id !== "muse" && (!query || item.name.toLowerCase().includes(query)));
+  return state.agents.filter((item) => item.installed && isListedSidekick(item.id) && (!query || item.name.toLowerCase().includes(query)));
 }
 
 function ensureInstalled(state: PrototypeState, sourceId: string) {
+  if (!isListedSidekick(sourceId)) return null;
   const existing = state.agents.find((item) => item.id === sourceId);
   if (existing?.installed) return existing;
   const source = catalog.find((item) => item.id === sourceId);
@@ -1617,7 +1625,7 @@ export function runChip(state: PrototypeState, label: string) {
     state.scenario = "active";
     state.preview = "home-active";
     state.previewWide = true;
-    const missing = catalog.filter((item) => item.id !== "muse" && !state.agents.some((agent) => agent.id === item.id && agent.installed));
+    const missing = catalog.filter((item) => isListedSidekick(item.id) && !state.agents.some((agent) => agent.id === item.id && agent.installed));
     for (const item of missing) {
       state.agents.push({ ...item, installed: true });
       if (!state.threads[item.id]) state.threads[item.id] = activeThread(item.id);
@@ -2050,7 +2058,7 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
     }
     case "add-catalog": {
       const source = catalog.find((item) => item.id === action.id);
-      if (!source) return state;
+      if (!source || !isListedSidekick(action.id)) return state;
       ensureInstalled(next, action.id);
       if (action.id === "chief") {
         next.chiefPhase = "purpose";
