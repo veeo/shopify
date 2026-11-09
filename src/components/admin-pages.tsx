@@ -1044,7 +1044,6 @@ function OnlineStorePreferences({ state, nav }: Props) {
 
 const agentChannels = [
   { name: "ChatGPT", art: "/assets/admin/ch-chatgpt.png" },
-  { name: "Meta AI and Muse", art: "/assets/admin/ch-meta.png" },
   { name: "Microsoft Copilot", art: "/assets/admin/ch-copilot.png" },
   { name: "Shop", art: "/assets/admin/ch-shop.png" },
   { name: "Other channels", art: "/assets/admin/ch-other.png" },

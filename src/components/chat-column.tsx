@@ -1133,7 +1133,7 @@ function SidekickSwitcher({
   onPick: (id: string) => void;
   onAdd?: () => void;
 }) {
-  const agents = state.agents.filter((item) => item.installed);
+  const agents = state.agents.filter((item) => item.installed && item.id !== "muse");
   return (
     <Popover id="sidekick-switcher" onDismiss={onDismiss} className="bottom-[calc(100%+8px)] left-0 w-64 origin-bottom-left p-1.5">
       <p className="px-2 pb-1 pt-1.5 text-[12px] text-[#8e8f8b]">Switch sidekick</p>
@@ -1190,7 +1190,7 @@ function PlusMenu({
 }) {
   const [sub, setSub] = useState<"mention" | "skills" | "apps" | null>(null);
   const [generate, setGenerate] = useState(true);
-  const agents = state.agents.filter((item) => item.installed);
+  const agents = state.agents.filter((item) => item.installed && item.id !== "muse");
   const row = `flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left ${light ? "text-[12px] text-[#303030] hover:bg-[#f1f1f1]" : "text-[13px] text-white hover:bg-white/[0.07]"}`;
   const divider = `my-1 h-px ${light ? "bg-[#ebebeb]" : "bg-white/10"}`;
 

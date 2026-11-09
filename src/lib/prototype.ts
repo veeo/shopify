@@ -1136,7 +1136,7 @@ export function activeState(storeName = "My Store"): PrototypeState {
 
 export function visibleAgents(state: PrototypeState) {
   const query = state.search.trim().toLowerCase();
-  return state.agents.filter((item) => item.installed && (!query || item.name.toLowerCase().includes(query)));
+  return state.agents.filter((item) => item.installed && item.id !== "muse" && (!query || item.name.toLowerCase().includes(query)));
 }
 
 function ensureInstalled(state: PrototypeState, sourceId: string) {
@@ -1617,7 +1617,7 @@ export function runChip(state: PrototypeState, label: string) {
     state.scenario = "active";
     state.preview = "home-active";
     state.previewWide = true;
-    const missing = catalog.filter((item) => !state.agents.some((agent) => agent.id === item.id && agent.installed));
+    const missing = catalog.filter((item) => item.id !== "muse" && !state.agents.some((agent) => agent.id === item.id && agent.installed));
     for (const item of missing) {
       state.agents.push({ ...item, installed: true });
       if (!state.threads[item.id]) state.threads[item.id] = activeThread(item.id);
