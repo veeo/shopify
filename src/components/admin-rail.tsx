@@ -354,8 +354,9 @@ function Alerts({
 }
 
 const menuShell =
-  "pop-in absolute z-50 flex w-[240px] flex-col rounded-2xl bg-white p-1.5 text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)]";
-const menuItem = "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] hover:bg-[#f1f1f1]";
+  "pop-in absolute z-50 flex max-h-[min(520px,calc(100vh-24px))] w-[272px] flex-col overflow-y-auto rounded-2xl bg-white p-1.5 text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)]";
+const menuItem = "flex h-9 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[13px] leading-5 text-[#303030] hover:bg-[#f1f1f1]";
+const menuDivider = "mx-1.5 my-1 h-px shrink-0 bg-[#ebebeb]";
 
 /** The store itself: switch stores or create one. */
 export function StoreMenu({
@@ -393,7 +394,7 @@ export function StoreMenu({
   );
 }
 
-/** The merchant's account: admin, help, log out, and the store stage. */
+/** The merchant's account: the store, help, the design system, prototype controls, and log out. */
 export function AccountMenu({
   storeName,
   scenario,
@@ -406,6 +407,7 @@ export function AccountMenu({
   onScenario,
   onArrival,
   onMenuStyle,
+  onDesignSystem,
 }: {
   storeName: string;
   scenario: "setup" | "active";
@@ -418,6 +420,7 @@ export function AccountMenu({
   onScenario: (scenario: "setup" | "active") => void;
   onArrival: (arrival: "tasks" | "sidekick") => void;
   onMenuStyle: (style: "push" | "drop") => void;
+  onDesignSystem: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(true, ref, onClose);
@@ -431,14 +434,72 @@ export function AccountMenu({
         }}
         className={menuItem}
       >
-        <img src="/assets/user.png" alt="" className="size-6 rounded-full object-cover" />
-        {storeName} Admin
+        <img src="/assets/user.png" alt="" className="size-5 rounded-full object-cover" />
+        <span className="min-w-0 flex-1 truncate">{storeName} Admin</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          onClose();
+          onSettings();
+        }}
+        className={menuItem}
+      >
+        <span className="grid size-5 place-items-center rounded-full bg-[#36fba1] text-[9px] font-bold text-[#0b3b26]">{initials(storeName)}</span>
+        <span className="min-w-0 flex-1 truncate">{storeName}</span>
       </button>
       <a href="https://help.shopify.com" target="_blank" rel="noreferrer" onClick={onClose} className={menuItem}>
-        <PIcon name="QuestionCircle" size={16} />
+        <span className="grid size-5 place-items-center">
+          <PIcon name="QuestionCircle" size={16} />
+        </span>
         Help Center
       </a>
-      <span className="my-1 h-px bg-[#ebebeb]" />
+      <button
+        type="button"
+        onClick={() => {
+          onClose();
+          onDesignSystem();
+        }}
+        className={menuItem}
+      >
+        <span className="grid size-5 place-items-center">
+          <PIcon name="Apps" size={16} />
+        </span>
+        <span className="min-w-0 flex-1">Design system</span>
+        <PIcon name="ChevronRight" size={16} />
+      </button>
+      <span className={menuDivider} />
+      <p className="px-2 pb-1 pt-1.5 text-[12px] font-medium text-[#616161]">Prototype</p>
+      <MenuChoice
+        label="Store"
+        value={scenario}
+        options={[
+          ["setup", "New store"],
+          ["active", "Active store"],
+        ]}
+        onChange={onScenario}
+      />
+      {scenario === "setup" ? (
+        <MenuChoice
+          label="Opening"
+          value={arrival}
+          options={[
+            ["tasks", "Tasks"],
+            ["sidekick", "Sidekick"],
+          ]}
+          onChange={onArrival}
+        />
+      ) : null}
+      <MenuChoice
+        label="Navigation"
+        value={menuStyle}
+        options={[
+          ["push", "Push down"],
+          ["drop", "Dropdown"],
+        ]}
+        onChange={onMenuStyle}
+      />
+      <span className={menuDivider} />
       <button
         type="button"
         onClick={() => {
@@ -447,80 +508,44 @@ export function AccountMenu({
         }}
         className={menuItem}
       >
-        <PIcon name="Exit" size={16} />
+        <span className="grid size-5 place-items-center">
+          <PIcon name="Exit" size={16} />
+        </span>
         Log out
       </button>
-      <span className="my-1 h-px bg-[#ebebeb]" />
-      <div role="group" aria-label="Store" className="grid grid-cols-2 gap-1 p-1">
-        {(
-          [
-            ["setup", "New store"],
-            ["active", "Active store"],
-          ] as const
-        ).map(([value, label]) => {
-          const on = scenario === value;
+    </div>
+  );
+}
+
+function MenuChoice<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: readonly (readonly [T, string])[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="px-1.5 py-1">
+      <p className="px-1.5 pb-1 text-[12px] text-[#616161]">{label}</p>
+      <div role="group" aria-label={label} className="grid grid-cols-2 gap-0.5 rounded-[10px] bg-[#f1f1f1] p-0.5">
+        {options.map(([option, text]) => {
+          const on = value === option;
           return (
             <button
-              key={value}
+              key={option}
               type="button"
               aria-pressed={on}
-              onClick={() => onScenario(value)}
-              className={`rounded-lg px-2 py-1.5 text-[12px] ${on ? "bg-[#303030] font-semibold text-white" : "text-[#303030] hover:bg-[#f1f1f1]"}`}
+              onClick={() => onChange(option)}
+              className={`h-8 rounded-lg px-2 text-[13px] ${on ? "bg-white font-medium text-[#171817] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.08)]" : "text-[#303030] hover:bg-white/70"}`}
             >
-              {label}
+              {text}
             </button>
           );
         })}
-      </div>
-      {scenario === "setup" ? (
-        <div className="px-1 pb-1">
-          <p className="px-1 pb-1 text-[11px] text-[#616161]">New store</p>
-          <div role="group" aria-label="New store opening" className="grid grid-cols-2 gap-1">
-            {(
-              [
-                ["tasks", "Tasks"],
-                ["sidekick", "Sidekick"],
-              ] as const
-            ).map(([value, label]) => {
-              const on = arrival === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => onArrival(value)}
-                  className={`rounded-lg px-2 py-1.5 text-[12px] ${on ? "bg-[#303030] font-semibold text-white" : "text-[#303030] hover:bg-[#f1f1f1]"}`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-      <div className="px-1 pb-1">
-        <p className="px-1 pb-1 text-[11px] text-[#616161]">Navigation</p>
-        <div role="group" aria-label="Navigation" className="grid grid-cols-2 gap-1">
-          {(
-            [
-              ["push", "Push down"],
-              ["drop", "Dropdown"],
-            ] as const
-          ).map(([value, label]) => {
-            const on = menuStyle === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={on}
-                onClick={() => onMenuStyle(value)}
-                className={`rounded-lg px-2 py-1.5 text-[12px] ${on ? "bg-[#303030] font-semibold text-white" : "text-[#303030] hover:bg-[#f1f1f1]"}`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
