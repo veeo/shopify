@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
+import { nextSort, sortLabel, useWorkspaceView } from "@/components/workspace-view";
 import type { PreviewId } from "@/lib/admin-nav";
 
 /** The right side of the panel's hamburger header. Pages portal status notes and actions into it. */
@@ -461,35 +462,57 @@ export function Table({
 }
 
 export function TableSearch({ placeholder, tabs = ["All"], value, onChange }: { placeholder: string; tabs?: string[]; value?: string; onChange?: (value: string) => void }) {
+  const view = useWorkspaceView();
+  const current = view?.tab && tabs.includes(view.tab) ? view.tab : tabs[0];
+  const query = value ?? view?.query ?? "";
+  const sort = view?.sort || "newest";
   return (
     <div className="flex items-center gap-1.5 border-b border-[#ebebeb] px-2 py-1.5">
-      {tabs.map((tab, index) => (
-        <span key={tab} className={`rounded-lg px-2 py-1 text-[12px] font-semibold ${index === 0 ? "bg-[#ebebeb] text-[#303030]" : "text-[#616161]"}`}>
+      {tabs.map((tab) => (
+        <button
+          key={tab}
+          type="button"
+          aria-pressed={tab === current}
+          onClick={() => view?.setTab(tab)}
+          className={`rounded-lg px-2 py-1 text-[12px] font-semibold ${tab === current ? "bg-[#ebebeb] text-[#303030]" : "text-[#616161] hover:bg-[#f7f7f7]"}`}
+        >
           {tab}
-        </span>
+        </button>
       ))}
       <label className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-lg px-1.5 text-[#616161] focus-within:bg-[#f7f7f7]">
         <PIcon name="Search" size={18} />
         <input
-          value={value}
-          onChange={(event) => onChange?.(event.target.value)}
+          value={query}
+          onChange={(event) => (onChange ?? view?.setQuery)?.(event.target.value)}
           placeholder={placeholder}
           aria-label={placeholder}
           className="min-w-0 flex-1 bg-transparent text-[12px] text-[#303030] outline-none placeholder:text-[#8a8a8a]"
         />
       </label>
-      <span className="grid size-7 place-items-center rounded-lg text-[#4a4a4a] shadow-[0_0_0_1px_#e3e3e3]">
+      <button
+        type="button"
+        aria-label={`Sort: ${sortLabel(sort)}`}
+        onClick={() => view?.setSort(nextSort(sort))}
+        className="grid size-7 place-items-center rounded-lg text-[#4a4a4a] shadow-[0_0_0_1px_#e3e3e3] hover:bg-[#fafafa]"
+      >
         <PIcon name="SortAscending" size={18} />
-      </span>
+      </button>
     </div>
   );
 }
 
 export function SearchField({ placeholder, icon = "Search", trailing }: { placeholder: string; icon?: PolarisIconName; trailing?: PolarisIconName }) {
+  const view = useWorkspaceView();
   return (
     <label className="flex h-8 items-center gap-1.5 rounded-lg bg-white px-2.5 text-[#616161] shadow-[0_0_0_1px_#e3e3e3] focus-within:shadow-[0_0_0_1.5px_#303030]">
       <PIcon name={icon} size={18} />
-      <input placeholder={placeholder} aria-label={placeholder} className="min-w-0 flex-1 bg-transparent text-[12px] text-[#303030] outline-none placeholder:text-[#8a8a8a]" />
+      <input
+        value={view?.query ?? ""}
+        onChange={(event) => view?.setQuery(event.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        className="min-w-0 flex-1 bg-transparent text-[12px] text-[#303030] outline-none placeholder:text-[#8a8a8a]"
+      />
       {trailing ? <PIcon name={trailing} size={18} /> : null}
     </label>
   );

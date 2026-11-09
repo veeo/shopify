@@ -1,4 +1,5 @@
 import { channelNav, findNav, mainNav, navFor, pageMeta, previewPages, settingsNav, type PreviewId } from "@/lib/admin-nav";
+import { applyWorkspace, captureWorkspace, emptyView, homeFor, readLiveScroll, sameDesk, type SavedWork, type ViewState, type Workspace } from "@/lib/workspace";
 
 export { previewPages, type PreviewId };
 
@@ -212,6 +213,10 @@ export type PrototypeState = {
   threads: Record<string, Block[]>;
   preview: PreviewId;
   previewWide: boolean;
+  /** Search, tab, sort, open record, form draft, and scroll for the admin that is on screen. */
+  view: ViewState;
+  /** Last admin place for every sidekick, including ones the merchant created. */
+  workspaces: Record<string, Workspace>;
   mode: "thread" | "add" | "create";
   purposes: string[];
   chiefPhase: "absent" | "purpose" | "working";
@@ -960,6 +965,8 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
     },
     preview: "home-setup",
     previewWide: false,
+    view: emptyView(),
+    workspaces: { sidekick: homeFor("sidekick", "setup") },
     mode: "thread",
     purposes: ["priorities", "decisions", "noise"],
     chiefPhase: "absent",
@@ -1106,6 +1113,8 @@ export function activeState(storeName = "My Store"): PrototypeState {
     preview: "home-active",
     chiefPhase: "working",
     previewWide: false,
+    view: emptyView(),
+    workspaces: { chief: homeFor("chief", "active") },
   };
 }
 
@@ -1158,6 +1167,12 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
       state.selectedProductId = product.id;
       state.preview = "product";
       state.previewWide = effect.wide ?? false;
+      state.view = {
+        ...state.view,
+        recordId: product.id,
+        scroll: 0,
+        draft: { title: product.title, description: product.description, price: product.price, status: product.status },
+      };
     } else if (effect.type === "add-sidekick") {
       const added = ensureInstalled(state, effect.id);
       if (!added) continue;
@@ -1768,6 +1783,7 @@ export type Action =
   | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string }
   | { type: "intro-seen" }
   | { type: "preview"; page: PreviewId; wide?: boolean }
+  | { type: "view"; patch: Partial<Omit<ViewState, "draft">> & { draft?: Record<string, string> } }
   | { type: "product"; id: string }
   | { type: "update-product"; id: string; patch: Partial<Product> }
   | { type: "rail"; id: string }
@@ -1783,6 +1799,12 @@ export type Action =
   | { type: "logout" };
 
 export function reducer(state: PrototypeState, action: Action): PrototypeState {
+  const next = reduceInner(state, action);
+  if (next === state) return state;
+  return settleWorkspace(state, next, action);
+}
+
+function reduceInner(state: PrototypeState, action: Action): PrototypeState {
   const next: PrototypeState = {
     ...state,
     agents: state.agents.map((item) => ({ ...item })),
@@ -1795,6 +1817,8 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
     ratings: { ...state.ratings },
     cardsDone: [...state.cardsDone],
     cardsDismissed: [...state.cardsDismissed],
+    view: { ...state.view, draft: { ...state.view.draft } },
+    workspaces: Object.fromEntries(Object.entries(state.workspaces).map(([key, workspace]) => [key, { ...workspace, draft: { ...workspace.draft } }])),
   };
 
   switch (action.type) {
@@ -2066,13 +2090,25 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       return next;
     }
     case "preview":
-      next.preview = action.page;
-      next.previewWide = action.wide ?? action.page === "payments-setup";
+      if (action.page === next.preview) {
+        next.previewWide = action.wide ?? action.page === "payments-setup";
+        return next;
+      }
+      openPage(next, action.page, action.wide);
+      return next;
+    case "view":
+      next.view = {
+        ...next.view,
+        ...action.patch,
+        draft: action.patch.draft ? { ...next.view.draft, ...action.patch.draft } : next.view.draft,
+      };
+      if (action.patch.recordId !== undefined && next.preview === "product") next.selectedProductId = action.patch.recordId;
       return next;
     case "product":
       next.selectedProductId = action.id;
       next.preview = "product";
       next.previewWide = false;
+      next.view = { ...next.view, recordId: action.id, scroll: 0 };
       return next;
     case "update-product":
       next.products = next.products.map((product) =>
@@ -2093,17 +2129,86 @@ export function reducer(state: PrototypeState, action: Action): PrototypeState {
       next.selectedProductId = product.id;
       next.preview = "product";
       next.previewWide = false;
+      next.view = { ...emptyView(), query: next.view.query, tab: next.view.tab, sort: next.view.sort, recordId: product.id };
       return next;
     }
     case "rail": {
       const page = railPage(action.id, next);
-      next.preview = page;
-      next.previewWide = false;
+      openPage(next, page, false);
       return next;
     }
     default:
       return state;
   }
+}
+
+const freshActions = new Set<Action["type"]>(["scenario", "reset", "arrival", "boot-active", "logout", "sign-in"]);
+const restoringActions = new Set<Action["type"]>(["select", "add-catalog", "create-agent"]);
+
+function openPage(state: PrototypeState, page: PreviewId, wide?: boolean) {
+  if (sameDesk(state.preview, page)) state.view = { ...state.view, recordId: "", scroll: 0 };
+  else state.view = emptyView();
+  state.preview = page;
+  state.previewWide = wide ?? page === "payments-setup";
+}
+
+function settleWorkspace(prev: PrototypeState, next: PrototypeState, action: Action): PrototypeState {
+  if (freshActions.has(action.type)) return next;
+  const live = readLiveScroll();
+  if (next.selectedAgentId !== prev.selectedAgentId) {
+    next.workspaces = { ...next.workspaces, [prev.selectedAgentId]: captureWorkspace(prev, live ?? prev.view.scroll) };
+  }
+  if (restoringActions.has(action.type)) {
+    applyWorkspace(next, next.selectedAgentId, next.scenario);
+    return next;
+  }
+  if (action.type !== "view" && next.preview !== prev.preview && !sameDesk(prev.preview, next.preview)) {
+    next.view = emptyView();
+  }
+  const samePlace = next.preview === prev.preview && next.selectedAgentId === prev.selectedAgentId;
+  const scroll = samePlace ? (live ?? next.view.scroll) : next.view.scroll;
+  next.workspaces = { ...next.workspaces, [next.selectedAgentId]: captureWorkspace(next, scroll) };
+  return next;
+}
+
+export function restoreWork(state: PrototypeState, saved: SavedWork): PrototypeState {
+  if (saved.scenario !== state.scenario || !saved.workspaces) return state;
+  const customAgents = (Array.isArray(saved.agents) ? (saved.agents as Agent[]) : []).filter(
+    (agent) => agent && typeof agent.id === "string" && agent.id.startsWith("custom-"),
+  );
+  const agents = state.agents.map((agent) => ({ ...agent }));
+  for (const agent of customAgents) {
+    const index = agents.findIndex((item) => item.id === agent.id);
+    if (index >= 0) agents[index] = { ...agents[index], ...agent, installed: true };
+    else agents.push({ ...agent, installed: true });
+  }
+  const threads = { ...state.threads };
+  for (const agent of customAgents) {
+    const blocks = saved.threads?.[agent.id];
+    if (Array.isArray(blocks)) threads[agent.id] = blocks as Block[];
+  }
+  const products: Product[] =
+    Array.isArray(saved.products) && saved.products.length
+      ? saved.products.map((product) => ({ ...product, tone: product.tone as Product["tone"], status: product.status === "Active" ? "Active" : "Draft" }))
+      : state.products;
+  const workspaces: Record<string, Workspace> = {};
+  for (const [id, workspace] of Object.entries(saved.workspaces)) {
+    if (!workspace || !(previewPages as readonly string[]).includes(workspace.page)) continue;
+    workspaces[id] = { ...emptyView(), ...workspace, draft: { ...(workspace.draft ?? {}) } };
+  }
+  const selected = agents.some((agent) => agent.id === saved.selectedAgentId && agent.installed) ? saved.selectedAgentId : state.selectedAgentId;
+  const next: PrototypeState = {
+    ...state,
+    agents,
+    threads,
+    products,
+    workspaces,
+    selectedAgentId: selected,
+    seq: Math.max(state.seq, saved.seq || 0),
+    view: emptyView(),
+  };
+  applyWorkspace(next, selected, next.scenario);
+  return next;
 }
 
 function railPage(id: string, state: PrototypeState): PreviewId {

@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
 import { Orb } from "@/components/marks";
@@ -16,6 +16,7 @@ import {
   purposes,
   focusAskedPage,
   reducer,
+  restoreWork,
   scriptedTurn,
   selectedAgent,
   sidekickPanels,
@@ -27,6 +28,7 @@ import {
   type PrototypeState,
 } from "@/lib/prototype";
 import { segmentsOf, sourcesOf } from "@/lib/turn";
+import { emptyWork, readWorkSnapshot, saveWork, subscribeWork } from "@/lib/workspace";
 
 const bootMs = 1500;
 
@@ -52,12 +54,33 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     bootTimer.current = window.setTimeout(() => setBooting(false), bootMs);
   }
 
+  const client = useSyncExternalStore(subscribeWork, () => true, () => false);
+  const saved = useSyncExternalStore(subscribeWork, readWorkSnapshot, emptyWork);
+  const [appliedWork, setAppliedWork] = useState(false);
+  if (client && !appliedWork) {
+    setAppliedWork(true);
+    if (saved) setState((current) => restoreWork(current, saved));
+  }
   useEffect(() => {
     bootTimer.current = window.setTimeout(() => setBooting(false), bootMs);
     return () => {
       if (bootTimer.current) window.clearTimeout(bootTimer.current);
     };
   }, []);
+  useEffect(() => {
+    if (!appliedWork) return;
+    const custom = state.agents.filter((agent) => agent.id.startsWith("custom-"));
+    const threads = Object.fromEntries(custom.map((agent) => [agent.id, state.threads[agent.id] ?? []]));
+    saveWork({
+      scenario: state.scenario,
+      selectedAgentId: state.selectedAgentId,
+      seq: state.seq,
+      workspaces: state.workspaces,
+      products: state.products,
+      agents: custom,
+      threads,
+    });
+  }, [appliedWork, state]);
   const turn = useRef<Turn | null>(null);
   const applied = useRef(new Set<string>());
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
@@ -304,6 +327,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         present={panels.preview}
         state={state}
         onPreview={(page, wide) => dispatch({ type: "preview", page, wide })}
+        onView={(patch) => dispatch({ type: "view", patch })}
         onChip={(label) => dispatch({ type: "chip", label })}
         onCard={(id) => {
           if (id === "pos") window.open("https://hardware.shopify.com/", "_blank", "noopener");

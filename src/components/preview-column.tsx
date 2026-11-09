@@ -5,7 +5,9 @@ import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
 import { Badge, Body, Btn, Card as AdminCard, circleButton, HeaderExtras, HeaderSlotProvider, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
+import { WorkspaceViewProvider, useWorkspaceView, type WorkspaceViewApi } from "@/components/workspace-view";
 import { isSettingsPage, sectionChoices } from "@/lib/admin-nav";
+import { bindScrollReader } from "@/lib/workspace";
 import type { BusinessType, PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
 
 type Nav = PageNav & {
@@ -31,6 +33,7 @@ export function PreviewColumn({
   onAddProduct,
   onRail,
   onSearch,
+  onView,
 }: {
   state: PrototypeState;
   present?: boolean;
@@ -48,8 +51,9 @@ export function PreviewColumn({
   onAddProduct: () => void;
   onRail: (id: string) => void;
   onSearch: (scope?: string) => void;
+  onView: (patch: Partial<PrototypeState["view"]> & { draft?: Record<string, string> }) => void;
 }) {
-  const wide = state.previewWide || state.preview === "payments-setup";
+  const wide = state.previewWide;
   const panelWidth = wide ? 584 : 393;
   const [entering, setEntering] = useState(false);
   const [seenPresent, setSeenPresent] = useState(present);
@@ -67,6 +71,14 @@ export function PreviewColumn({
   const menuRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const savedScroll = useRef(0);
+  const scrollTimer = useRef<number | null>(null);
+  useEffect(() => bindScrollReader(() => scrollRef.current?.scrollTop ?? null), []);
+  const place = `${state.selectedAgentId}:${state.preview}`;
+  useLayoutEffect(() => {
+    if (scrollTimer.current) window.clearTimeout(scrollTimer.current);
+    const el = scrollRef.current;
+    if (el && el.scrollTop !== state.view.scroll) el.scrollTop = state.view.scroll;
+  }, [place, state.view.scroll]);
   // A click on the pushed page dismisses the menu. The pointerdown closes it
   // before the click, so the click is swallowed here or it would activate whatever it landed on.
   const swallow = useRef(false);
@@ -138,12 +150,6 @@ export function PreviewColumn({
       if (sheetScroll.current) sheetScroll.current.scrollTop = 0;
       return;
     }
-    if (!previewChanged) return;
-    const returning = (prev === "product" && state.preview === "products") || (prev === "payments-setup" && state.preview === "payments");
-    if (returning) return;
-    const el = scrollRef.current;
-    if (el) el.scrollTop = 0;
-    savedScroll.current = 0;
   }, [state.preview, state.selectedProductId, state.paymentsStep]);
   function finishClose() {
     if (closed.current) return;
@@ -181,6 +187,18 @@ export function PreviewColumn({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [menu]);
+  const viewApi: WorkspaceViewApi = {
+    query: state.view.query,
+    tab: state.view.tab,
+    sort: state.view.sort,
+    recordId: state.view.recordId,
+    draft: state.view.draft,
+    setQuery: (query) => onView({ query }),
+    setTab: (tab) => onView({ tab }),
+    setSort: (sort) => onView({ sort }),
+    setRecord: (recordId) => onView({ recordId }),
+    setDraft: (draft) => onView({ draft }),
+  };
   const menuProps = {
     preview: state.preview,
     onOpen: (id: string) => nav.rail(id),
@@ -192,6 +210,11 @@ export function PreviewColumn({
   };
   return (
     <aside
+      data-admin-page={state.preview}
+      data-admin-wide={wide ? "true" : "false"}
+      data-admin-query={state.view.query}
+      data-admin-tab={state.view.tab}
+      data-admin-record={state.view.recordId}
       className="panel-settle flex h-full shrink-0 justify-end overflow-hidden"
       style={{ width: panelWidth }}
     >
@@ -202,6 +225,7 @@ export function PreviewColumn({
           state.motion ? "transition-[background-color] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
         } ${!present ? "pointer-events-none translate-x-full opacity-0" : ""} ${present && curtain ? "panel-reveal" : ""}`}
       >
+      <WorkspaceViewProvider value={viewApi}>
       <HeaderSlotProvider slot={slot}>
         <div
           inert={kind || closing ? true : undefined}
@@ -209,6 +233,7 @@ export function PreviewColumn({
         >
           <div className="sheet-scrim pointer-events-none absolute inset-0 z-40 bg-black/25" />
         <header ref={headerRef} className="relative z-30 flex shrink-0 items-center justify-between gap-3 px-6 pb-1 pt-7">
+          <div className="flex items-center gap-1.5">
           {state.preview === "product" ? (
             <button
               type="button"
@@ -254,9 +279,28 @@ export function PreviewColumn({
               </span>
             </button>
           )}
+          {wide ? (
+            <button
+              type="button"
+              aria-label="Collapse admin"
+              onClick={() => onPreview(state.preview, false)}
+              className={`${circleButton} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005bd3]`}
+            >
+              <PIcon name="LayoutSidebarRight" size={18} />
+            </button>
+          ) : null}
+          </div>
           <div ref={setSlot} className="flex min-w-0 items-center justify-end gap-1.5" />
         </header>
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none]">
+        <div
+          ref={scrollRef}
+          onScroll={() => {
+            const top = scrollRef.current?.scrollTop ?? 0;
+            if (scrollTimer.current) window.clearTimeout(scrollTimer.current);
+            scrollTimer.current = window.setTimeout(() => onView({ scroll: top }), 120);
+          }}
+          className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none]"
+        >
           {state.menuStyle === "push" ? (
             <div
               className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
@@ -356,6 +400,7 @@ export function PreviewColumn({
           </div>
         ) : null}
       </HeaderSlotProvider>
+      </WorkspaceViewProvider>
       </div>
     </aside>
   );
@@ -1323,8 +1368,17 @@ const toneClass: Record<ProductTone, string> = {
 };
 
 function Products({ state, onProduct, onAdd, nav }: { state: PrototypeState; onProduct: (id: string) => void; onAdd: () => void; nav: Nav }) {
-  const [query, setQuery] = useState("");
-  const shown = state.products.filter((product) => product.title.toLowerCase().includes(query.trim().toLowerCase()));
+  const view = useWorkspaceView();
+  const query = view?.query ?? "";
+  const tab = view?.tab || "All";
+  const shown = state.products.filter((product) => {
+    if (tab === "Active" && product.status !== "Active") return false;
+    if (tab === "Draft" && product.status !== "Draft") return false;
+    return product.title.toLowerCase().includes(query.trim().toLowerCase());
+  });
+  if (view?.sort === "name") shown.sort((a, b) => a.title.localeCompare(b.title));
+  else if (view?.sort === "price") shown.sort((a, b) => Number(b.price) - Number(a.price));
+  else if (view?.sort === "oldest") shown.reverse();
   return (
     <>
       <TopBar
@@ -1356,7 +1410,7 @@ function Products({ state, onProduct, onAdd, nav }: { state: PrototypeState; onP
         </AdminCard>
         <Table
           select
-          toolbar={<TableSearch placeholder="Search and filter" value={query} onChange={setQuery} />}
+          toolbar={<TableSearch placeholder="Search and filter" tabs={["All", "Active", "Draft"]} />}
           onRow={(index) => onProduct(shown[index].id)}
           columns={[
             { label: "", width: 28 },
@@ -1433,10 +1487,12 @@ function ProductEdit({
   onProduct: (id: string) => void;
   onUpdate: (id: string, patch: Partial<Product>) => void;
 }) {
-  const [taxed, setTaxed] = useState(true);
-  const [tracked, setTracked] = useState(true);
+  const view = useWorkspaceView();
   const product = state.products.find((item) => item.id === state.selectedProductId) ?? state.products[0];
   if (!product) return null;
+  const taxed = (view?.draft.taxed ?? "yes") !== "no";
+  const tracked = (view?.draft.tracked ?? "yes") !== "no";
+  const quantity = view?.draft.quantity ?? String(Number.parseInt(product.inventory, 10) || 0);
   const fresh = !product.title && !product.description;
   const title = product.title.trim() || (fresh ? "Add product" : "Untitled product");
   return (
@@ -1520,7 +1576,7 @@ function ProductEdit({
                   {label}
                 </span>
               ))}
-              <button type="button" onClick={() => setTaxed((value) => !value)} className="flex items-center gap-1 rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
+              <button type="button" onClick={() => view?.setDraft({ taxed: taxed ? "no" : "yes" })} className="flex items-center gap-1 rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
                 Charge tax <span className="rounded bg-[#e3e3e3] px-1 font-medium text-[#303030]">{taxed ? "Yes" : "No"}</span>
               </button>
               <span className="rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">Cost per item</span>
@@ -1532,7 +1588,7 @@ function ProductEdit({
             <span className="text-[13px] font-semibold">Inventory</span>
             <span className="flex items-center gap-2 text-[12px] text-[#616161]">
               Inventory tracked
-              <Toggle on={tracked} onChange={setTracked} label="Inventory tracked" />
+              <Toggle on={tracked} onChange={(on) => view?.setDraft({ tracked: on ? "yes" : "no" })} label="Inventory tracked" />
             </span>
           </div>
           {tracked ? (
@@ -1543,7 +1599,12 @@ function ProductEdit({
               </div>
               <div className="flex items-center justify-between px-2.5 py-2">
                 <span>Shop location</span>
-                <input aria-label="Quantity" defaultValue={Number.parseInt(product.inventory, 10) || 0} className={`${inputClass} h-7 w-20 text-right`} />
+                <input
+                  aria-label="Quantity"
+                  value={quantity}
+                  onChange={(event) => view?.setDraft({ quantity: event.target.value })}
+                  className={`${inputClass} h-7 w-20 text-right`}
+                />
               </div>
             </div>
           ) : null}
