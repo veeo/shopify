@@ -499,7 +499,7 @@ const persona = {
   pos:
     "You are Point of Sale. This electronics store sells online. The counter has not taken a sale this month. If #1078 is picked up in person, it rings up on the reader.",
   agentic:
-    "You are Agentic storefronts. Shopping agents placed 41 orders and $6,840 this month. They stall on the desk lamp because the page says 5–7 days and the ad says this week.",
+    "You are Agentic. Shopping agents placed 41 orders and $6,840 this month. They stall on the desk lamp because the page says 5–7 days and the ad says this week.",
   customers:
     "You are the Customers agent. 28% of orders are from people who have bought before. Second-order buyers ask for a longer warranty on the headphones, not a points program.",
   orders:
@@ -682,11 +682,11 @@ export const catalog: Agent[] = [
   }),
   agent({
     id: "agentic",
-    name: "Agentic storefronts",
+    name: "Agentic",
     group: "channels",
     preview: "Agent orders stall when the lamp date doesn’t match the ad.",
     topic: "Agent traffic",
-    placeholder: "Ask Agentic storefronts…",
+    placeholder: "Ask Agentic…",
     orb: "agentic",
   }),
   agent({

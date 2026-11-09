@@ -1864,7 +1864,7 @@ const addCopy: Record<string, string> = {
   store: "The online store: theme, product pages, and delivery promises.",
   shop: "The Shop channel and the listings shoppers see there.",
   pos: "Point of Sale for the counter, pickup, and in-person sales.",
-  agentic: "Agentic storefronts, where shopping agents find and buy.",
+  agentic: "Agentic, where shopping agents find and buy.",
   customers: "Buyers, repeat orders, and what they ask for next.",
   orders: "Fulfillment, payment, and the orders that still need a hand.",
   finance: "Payouts, fees, and what is on the way to the bank.",
