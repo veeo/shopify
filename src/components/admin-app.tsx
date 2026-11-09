@@ -7,6 +7,7 @@ import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
 import { Orb } from "@/components/marks";
 import { OrbAudioProvider } from "@/components/orb-audio";
+import { DesignSystem } from "@/components/design-system";
 import { PreviewColumn } from "@/components/preview-column";
 import { SearchPalette } from "@/components/search-palette";
 import {
@@ -44,6 +45,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   const [offline, setOffline] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [palette, setPalette] = useState<{ open: boolean; scope?: string }>({ open: false });
+  const [design, setDesign] = useState(false);
   // The turn being streamed. Cleared in the same update that commits its reply, so the live view and
   // the committed message swap in one render instead of leaving a blank frame between them.
   const [live, setLive] = useState<{ agentId: string; from: number } | null>(null);
@@ -473,6 +475,10 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
       data-shell={stage ? "conversation" : settling ? "reveal" : "workspace"}
       className="fade-in p-partial-theme-admin-next-dark relative flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white"
     >
+      {design ? (
+        <DesignSystem onBack={() => setDesign(false)} />
+      ) : (
+      <>
         <AgentNav
           present={panels.nav}
           state={state}
@@ -487,6 +493,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
           onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
           onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
           onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
+          onDesignSystem={() => setDesign(true)}
         />
         <div
           aria-hidden
@@ -559,6 +566,8 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         />
       ) : null}
       <span className="sr-only">{agent.name}</span>
+      </>
+      )}
     </div>
     </OrbAudioProvider>
   );

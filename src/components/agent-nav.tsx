@@ -32,6 +32,7 @@ export function AgentNav({
   onMenuStyle,
   onSettings,
   onLogout,
+  onDesignSystem,
 }: {
   state: PrototypeState;
   navOpen: boolean;
@@ -46,6 +47,7 @@ export function AgentNav({
   onScenario: (scenario: "setup" | "active") => void;
   onArrival: (arrival: "tasks" | "sidekick") => void;
   onMenuStyle: (style: "push" | "drop") => void;
+  onDesignSystem: () => void;
 }) {
   const agents = visibleAgents(state);
   const [menu, setMenu] = useState<"account" | "store" | null>(null);
@@ -55,12 +57,17 @@ export function AgentNav({
     .filter((item) => hiddenSidekicks.has(item.id))
     .map((item) => state.agents.find((agent) => agent.id === item.id) ?? item)
     .filter((item) => !query || item.name.toLowerCase().includes(query));
-  useEffect(() => {
-    if (hiddenSidekicks.has(state.selectedAgentId) && state.mode === "thread") setHiddenOpen(true);
-  }, [state.selectedAgentId, state.mode]);
-  useEffect(() => {
+  const hiddenSelection = hiddenSidekicks.has(state.selectedAgentId) && state.mode === "thread" ? state.selectedAgentId : "";
+  const [openedFor, setOpenedFor] = useState("");
+  if (hiddenSelection !== openedFor) {
+    setOpenedFor(hiddenSelection);
+    if (hiddenSelection) setHiddenOpen(true);
+  }
+  const [openedQuery, setOpenedQuery] = useState("");
+  if (query !== openedQuery) {
+    setOpenedQuery(query);
     if (query && hiddenItems.length > 0) setHiddenOpen(true);
-  }, [query, hiddenItems.length]);
+  }
   const trayOpen = hiddenOpen && hiddenItems.length > 0;
   const collapsed = !navOpen;
   const visibleGroups = groups
@@ -344,6 +351,10 @@ export function AgentNav({
                   onArrival(arrival);
                 }}
                 onMenuStyle={onMenuStyle}
+                onDesignSystem={() => {
+                  setMenu(null);
+                  onDesignSystem();
+                }}
               />
             ) : null}
           </span>

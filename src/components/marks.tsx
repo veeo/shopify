@@ -38,6 +38,7 @@ export function Orb({
   colorFrom,
   colorTo,
   presence = "rest",
+  orbState,
 }: {
   id: OrbId;
   size?: number;
@@ -48,11 +49,13 @@ export function Orb({
   presence?: "rest" | "selected";
   /** Kept so a row can mark the pointer without changing the orb. */
   hot?: boolean;
+  /** Show a voice state without a live microphone. Audio still wins when this sidekick is talking. */
+  orbState?: OrbState;
 }) {
   const resolved = canonicalOrb(id);
   const audio = useOrbAudio(agentId);
   const reduced = useReducedMotion();
-  const state: OrbState = audio.state ?? (presence === "selected" ? "selected" : "idle");
+  const state: OrbState = audio.state ?? orbState ?? (presence === "selected" ? "selected" : "idle");
   const look = ORB_LOOK[presenceFor(state, reduced)];
   const body = isVoiceOrb(resolved) ? (
     <VoiceOrb id={resolved} size={size} state={state} levelRef={audio.levelRef} colorFrom={colorFrom} colorTo={colorTo} />
