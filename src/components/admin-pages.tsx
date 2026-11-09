@@ -129,6 +129,12 @@ function Orders({ state, nav }: Props) {
             <Kpi label="Orders fulfilled" value="9" points={[2, 3, 3, 5, 4, 6, 7, 9]} />
             <Kpi label="Returns" value="$0.00" />
           </div>
+          {view?.draft.action ? (
+            <Card className="flex items-center justify-between gap-3">
+              <span className="text-[13px] font-semibold">Ready to {view.draft.action}</span>
+              <Badge tone="caution">Action</Badge>
+            </Card>
+          ) : null}
           {selected ? (
             <Card className="flex items-center justify-between gap-3">
               <span className="flex min-w-0 flex-col">
@@ -199,7 +205,11 @@ function Customers({ state, nav }: Props) {
   const [open, setOpen] = useState(false);
   const view = useWorkspaceView();
   const query = (view?.query ?? "").trim().toLowerCase();
-  const rows = customerRows.filter((row) => !query || row.join(" ").toLowerCase().includes(query));
+  const names = (view?.draft.names ?? "").split("|").filter(Boolean);
+  const rows = customerRows.filter((row) => {
+    if (names.length && !names.includes(row[0])) return false;
+    return !query || row.join(" ").toLowerCase().includes(query);
+  });
   const selected = rows.find((row) => row[0] === view?.recordId);
   return (
     <Shell page="customers" nav={nav} actions={[{ label: "Import" }, { label: "Add customer", tone: "primary" }]} more={[{ label: "Export" }]}>
@@ -216,6 +226,15 @@ function Customers({ state, nav }: Props) {
         ) : null}
       </Card>
       <SearchField placeholder="Search customers" trailing="LayoutColumns3" />
+      {view?.draft.segment ? (
+        <Card className="flex items-center justify-between gap-3">
+          <span className="flex min-w-0 flex-col">
+            <span className="text-[13px] font-semibold">{view.draft.segment}</span>
+            <span className="text-[12px] text-[#616161]">Segment · {names.length} customers</span>
+          </span>
+          <Badge tone="success">Created</Badge>
+        </Card>
+      ) : null}
       {selected ? (
         <Card className="flex flex-col gap-1">
           <span className="text-[13px] font-semibold">{selected[0]}</span>
@@ -915,8 +934,15 @@ const themes = [
 ];
 
 function OnlineStore({ state, nav }: Props) {
+  const view = useWorkspaceView();
   return (
     <Shell page="online-store" nav={nav} actions={[{ label: "Private", icon: "Lock" }, { label: "Preview store" }]} more={[{ label: "Pages", onClick: () => nav.go("online-store-pages") }, { label: "Preferences", onClick: () => nav.go("online-store-preferences") }]}>
+      {view?.draft.note ? (
+        <Card className="flex flex-col gap-1">
+          <span className="text-[13px] font-semibold">Theme editor</span>
+          <span className="text-[12px] text-[#616161]">{view.draft.note}</span>
+        </Card>
+      ) : null}
       <div className="relative overflow-hidden rounded-xl shadow-[0_0_0_1px_#e3e3e3]">
         <div className="flex items-center justify-between bg-white px-3 py-1.5 text-[9px]">
           <span className="font-semibold">{state.storeName}</span>

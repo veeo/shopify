@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { ChipButton, Orb } from "@/components/marks";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Markdown } from "@/components/markdown";
+import { ArtifactRow, ChoiceCards } from "@/components/choice-cards";
 import { useOrbAudioPublish } from "@/components/orb-audio";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { pageMeta } from "@/lib/admin-nav";
@@ -58,6 +59,8 @@ export function ChatColumn({
   onAddAgent,
   onIntroduced,
   onIntroFinished,
+  onChoose,
+  onBundle,
 }: {
   state: PrototypeState;
   liveSegments: LiveSegment[] | null;
@@ -81,6 +84,8 @@ export function ChatColumn({
   onAddAgent: () => void;
   onIntroduced?: () => void;
   onIntroFinished?: () => void;
+  onChoose: (blockId: string, cardId: string) => void;
+  onBundle: (blockId: string) => void;
 }) {
   const agent = selectedAgent(state);
   const purpose = state.selectedAgentId === "chief" && state.chiefPhase === "purpose" && state.mode === "thread";
@@ -226,6 +231,8 @@ export function ChatColumn({
                         if (!locked) onSend(text);
                       }}
                       onCreate={onCreate}
+                      onChoose={onChoose}
+                      onBundle={onBundle}
                     />
                   ),
                 )}
@@ -723,7 +730,7 @@ export function Composer({
   const avatarAgent = state.mode === "add" || state.mode === "create" ? (state.agents.find((item) => item.id === "sidekick") ?? agent) : agent;
   useOrbAudioPublish(
     liveAgentId,
-    voiceOpen ? null : listening ? "listening" : transcribing || busy ? "thinking" : null,
+    voiceOpen ? null : listening ? "listening" : transcribing || busy || state.workingAgentId === liveAgentId ? "thinking" : null,
     () => (listening ? (recording.current?.level() ?? 0) : 0),
   );
 
@@ -1681,6 +1688,8 @@ function BlockView({
   onChip,
   onAsk,
   onCreate,
+  onChoose,
+  onBundle,
 }: {
   block: Block;
   answer: boolean;
@@ -1690,6 +1699,8 @@ function BlockView({
   onChip: (label: string) => void;
   onAsk: (text: string) => void;
   onCreate: (name: string, purpose: string) => void;
+  onChoose: (blockId: string, cardId: string) => void;
+  onBundle: (blockId: string) => void;
 }) {
   if (block.type === "text" && block.role === "user") {
     return (
@@ -1701,6 +1712,29 @@ function BlockView({
     );
   }
   if (block.type === "text") return <AssistantText block={block} answer={answer} rating={rating} onRate={onRate} />;
+  if (block.type === "status") {
+    return (
+      <p role="status" aria-live="polite" className="rise flex items-center gap-2 py-1 text-[13px] text-[#c6c6c6]">
+        <span className="size-1.5 animate-pulse rounded-full bg-white motion-reduce:animate-none" />
+        {block.label}
+      </p>
+    );
+  }
+  if (block.type === "choices") {
+    return (
+      <ChoiceCards
+        title={block.title}
+        cards={block.cards}
+        selected={block.selected}
+        mode={block.mode}
+        settled={block.settled}
+        replaced={block.replaced}
+        onPick={(cardId) => onChoose(block.id, cardId)}
+        onBundle={() => onBundle(block.id)}
+        onDifferent={() => onAsk("Show me different options")}
+      />
+    );
+  }
   if (block.type === "chips") {
     const opening = block.id === "arrive-chips";
     return (
@@ -1757,14 +1791,8 @@ function BlockView({
           </p>
         </div>
         {sellers.map((item) => (
-          <div key={item.title} className="flex items-center gap-4">
-            <img src={item.image} alt="" className="size-24 rounded-2xl object-cover shadow-[inset_0_0_4px_rgba(255,255,255,0.2)]" />
-            <div>
-              <p className="text-[15px] text-[#8e8f8b]">
-                {item.title} · {item.meta}
-              </p>
-              <p className="mt-1 text-[15px] leading-[1.4]">{item.advice}</p>
-            </div>
+          <div key={item.title} className="flex flex-wrap items-center gap-3">
+            <ArtifactRow image={item.image} title={item.title} meta={item.meta} body={item.advice} />
           </div>
         ))}
       </div>
