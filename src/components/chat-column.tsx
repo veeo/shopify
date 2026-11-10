@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChipButton, Orb } from "@/components/marks";
+import { ChipButton, Orb, ShopifyMark } from "@/components/marks";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Markdown } from "@/components/markdown";
 import { ArtifactRow, ChoiceCards } from "@/components/choice-cards";
@@ -44,6 +44,11 @@ export function ChatColumn({
   busy,
   locked,
   offline,
+  chrome = "desktop",
+  showAdminButton = false,
+  adminOpen = false,
+  onOpenAgents,
+  onOpenAdmin,
   onChip,
   onSend,
   onStop,
@@ -69,6 +74,12 @@ export function ChatColumn({
   busy: boolean;
   locked: boolean;
   offline: boolean;
+  /** Desktop keeps the classic header; compact/mobile add logo + admin affordances. */
+  chrome?: "desktop" | "compact" | "mobile";
+  showAdminButton?: boolean;
+  adminOpen?: boolean;
+  onOpenAgents?: () => void;
+  onOpenAdmin?: () => void;
   onChip: (label: string) => void;
   onSend: (text: string) => void;
   onStop: () => void;
@@ -132,11 +143,30 @@ export function ChatColumn({
     if (node.scrollHeight - node.scrollTop - node.clientHeight < 240) node.scrollTop = node.scrollHeight;
   }, [thread.length, liveLength, busy]);
 
+  const mobileChrome = chrome === "mobile";
+  const tightChrome = chrome !== "desktop";
+
   return (
-    <section data-opening={stage ? beat : "workspace"} className="relative flex min-h-0 min-w-0 flex-1 flex-col px-8 pb-3 pt-7">
+    <section
+      data-opening={stage ? beat : "workspace"}
+      data-chat-chrome={chrome}
+      className={`relative flex min-h-0 min-w-0 flex-1 flex-col pb-3 ${
+        mobileChrome ? "px-4 pt-[max(1rem,env(safe-area-inset-top))]" : tightChrome ? "px-5 pt-6" : "px-8 pt-7"
+      }`}
+    >
       <div className="flex min-h-0 flex-1 flex-col">
-          <header className="relative mb-6 flex items-start justify-between gap-4">
-            <h1 className="min-w-0 flex-1 text-[25px] font-medium leading-8 tracking-[-0.75px]">
+          <header className={`relative mb-5 flex items-start gap-3 ${tightChrome ? "justify-between" : "justify-between gap-4"}`}>
+            {mobileChrome && onOpenAgents ? (
+              <button
+                type="button"
+                aria-label="Open sidekicks"
+                onClick={onOpenAgents}
+                className="press mt-0.5 grid size-8 shrink-0 place-items-center rounded-full hover:bg-white/[0.08]"
+              >
+                <ShopifyMark />
+              </button>
+            ) : null}
+            <h1 className={`min-w-0 flex-1 font-medium tracking-[-0.75px] ${mobileChrome ? "text-[22px] leading-7" : "text-[25px] leading-8"}`}>
               {writing ? (
                 <TitleIntro
                   motion={state.motion}
@@ -168,6 +198,19 @@ export function ChatColumn({
                 </span>
               )}
             </h1>
+            {showAdminButton && onOpenAdmin ? (
+              <button
+                type="button"
+                aria-label={adminOpen ? "Close admin" : "Open admin"}
+                aria-pressed={adminOpen}
+                onClick={onOpenAdmin}
+                className={`press mt-0.5 grid size-8 shrink-0 place-items-center rounded-full transition-colors hover:bg-white/[0.08] ${
+                  adminOpen ? "bg-white/[0.1]" : ""
+                }`}
+              >
+                <PIcon name="LayoutSidebarRight" size={18} />
+              </button>
+            ) : null}
             {listing ? (
               <ChatsMenu
                 agentName={agent.name}

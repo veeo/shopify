@@ -22,6 +22,9 @@ export function AgentNav({
   state,
   navOpen,
   present = true,
+  presentation = "rail",
+  drawerOpen = false,
+  onCloseDrawer,
   onToggleNav,
   onSelect,
   onAdd,
@@ -37,6 +40,10 @@ export function AgentNav({
   state: PrototypeState;
   navOpen: boolean;
   present?: boolean;
+  /** In-flow rail, or a mobile/compact overlay drawer. */
+  presentation?: "rail" | "drawer";
+  drawerOpen?: boolean;
+  onCloseDrawer?: () => void;
   onToggleNav: () => void;
   onSettings: () => void;
   onLogout: () => void;
@@ -71,7 +78,13 @@ export function AgentNav({
     setOpenedQuery(query);
     if (query && hiddenItems.length > 0) setHiddenOpen(true);
   }
-  const collapsed = !navOpen;
+  const drawer = presentation === "drawer";
+  // Drawers always show the expanded roster so agents are easy to pick on a phone.
+  const collapsed = drawer ? false : !navOpen;
+  function pick(id: string) {
+    onSelect(id);
+    if (drawer) onCloseDrawer?.();
+  }
   const visibleGroups = groups
     .map((group) => ({
       ...group,
@@ -148,7 +161,7 @@ export function AgentNav({
         data-flip={`agent-${item.id}`}
         aria-current={selected ? "page" : undefined}
         aria-label={collapsed ? item.name : undefined}
-        onClick={() => onSelect(item.id)}
+        onClick={() => pick(item.id)}
         onMouseEnter={() => setHotId(item.id)}
         onMouseLeave={() => setHotId((current) => (current === item.id ? null : current))}
         className={
@@ -215,26 +228,33 @@ export function AgentNav({
   }
 
   const parked = !present;
-  return (
+  if (drawer && !drawerOpen) return null;
+
+  const body = (
     <aside
       ref={navRef}
-      className={`relative flex h-full min-w-0 shrink-0 flex-col pb-3 pt-7 motion-reduce:transition-none ${collapsed ? "w-[64px]" : "w-[248px] px-3"} ${parked || curtain ? "overflow-hidden" : ""}`}
-      style={{ transition: curtain ? undefined : `width ${move}` }}
+      data-agents={drawer ? "drawer" : "rail"}
+      className={
+        drawer
+          ? "shell-agents-drawer relative flex h-full w-[min(100vw-3rem,280px)] max-w-[280px] flex-col bg-[#0c0d0c] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(1.75rem,env(safe-area-inset-top))] text-white shadow-[8px_0_40px_rgba(0,0,0,0.45)]"
+          : `relative flex h-full min-w-0 shrink-0 flex-col pb-3 pt-7 motion-reduce:transition-none ${collapsed ? "w-[64px]" : "w-[248px] px-3"} ${parked || curtain ? "overflow-hidden" : ""}`
+      }
+      style={drawer || curtain ? undefined : { transition: `width ${move}` }}
     >
       <button
         type="button"
         data-flip="logo"
-        aria-label={navOpen ? "Collapse navigation" : "Expand navigation"}
-        aria-expanded={navOpen}
-        aria-keyshortcuts="Control+B Meta+B"
-        onClick={onToggleNav}
+        aria-label={drawer ? "Close sidekicks" : navOpen ? "Collapse navigation" : "Expand navigation"}
+        aria-expanded={drawer ? true : navOpen}
+        aria-keyshortcuts={drawer ? undefined : "Control+B Meta+B"}
+        onClick={drawer ? () => onCloseDrawer?.() : onToggleNav}
         className={`group/logo press absolute top-7 z-20 grid size-8 place-items-center rounded-full transition-colors hover:bg-white/[0.08] ${collapsed ? "left-4" : "left-5"}`}
       >
         <span className="transition-opacity duration-150 group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0">
           <ShopifyMark />
         </span>
         <span className="absolute inset-0 grid place-items-center text-white opacity-0 transition-opacity duration-150 group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100">
-          <PIcon name="LayoutSidebarLeft" size={20} />
+          <PIcon name={drawer ? "X" : "LayoutSidebarLeft"} size={20} />
         </span>
       </button>
       <div
@@ -396,5 +416,14 @@ export function AgentNav({
       </div>
       </div>
     </aside>
+  );
+
+  if (!drawer) return body;
+
+  return (
+    <div className="shell-agents-layer fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label="Sidekicks">
+      <button type="button" className="shell-scrim absolute inset-0 bg-black/50" aria-label="Close sidekicks" onClick={() => onCloseDrawer?.()} />
+      <div className="absolute inset-y-0 left-0 flex">{body}</div>
+    </div>
   );
 }

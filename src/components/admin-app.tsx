@@ -32,6 +32,8 @@ import { bundleOf, draftOf, interpret, type ChoiceCard, type DraftSpec } from "@
 import { segmentsOf, sourcesOf } from "@/lib/turn";
 import type { Chip, Product } from "@/lib/prototype";
 import { emptyWork, readWorkSnapshot, saveWork, subscribeWork } from "@/lib/workspace";
+import { useShellLayout } from "@/hooks/use-shell-layout";
+import { SHELL } from "@/lib/shell-layout";
 
 const bootMs = 1500;
 
@@ -44,8 +46,11 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   const [booting, setBooting] = useState(true);
   const [offline, setOffline] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [agentsDrawerOpen, setAgentsDrawerOpen] = useState(false);
+  const [adminSheetOpen, setAdminSheetOpen] = useState(false);
   const [palette, setPalette] = useState<{ open: boolean; scope?: string }>({ open: false });
   const [design, setDesign] = useState(false);
+  const layout = useShellLayout();
   // The turn being streamed. Cleared in the same update that commits its reply, so the live view and
   // the committed message swap in one render instead of leaving a blank frame between them.
   const [live, setLive] = useState<{ agentId: string; from: number } | null>(null);
@@ -103,13 +108,6 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   useEffect(() => {
     panelsRef.current = { nav: panels.nav, preview: panels.preview };
   }, [panels.nav, panels.preview]);
-  const [viewport, setViewport] = useState(1440);
-  useEffect(() => {
-    const measure = () => setViewport(document.documentElement.clientWidth);
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
   // The title is introduced where it will sit once both sidebars are in, so the room opens around it and the words never move.
   const [seenStage, setSeenStage] = useState(stage);
   const [settling, setSettling] = useState(false);
@@ -135,7 +133,16 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
       node.classList.add("conversation-settle");
     }
     placed.current = { stage, left: stage ? left : placed.current.left };
-  }, [stage, viewport, state.motion, booting]);
+  }, [stage, layout.width, state.motion, booting]);
+
+  // When the layout band changes, collapse the rail on tight surfaces and clear overlays that no longer apply.
+  const [seenLayoutMode, setSeenLayoutMode] = useState(layout.mode);
+  if (layout.mode !== seenLayoutMode) {
+    setSeenLayoutMode(layout.mode);
+    if (layout.preferNavCollapsed) setSidebarOpen(false);
+    if (layout.agents === "rail") setAgentsDrawerOpen(false);
+    if (layout.admin === "docked") setAdminSheetOpen(false);
+  }
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -144,6 +151,10 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
       if (key === "b") {
         event.preventDefault();
         if (!panelsRef.current.nav) return;
+        if (layout.agents === "drawer") {
+          setAgentsDrawerOpen((open) => !open);
+          return;
+        }
         setSidebarOpen((open) => !open);
       } else if (key === "k") {
         event.preventDefault();
@@ -153,7 +164,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [layout.agents]);
 
   const chat = useChat({
     transport,
@@ -470,36 +481,81 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     );
   }
 
+  const agentsDrawer = layout.agents === "drawer";
+  const adminSheet = layout.admin === "sheet";
+  const showAgentRail = panels.nav && !agentsDrawer;
+  const navOpen = sidebarOpen;
+  const agentsDrawerVisible = agentsDrawer && agentsDrawerOpen;
+  const adminSheetVisible = adminSheet && adminSheetOpen;
+  const dockedAdminWidth =
+    layout.allowAdminWide && state.previewWide ? SHELL.adminWide : Math.min(layout.adminWidth, SHELL.adminNarrow);
+
   return (
     <OrbAudioProvider>
     <div
       data-shell={stage ? "conversation" : settling ? "reveal" : "workspace"}
-      className="fade-in p-partial-theme-admin-next-dark relative flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white"
+      data-layout={layout.mode}
+      className={`fade-in p-partial-theme-admin-next-dark relative flex h-dvh gap-1 bg-[#0c0d0c] text-white ${
+        layout.mode === "mobile" ? "p-0" : "p-1"
+      }`}
     >
       {design ? (
         <DesignSystem onBack={() => setDesign(false)} />
       ) : (
       <>
-        <AgentNav
-          present={panels.nav}
-          state={state}
-          navOpen={sidebarOpen}
-          onToggleNav={() => setSidebarOpen((open) => !open)}
-          onSettings={() => dispatch({ type: "rail", id: "settings" })}
-          onLogout={logout}
-          onSelect={(id) => dispatch({ type: "select", id })}
-          onAdd={() => dispatch({ type: "toggle-add" })}
-          onSearch={() => dispatch({ type: "toggle-search" })}
-          onQuery={(query) => dispatch({ type: "search", query })}
-          onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
-          onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
-          onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
-          onDesignSystem={() => setDesign(true)}
-        />
+        {showAgentRail ? (
+          <AgentNav
+            present={panels.nav}
+            state={state}
+            presentation="rail"
+            navOpen={navOpen}
+            onToggleNav={() => setSidebarOpen((open) => !open)}
+            onSettings={() => dispatch({ type: "rail", id: "settings" })}
+            onLogout={logout}
+            onSelect={(id) => dispatch({ type: "select", id })}
+            onAdd={() => dispatch({ type: "toggle-add" })}
+            onSearch={() => dispatch({ type: "toggle-search" })}
+            onQuery={(query) => dispatch({ type: "search", query })}
+            onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
+            onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
+            onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
+            onDesignSystem={() => setDesign(true)}
+          />
+        ) : null}
+        {agentsDrawer ? (
+          <AgentNav
+            present
+            state={state}
+            presentation="drawer"
+            drawerOpen={agentsDrawerVisible}
+            onCloseDrawer={() => setAgentsDrawerOpen(false)}
+            navOpen
+            onToggleNav={() => setAgentsDrawerOpen(false)}
+            onSettings={() => {
+              setAgentsDrawerOpen(false);
+              dispatch({ type: "rail", id: "settings" });
+            }}
+            onLogout={logout}
+            onSelect={(id) => dispatch({ type: "select", id })}
+            onAdd={() => {
+              setAgentsDrawerOpen(false);
+              dispatch({ type: "toggle-add" });
+            }}
+            onSearch={() => dispatch({ type: "toggle-search" })}
+            onQuery={(query) => dispatch({ type: "search", query })}
+            onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
+            onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
+            onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
+            onDesignSystem={() => {
+              setAgentsDrawerOpen(false);
+              setDesign(true);
+            }}
+          />
+        ) : null}
         <div
           aria-hidden
           className="rail-reveal my-3 shrink-0 bg-white/10"
-          style={{ width: 1, opacity: panels.nav ? 1 : 0 }}
+          style={{ width: showAgentRail && panels.nav ? 1 : 0, opacity: showAgentRail && panels.nav ? 1 : 0 }}
         />
         <div ref={chatRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
         <ChatColumn
@@ -507,6 +563,11 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
           liveSegments={liveAgentId === agent.id ? liveSegments : null}
           offline={offline}
           busy={busy && liveAgentId === agent.id}
+          chrome={layout.chatChrome}
+          showAdminButton={adminSheet && panels.preview}
+          adminOpen={adminSheetVisible}
+          onOpenAgents={agentsDrawer ? () => setAgentsDrawerOpen(true) : undefined}
+          onOpenAdmin={adminSheet && panels.preview ? () => setAdminSheetOpen((open) => !open) : undefined}
           onSwitch={(id) => dispatch({ type: "select", id })}
           onAddAgent={() => dispatch({ type: "toggle-add" })}
           locked={busy}
@@ -531,8 +592,15 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         </div>
       <PreviewColumn
         present={panels.preview}
+        presentation={adminSheet ? "sheet" : "docked"}
+        sheetOpen={adminSheetVisible}
+        sheetEdge={layout.adminSheetEdge}
+        dockWidth={dockedAdminWidth}
+        onCloseSheet={() => setAdminSheetOpen(false)}
         state={state}
-        onPreview={(page, wide) => dispatch({ type: "preview", page, wide })}
+        onPreview={(page, wide) =>
+          dispatch({ type: "preview", page, wide: Boolean(wide) && layout.allowAdminWide })
+        }
         onView={(patch) => dispatch({ type: "view", patch })}
         onChip={(label) => dispatch({ type: "chip", label })}
         onCard={(id) => {

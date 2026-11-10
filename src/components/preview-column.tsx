@@ -20,6 +20,11 @@ type Nav = PageNav & {
 export function PreviewColumn({
   state,
   present = true,
+  presentation = "docked",
+  sheetOpen = false,
+  sheetEdge = "end",
+  dockWidth,
+  onCloseSheet,
   onPreview,
   onChip,
   onAsk,
@@ -38,6 +43,13 @@ export function PreviewColumn({
 }: {
   state: PrototypeState;
   present?: boolean;
+  /** Docked in the shell row, or an overlay sheet when space is tight. */
+  presentation?: "docked" | "sheet";
+  sheetOpen?: boolean;
+  sheetEdge?: "bottom" | "end";
+  /** Width when docked; falls back to the classic 393 / 584 sizes. */
+  dockWidth?: number;
+  onCloseSheet?: () => void;
   onPreview: (page: PreviewId, wide?: boolean) => void;
   onChip: (label: string) => void;
   onAsk: (text: string) => void;
@@ -54,8 +66,9 @@ export function PreviewColumn({
   onSearch: (scope?: string) => void;
   onView: (patch: Partial<PrototypeState["view"]> & { draft?: Record<string, string> }) => void;
 }) {
-  const wide = state.previewWide;
-  const panelWidth = wide ? 584 : 393;
+  const sheet = presentation === "sheet";
+  const wide = !sheet && state.previewWide;
+  const panelWidth = dockWidth ?? (wide ? 584 : 393);
   const [entering, setEntering] = useState(false);
   const [seenPresent, setSeenPresent] = useState(present);
   if (seenPresent !== present) {
@@ -225,22 +238,27 @@ export function PreviewColumn({
       onSearch(scope);
     },
   };
-  return (
-    <aside
-      data-admin-page={state.preview}
-      data-admin-wide={wide ? "true" : "false"}
-      data-admin-query={state.view.query}
-      data-admin-tab={state.view.tab}
-      data-admin-record={state.view.recordId}
-      className="panel-settle flex h-full shrink-0 justify-end overflow-hidden"
-      style={{ width: panelWidth }}
-    >
+  if (sheet && !sheetOpen) return null;
+
+  const panel = (
       <div
-        inert={!present ? true : undefined}
-        aria-hidden={!present || undefined}
-        className={`p-partial-theme-admin-next-light relative flex h-full w-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
+        data-admin-page={state.preview}
+        data-admin-wide={wide ? "true" : "false"}
+        data-admin-query={state.view.query}
+        data-admin-tab={state.view.tab}
+        data-admin-record={state.view.recordId}
+        data-admin={sheet ? "sheet" : "docked"}
+        inert={!present && !sheet ? true : undefined}
+        aria-hidden={!present && !sheet ? true : undefined}
+        className={`p-partial-theme-admin-next-light relative flex h-full w-full shrink-0 flex-col overflow-hidden text-[#303030] ${
+          sheet
+            ? sheetEdge === "bottom"
+              ? "shell-admin-sheet-bottom rounded-t-[20px]"
+              : "shell-admin-sheet-end rounded-l-[20px]"
+            : "rounded-[20px]"
+        } ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
           state.motion ? "transition-[background-color] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
-        } ${!present ? "pointer-events-none translate-x-full opacity-0" : ""} ${present && curtain ? "panel-reveal" : ""}`}
+        } ${!present && !sheet ? "pointer-events-none translate-x-full opacity-0" : ""} ${present && curtain && !sheet ? "panel-reveal" : ""}`}
       >
       <WorkspaceViewProvider value={viewApi}>
       <HeaderSlotProvider slot={slot}>
@@ -304,6 +322,16 @@ export function PreviewColumn({
               className={`${circleButton} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005bd3]`}
             >
               <PIcon name="LayoutSidebarRight" size={18} />
+            </button>
+          ) : null}
+          {sheet ? (
+            <button
+              type="button"
+              aria-label="Close admin"
+              onClick={() => onCloseSheet?.()}
+              className={`${circleButton} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005bd3]`}
+            >
+              <PIcon name="X" size={18} />
             </button>
           ) : null}
           </div>
@@ -419,6 +447,33 @@ export function PreviewColumn({
       </HeaderSlotProvider>
       </WorkspaceViewProvider>
       </div>
+  );
+
+  if (sheet) {
+    return (
+      <div
+        className="shell-admin-layer fixed inset-0 z-[55]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Admin"
+      >
+        <button type="button" className="shell-scrim absolute inset-0 bg-black/45" aria-label="Close admin" onClick={() => onCloseSheet?.()} />
+        <div
+          className={
+            sheetEdge === "bottom"
+              ? "absolute inset-x-0 bottom-0 flex h-[min(92dvh,920px)] max-h-[92dvh] pt-[env(safe-area-inset-top)]"
+              : "absolute inset-y-0 right-0 flex w-[min(100vw-1.5rem,420px)] max-w-[420px] pl-0"
+          }
+        >
+          {panel}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <aside className="panel-settle flex h-full shrink-0 justify-end overflow-hidden" style={{ width: panelWidth }}>
+      {panel}
     </aside>
   );
 }
