@@ -68,9 +68,9 @@ const tools = {
     execute: async (input) => input,
   }),
   addSidekick: tool({
-    description: "Install or connect a sidekick. Recommended: chief, ideas, trends, campaigns. Team: slack, grok, claude, gemini. Channels: store, shop, pos, agentic. Tools: customers, orders, finance, analytics.",
+    description: "Install or connect a sidekick. Recommended: chief, ideas, trends, campaigns. Team: slack, grok, muse, gemini, duet. Channels: store, shop, pos, agentic. Tools: customers, orders, finance, analytics.",
     inputSchema: z.object({
-      id: z.enum(["chief", "ideas", "trends", "campaigns", "slack", "grok", "claude", "gemini", "store", "shop", "pos", "agentic", "customers", "orders", "finance", "analytics"]),
+      id: z.enum(["chief", "ideas", "trends", "campaigns", "slack", "grok", "claude", "duet", "gemini", "store", "shop", "pos", "agentic", "customers", "orders", "finance", "analytics"]),
     }),
     execute: async (input) => input,
   }),

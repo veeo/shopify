@@ -22,12 +22,16 @@ export function emptyView(): ViewState {
   return { query: "", tab: "All", sort: "newest", recordId: "", draft: {}, scroll: 0 };
 }
 
+/** Opening one of these sidekicks shows its admin page in the wide panel. */
+const expandedTools = new Set(["customers", "orders", "finance", "analytics"]);
+
 function place(page: PreviewId, wide: boolean, extra?: Partial<ViewState>): Workspace {
   return { ...emptyView(), page, wide, ...extra };
 }
 
 /**
- * First visit for each sidekick. A saved workspace always wins over this.
+ * First visit for each sidekick. A saved workspace wins over this, except the
+ * tool sidekicks, which always open their own page in the wide panel.
  * `custom` covers sidekicks the merchant creates.
  */
 export const sidekickHomes: Record<string, Workspace> = {
@@ -39,6 +43,7 @@ export const sidekickHomes: Record<string, Workspace> = {
   grok: place("home-active", false),
   slack: place("orders", false, { tab: "Unfulfilled" }),
   claude: place("products", false, { tab: "Draft" }),
+  duet: place("products", false, { tab: "Draft" }),
   gemini: place("analytics", false),
   muse: place("home-active", false),
   store: place("online-store", false),
@@ -46,9 +51,9 @@ export const sidekickHomes: Record<string, Workspace> = {
   pos: place("pos", false),
   agentic: place("agentic", false),
   customers: place("customers", true),
-  orders: place("orders", false, { tab: "Unfulfilled" }),
-  finance: place("finance", false),
-  analytics: place("analytics", false),
+  orders: place("orders", true, { tab: "Unfulfilled" }),
+  finance: place("finance", true),
+  analytics: place("analytics", true),
   custom: place("home-active", false),
 };
 
@@ -102,7 +107,11 @@ export function applyWorkspace<P extends EditableProduct>(
   scenario: WorkspaceScenario,
 ) {
   const saved = state.workspaces[agentId];
-  const workspace = saved ? { ...saved, draft: { ...saved.draft } } : homeFor(agentId, scenario);
+  let workspace = saved ? { ...saved, draft: { ...saved.draft } } : homeFor(agentId, scenario);
+  const home = sidekickHomes[agentId];
+  if (home && expandedTools.has(agentId)) {
+    workspace = workspace.page === home.page ? { ...workspace, wide: true } : { ...home, draft: { ...home.draft } };
+  }
   state.workspaces = { ...state.workspaces, [agentId]: workspace };
   const productMissing = workspace.page === "product" && !state.products.some((item) => item.id === workspace.recordId);
   state.preview = productMissing ? "products" : workspace.page;
@@ -152,7 +161,7 @@ export function readLiveScroll() {
   }
 }
 
-const storageKey = "sidekick-workspaces-v1";
+const storageKey = "sidekick-workspaces-v2";
 
 export type SavedProduct = EditableProduct & { tone: string; image?: string; inventory: string };
 

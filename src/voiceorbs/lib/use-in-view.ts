@@ -1,7 +1,7 @@
 // VoiceOrbs (MIT) © 2026 Alexis Munoz — https://github.com/amunozdev/voiceorbs
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 
 export const observeActivity = (
@@ -10,7 +10,9 @@ export const observeActivity = (
 ): (() => void) => {
   let inView = true;
   let pageVisible = document.visibilityState === 'visible';
-  let active = inView && pageVisible;
+  // Start unknown so the first observation reports the real visibility. Callers that
+  // begin hidden, such as a WebGL orb, would otherwise never hear that they are on screen.
+  let active = false;
 
   const sync = () => {
     const next = inView && pageVisible;
@@ -65,4 +67,18 @@ export const useInView = (
   }, [ref]);
 
   return activeRef;
+};
+
+/** False until the element is actually on screen, so an offscreen orb never opens a WebGL context. */
+export const useOnScreen = (): { ref: (node: Element | null) => void; on: boolean } => {
+  const [on, setOn] = useState(false);
+  const cleanup = useRef<(() => void) | null>(null);
+  const ref = useCallback((node: Element | null) => {
+    cleanup.current?.();
+    cleanup.current = node ? observeActivity(node, setOn) : null;
+  }, []);
+
+  useEffect(() => () => cleanup.current?.(), []);
+
+  return { ref, on };
 };

@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
 import { Badge, Body, Btn, Card as AdminCard, circleButton, HeaderExtras, HeaderSlotProvider, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { WorkspaceViewProvider, useWorkspaceView, type WorkspaceViewApi } from "@/components/workspace-view";
-import { isSettingsPage, sectionChoices } from "@/lib/admin-nav";
+import { isSettingsPage, sectionChoices, sharesSection } from "@/lib/admin-nav";
 import { bindScrollReader } from "@/lib/workspace";
-import type { BusinessType, PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
+import { bestSellerIds, bestSellerRank, type BusinessType, type PreviewId, type Product, type ProductTone, type PrototypeState } from "@/lib/prototype";
 
 type Nav = PageNav & {
   onPreview: (page: PreviewId, wide?: boolean) => void;
@@ -19,6 +20,11 @@ type Nav = PageNav & {
 export function PreviewColumn({
   state,
   present = true,
+  presentation = "docked",
+  sheetOpen = false,
+  sheetEdge = "end",
+  dockWidth,
+  onCloseSheet,
   onPreview,
   onChip,
   onAsk,
@@ -37,6 +43,13 @@ export function PreviewColumn({
 }: {
   state: PrototypeState;
   present?: boolean;
+  /** Docked in the shell row, or an overlay sheet when space is tight. */
+  presentation?: "docked" | "sheet";
+  sheetOpen?: boolean;
+  sheetEdge?: "bottom" | "end";
+  /** Width when docked; falls back to the classic 393 / 584 sizes. */
+  dockWidth?: number;
+  onCloseSheet?: () => void;
   onPreview: (page: PreviewId, wide?: boolean) => void;
   onChip: (label: string) => void;
   onAsk: (text: string) => void;
@@ -53,8 +66,9 @@ export function PreviewColumn({
   onSearch: (scope?: string) => void;
   onView: (patch: Partial<PrototypeState["view"]> & { draft?: Record<string, string> }) => void;
 }) {
-  const wide = state.previewWide;
-  const panelWidth = wide ? 584 : 393;
+  const sheet = presentation === "sheet";
+  const wide = !sheet && state.previewWide;
+  const panelWidth = dockWidth ?? (wide ? 584 : 393);
   const [entering, setEntering] = useState(false);
   const [seenPresent, setSeenPresent] = useState(present);
   if (seenPresent !== present) {
@@ -99,14 +113,29 @@ export function PreviewColumn({
   useEffect(() => {
     closeMenu.current = setMenuOpen;
   });
+  const [quietFor, setQuietFor] = useState<PreviewId | null>(null);
   const nav: Nav = {
     onPreview,
     onRail,
     onChip,
     go: (page) => {
       menuRef.current = false;
-      setMenu(false);
-      onPreview(page);
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const morph = state.motion && !reduce && sharesSection(state.preview, page) && typeof document.startViewTransition === "function";
+      if (!morph) {
+        setMenu(false);
+        onPreview(page);
+        return;
+      }
+      document.documentElement.classList.add("vt-titles");
+      const transition = document.startViewTransition(() => {
+        flushSync(() => {
+          setQuietFor(page);
+          setMenu(false);
+          onPreview(page);
+        });
+      });
+      transition.finished.finally(() => document.documentElement.classList.remove("vt-titles"));
     },
     rail: (id) => {
       menuRef.current = false;
@@ -127,6 +156,7 @@ export function PreviewColumn({
   const seenPreview = useRef(state.preview);
   if (kind && menu) setMenu(false);
   const underlayPage: PreviewId = kind === "payments" ? "payments" : state.preview;
+  if (quietFor && quietFor !== state.preview) setQuietFor(null);
   const settingsLevel = underlayPage === "settings" || isSettingsPage(underlayPage);
   const headerRef = useRef<HTMLElement>(null);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
@@ -208,22 +238,27 @@ export function PreviewColumn({
       onSearch(scope);
     },
   };
-  return (
-    <aside
-      data-admin-page={state.preview}
-      data-admin-wide={wide ? "true" : "false"}
-      data-admin-query={state.view.query}
-      data-admin-tab={state.view.tab}
-      data-admin-record={state.view.recordId}
-      className="panel-settle flex h-full shrink-0 justify-end overflow-hidden"
-      style={{ width: panelWidth }}
-    >
+  if (sheet && !sheetOpen) return null;
+
+  const panel = (
       <div
-        inert={!present ? true : undefined}
-        aria-hidden={!present || undefined}
-        className={`p-partial-theme-admin-next-light relative flex h-full w-full shrink-0 flex-col overflow-hidden rounded-[20px] text-[#303030] ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
+        data-admin-page={state.preview}
+        data-admin-wide={wide ? "true" : "false"}
+        data-admin-query={state.view.query}
+        data-admin-tab={state.view.tab}
+        data-admin-record={state.view.recordId}
+        data-admin={sheet ? "sheet" : "docked"}
+        inert={!present && !sheet ? true : undefined}
+        aria-hidden={!present && !sheet ? true : undefined}
+        className={`p-partial-theme-admin-next-light relative flex h-full w-full shrink-0 flex-col overflow-hidden text-[#303030] ${
+          sheet
+            ? sheetEdge === "bottom"
+              ? "shell-admin-sheet-bottom rounded-t-[20px]"
+              : "shell-admin-sheet-end rounded-l-[20px]"
+            : "rounded-[20px]"
+        } ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
           state.motion ? "transition-[background-color] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
-        } ${!present ? "pointer-events-none translate-x-full opacity-0" : ""} ${present && curtain ? "panel-reveal" : ""}`}
+        } ${!present && !sheet ? "pointer-events-none translate-x-full opacity-0" : ""} ${present && curtain && !sheet ? "panel-reveal" : ""}`}
       >
       <WorkspaceViewProvider value={viewApi}>
       <HeaderSlotProvider slot={slot}>
@@ -289,6 +324,16 @@ export function PreviewColumn({
               <PIcon name="LayoutSidebarRight" size={18} />
             </button>
           ) : null}
+          {sheet ? (
+            <button
+              type="button"
+              aria-label="Close admin"
+              onClick={() => onCloseSheet?.()}
+              className={`${circleButton} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005bd3]`}
+            >
+              <PIcon name="X" size={18} />
+            </button>
+          ) : null}
           </div>
           <div ref={setSlot} className="flex min-w-0 items-center justify-end gap-1.5" />
         </header>
@@ -316,7 +361,7 @@ export function PreviewColumn({
           ) : null}
           <div
             key={underlayPage}
-            className={`${state.motion ? "page-in" : ""} ${menu && state.menuStyle === "push" ? "opacity-40 transition-opacity duration-300" : "opacity-100 transition-opacity duration-300"}`}
+            className={`${state.motion && quietFor !== underlayPage ? "page-in" : ""} ${menu && state.menuStyle === "push" ? "opacity-40 transition-opacity duration-300" : "opacity-100 transition-opacity duration-300"}`}
             onPointerDownCapture={(event) => {
               if (!menu || state.menuStyle !== "push") return;
               swallow.current = true;
@@ -402,6 +447,33 @@ export function PreviewColumn({
       </HeaderSlotProvider>
       </WorkspaceViewProvider>
       </div>
+  );
+
+  if (sheet) {
+    return (
+      <div
+        className="shell-admin-layer fixed inset-0 z-[55]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Admin"
+      >
+        <button type="button" className="shell-scrim absolute inset-0 bg-black/45" aria-label="Close admin" onClick={() => onCloseSheet?.()} />
+        <div
+          className={
+            sheetEdge === "bottom"
+              ? "absolute inset-x-0 bottom-0 flex h-[min(92dvh,920px)] max-h-[92dvh] pt-[env(safe-area-inset-top)]"
+              : "absolute inset-y-0 right-0 flex w-[min(100vw-1.5rem,420px)] max-w-[420px] pl-0"
+          }
+        >
+          {panel}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <aside className="panel-settle flex h-full shrink-0 justify-end overflow-hidden" style={{ width: panelWidth }}>
+      {panel}
     </aside>
   );
 }
@@ -488,7 +560,7 @@ function Screen(props: {
     case "products":
       return <Products state={state} onProduct={props.onProduct} onAdd={props.onAddProduct} nav={nav} />;
     case "product":
-      return <ProductEdit state={state} onBack={() => nav.onPreview("products")} onProduct={props.onProduct} onUpdate={props.onUpdateProduct} />;
+      return <ProductEdit state={state} onBack={() => nav.onPreview("products")} onProduct={props.onProduct} onUpdate={props.onUpdateProduct} onConfirm={nav.onChip} />;
     case "online-store":
       if (state.lookbook) return <ThemeBoard state={state} onUse={props.onUseTheme} />;
       return <AdminPage page={page} state={state} nav={nav} />;
@@ -1371,12 +1443,15 @@ function Products({ state, onProduct, onAdd, nav }: { state: PrototypeState; onP
   const view = useWorkspaceView();
   const query = view?.query ?? "";
   const tab = view?.tab || "All";
+  const best = new Set<string>(bestSellerIds);
   const shown = state.products.filter((product) => {
+    if (tab === "Best sellers" && !best.has(product.id)) return false;
     if (tab === "Active" && product.status !== "Active") return false;
     if (tab === "Draft" && product.status !== "Draft") return false;
     return product.title.toLowerCase().includes(query.trim().toLowerCase());
   });
-  if (view?.sort === "name") shown.sort((a, b) => a.title.localeCompare(b.title));
+  if (tab === "Best sellers" && (view?.sort || "newest") === "newest") shown.sort((a, b) => bestSellerRank(a.id) - bestSellerRank(b.id));
+  else if (view?.sort === "name") shown.sort((a, b) => a.title.localeCompare(b.title));
   else if (view?.sort === "price") shown.sort((a, b) => Number(b.price) - Number(a.price));
   else if (view?.sort === "oldest") shown.reverse();
   return (
@@ -1410,7 +1485,7 @@ function Products({ state, onProduct, onAdd, nav }: { state: PrototypeState; onP
         </AdminCard>
         <Table
           select
-          toolbar={<TableSearch placeholder="Search and filter" tabs={["All", "Active", "Draft"]} />}
+          toolbar={<TableSearch placeholder="Search and filter" tabs={["All", "Active", "Draft", "Best sellers"]} />}
           onRow={(index) => onProduct(shown[index].id)}
           columns={[
             { label: "", width: 28 },
@@ -1481,14 +1556,29 @@ function ProductEdit({
   onBack,
   onProduct,
   onUpdate,
+  onConfirm,
 }: {
   state: PrototypeState;
   onBack: () => void;
   onProduct: (id: string) => void;
   onUpdate: (id: string, patch: Partial<Product>) => void;
+  onConfirm: (label: string) => void;
 }) {
   const view = useWorkspaceView();
   const product = state.products.find((item) => item.id === state.selectedProductId) ?? state.products[0];
+  const filling = state.workingAgentId;
+  const titleMark = product?.title ?? "";
+  const descriptionMark = product?.description ?? "";
+  const priceMark = product?.price ?? "";
+  const imageMark = product?.image ?? "";
+  const variantMark = view?.draft.variant ?? "";
+  useEffect(() => {
+    if (!filling) return;
+    const field = variantMark ? "variant" : imageMark ? "media" : priceMark ? "price" : descriptionMark ? "description" : titleMark ? "title" : "";
+    if (!field) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.querySelector(`[data-field="${field}"]`)?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+  }, [filling, titleMark, descriptionMark, priceMark, imageMark, variantMark]);
   if (!product) return null;
   const taxed = (view?.draft.taxed ?? "yes") !== "no";
   const tracked = (view?.draft.tracked ?? "yes") !== "no";
@@ -1501,9 +1591,20 @@ function ProductEdit({
         <Btn tone="white" onClick={onBack}>
           Cancel
         </Btn>
-        <Btn tone="primary" onClick={onBack}>
-          Save
-        </Btn>
+        {view?.draft.variant ? (
+          <>
+            <Btn tone="gray" onClick={() => onConfirm("Save as draft")}>
+              Save as draft
+            </Btn>
+            <Btn tone="primary" onClick={() => onConfirm("Publish")}>
+              Publish
+            </Btn>
+          </>
+        ) : (
+          <Btn tone="primary" onClick={onBack}>
+            Save
+          </Btn>
+        )}
       </HeaderExtras>
       <TopBar
         title={title}
@@ -1513,11 +1614,11 @@ function ProductEdit({
       />
       <Body>
         <AdminCard className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1">
+          <label data-field="title" className="flex flex-col gap-1">
             <Label>Title</Label>
             <input value={product.title} placeholder="Short sleeve t-shirt" onChange={(event) => onUpdate(product.id, { title: event.target.value })} className={`${inputClass} h-8`} />
           </label>
-          <div className="flex flex-col gap-1">
+          <div data-field="description" className="flex flex-col gap-1">
             <Label>Description</Label>
             <div className="overflow-hidden rounded-lg border border-[#8a8a8a]/40 focus-within:border-[#303030]">
               <div className="flex items-center gap-0.5 overflow-x-auto border-b border-[#ebebeb] bg-[#f7f7f7] px-1.5 py-1 text-[#4a4a4a] [scrollbar-width:none]">
@@ -1539,7 +1640,7 @@ function ProductEdit({
               />
             </div>
           </div>
-          <div className="flex flex-col gap-1">
+          <div data-field="media" className="flex flex-col gap-1">
             <Label>Media</Label>
             <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-[#8a8a8a] px-4 py-5">
               {product.image ? <img src={product.image} alt="" className="mb-1 size-14 rounded-md object-cover" /> : null}
@@ -1557,6 +1658,7 @@ function ProductEdit({
           </div>
         </AdminCard>
         <Section title="Price">
+          <div data-field="price" />
           <AdminCard flush>
             <div className="p-3">
               <label className="flex h-8 w-40 items-center gap-1 rounded-lg border border-[#8a8a8a]/40 px-2.5 text-[12px] focus-within:border-[#303030]">
@@ -1606,6 +1708,12 @@ function ProductEdit({
                   className={`${inputClass} h-7 w-20 text-right`}
                 />
               </div>
+              {view?.draft.variant ? (
+                <div data-field="variant" className="flex items-center justify-between border-t border-[#ebebeb] px-2.5 py-2">
+                  <span>Variant</span>
+                  <span className="font-medium text-[#303030]">{view.draft.variant}</span>
+                </div>
+              ) : null}
             </div>
           ) : null}
           <div className="flex flex-wrap gap-1.5 border-t border-[#ebebeb] px-3 py-2">

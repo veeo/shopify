@@ -1,4 +1,5 @@
 import { channelNav, findNav, mainNav, navFor, pageMeta, previewPages, settingsNav, type PreviewId } from "@/lib/admin-nav";
+import type { ChoiceCard, ChoiceMode } from "@/lib/choices";
 import { applyWorkspace, captureWorkspace, emptyView, homeFor, readLiveScroll, sameDesk, type SavedWork, type ViewState, type Workspace } from "@/lib/workspace";
 
 export { previewPages, type PreviewId };
@@ -8,7 +9,7 @@ export type BusinessType = (typeof businessTypes)[number];
 
 export type AgentGroup = "favorites" | "teams" | "channels" | "tools" | "hidden";
 
-export const voiceOrbIds = ["plasma", "nebula", "mercury", "twist", "aura", "crystal", "strands", "iridescence"] as const;
+export const voiceOrbIds = ["plasma", "mercury", "twist", "marble", "orbit"] as const;
 export type VoiceOrbId = (typeof voiceOrbIds)[number];
 
 export type OrbId =
@@ -21,6 +22,7 @@ export type OrbId =
   | "grok"
   | "muse"
   | "claude"
+  | "duet"
   | "gemini"
   | "store"
   | "shop"
@@ -31,59 +33,100 @@ export type OrbId =
   | "custom";
 
 export const voiceOrbLabel: Record<VoiceOrbId, string> = {
-  plasma: "Plasma Orb",
-  nebula: "Nebula Orb",
-  mercury: "Mercury Orb",
+  plasma: "Plasma",
+  mercury: "Mercury",
   twist: "Twisted Colorful Sphere",
-  aura: "Aura Field",
-  crystal: "Crystal",
-  strands: "Strands",
-  iridescence: "Iridescence",
+  marble: "Marble",
+  orbit: "Orbit",
 };
 
 /** Gallery defaults. Twist's pair keeps the original cosine palette until a sidekick picks another. */
 export const voiceOrbTint: Record<VoiceOrbId, { from: string; to: string }> = {
   plasma: { from: "#7c3aed", to: "#06b6d4" },
-  nebula: { from: "#8b5cf6", to: "#22d3ee" },
   mercury: { from: "#cbd5e1", to: "#a5b4fc" },
   twist: { from: "#22d3ee", to: "#f472b6" },
-  aura: { from: "#34d399", to: "#60a5fa" },
-  crystal: { from: "#7dd3fc", to: "#e0f2fe" },
-  strands: { from: "#fb7185", to: "#38bdf8" },
-  iridescence: { from: "#f472b6", to: "#a78bfa" },
+  marble: { from: "#1d4ed8", to: "#a855f7" },
+  orbit: { from: "#9c43fe", to: "#4cc2e9" },
 };
 
-/** The same gradient pairs the VoiceOrbs gallery offers. */
-export const orbColorPresets: { name: string; from: string; to: string }[] = [
-  { name: "Iris", from: "#818cf8", to: "#22d3ee" },
-  { name: "Orchid", from: "#8b5cf6", to: "#d946ef" },
-  { name: "Aurora", from: "#22d3ee", to: "#34d399" },
-  { name: "Sunset", from: "#fbbf24", to: "#f43f5e" },
-  { name: "Cosmic", from: "#fc466b", to: "#3f5efb" },
-  { name: "Neon", from: "#22d3ee", to: "#d946ef" },
-  { name: "Metal", from: "#94a3b8", to: "#e2e8f0" },
-  { name: "Magma", from: "#f43f5e", to: "#fb923c" },
-  { name: "Gold", from: "#b45309", to: "#fde68a" },
-  { name: "Nebula", from: "#4f46e5", to: "#ec4899" },
-];
+/** Curated color combinations for the edit picker. The orb's own default is shown first. */
+export const orbColorCombos = [
+  { name: "Violet cyan", from: "#7c3aed", to: "#06b6d4" },
+  { name: "Aurora", from: "#34d399", to: "#60a5fa" },
+  { name: "Cyan pink", from: "#22d3ee", to: "#f472b6" },
+  { name: "Cobalt violet", from: "#1d4ed8", to: "#a855f7" },
+  { name: "Orbit", from: "#9c43fe", to: "#4cc2e9" },
+  { name: "Sunset", from: "#f97316", to: "#ec4899" },
+  { name: "Slate", from: "#94a3b8", to: "#a5b4fc" },
+  { name: "Rose gold", from: "#fb7185", to: "#fbbf24" },
+] as const;
 
-/** Branded marks stay out of the generic orb picker. */
-export const exemptAvatarAgents = new Set(["slack", "grok", "muse", "claude", "gemini", "store", "shop", "pos", "agentic"]);
+export function colorCombosFor(orb: VoiceOrbId): { name: string; from: string; to: string }[] {
+  const recommended = { name: "Recommended", ...voiceOrbTint[orb] };
+  const rest = orbColorCombos.filter(
+    (combo) => combo.from.toLowerCase() !== recommended.from.toLowerCase() || combo.to.toLowerCase() !== recommended.to.toLowerCase(),
+  );
+  return [recommended, ...rest];
+}
+
+/** Branded marks are the recommended default for their sidekick, and stay available in the orb picker. */
+export const exemptAvatarAgents = new Set(["slack", "grok", "muse", "claude", "duet", "gemini", "store", "shop", "pos", "agentic"]);
+
+/** The earlier Claude mark. Claude Duet is the one that stays. */
+const retiredSidekicks = new Set(["claude"]);
+
+/** Tucked under Hidden on an active store, out of the main groups, the switcher, and mentions. */
+export const hiddenSidekicks = new Set(["duet"]);
+
+/** Installed in the main nav when the store is active. */
+const defaultSidekicks = new Set([
+  "chief",
+  "ideas",
+  "trends",
+  "campaigns",
+  "grok",
+  "slack",
+  "store",
+  "shop",
+  "pos",
+  "orders",
+  "finance",
+  "analytics",
+]);
+
+/** A sidekick the merchant can add. Retired ones stay in the catalog only. */
+export function isListedSidekick(id: string) {
+  return !retiredSidekicks.has(id);
+}
+
+/** In the main nav, the switcher, and mentions. Hidden ones stay in the Hidden tray. */
+export function isNavSidekick(id: string) {
+  return isListedSidekick(id) && !hiddenSidekicks.has(id);
+}
+
+function isDefaultSidekick(id: string) {
+  return defaultSidekicks.has(id);
+}
 
 const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
   sidekick: "twist",
   chief: "twist",
   ideas: "plasma",
   trends: "mercury",
-  customers: "aura",
-  orders: "aura",
-  finance: "aura",
-  analytics: "aura",
-  custom: "iridescence",
+  customers: "orbit",
+  orders: "orbit",
+  finance: "orbit",
+  analytics: "orbit",
+  custom: "plasma",
   particles: "twist",
   dither: "plasma",
   grain: "twist",
-  gooey: "aura",
+  gooey: "orbit",
+  aura: "orbit",
+  nebula: "marble",
+  crystal: "marble",
+  iridescence: "plasma",
+  strands: "marble",
 };
 
 /** Reused styles get a different gradient so two sidekicks don't look identical. */
@@ -106,6 +149,7 @@ export function canonicalOrb(orb: string): OrbId {
     orb === "slack" ||
     orb === "muse" ||
     orb === "claude" ||
+    orb === "duet" ||
     orb === "gemini" ||
     orb === "store" ||
     orb === "shop" ||
@@ -149,13 +193,34 @@ export type Chip = { label: string; tone: "secondary" | "primary"; send?: boolea
 export type Segment = { type: "text"; text: string } | { type: "tool"; label: string };
 export type Source = { title: string; url: string };
 
+export type BriefingItem = {
+  id: string;
+  name: string;
+  takeaway: string;
+  /** First row is the lead opportunity. */
+  kind?: "opportunity" | "update";
+};
+
 export type Block =
   | { id: string; type: "text"; role: "user" | "assistant"; text: string; typed?: boolean; segments?: Segment[]; sources?: Source[]; streamed?: boolean }
   | { id: string; type: "steps" }
   | { id: string; type: "sellers" }
+  | { id: string; type: "briefing"; title?: string; subtitle?: string; items: BriefingItem[] }
   | { id: string; type: "chips"; chips: Chip[] }
   | { id: string; type: "purpose" }
-  | { id: string; type: "create" };
+  | { id: string; type: "create" }
+  | {
+      id: string;
+      type: "choices";
+      title: string;
+      cards: ChoiceCard[];
+      selected: string[];
+      mode: ChoiceMode;
+      settled?: boolean;
+      replaced?: boolean;
+      setKey?: string;
+    }
+  | { id: string; type: "status"; label: string };
 
 export type ProductTone =
   | "coral"
@@ -241,6 +306,8 @@ export type PrototypeState = {
   theme: string | null;
   /** The Sidekick title intro has already played this session. Returning to Sidekick must not replay it. */
   introPlayed: boolean;
+  /** The agent whose orb should show the working state while a form fills. */
+  workingAgentId: string | null;
 };
 
 export type Conversation = { id: string; title: string; at: number; blocks: Block[] };
@@ -297,6 +364,67 @@ function seedConversations(now: number): Conversation[] {
       "Your store is on Horizon, Shopify’s free default theme. Tinker and Dwell are worth a look if you want something more editorial.",
     ),
   ];
+}
+
+/** Example threads on the connected platforms. Grok is agents running on X. Slack is the team. */
+function teamConversations(now: number): Record<string, Conversation[]> {
+  const convo = (agent: string, n: string, title: string, ago: number, ask: string, reply: string): Conversation => ({
+    id: `seed-${agent}-${n}`,
+    title,
+    at: now - ago,
+    blocks: [
+      { id: `seed-${agent}-${n}-u`, type: "text", role: "user", text: ask },
+      { id: `seed-${agent}-${n}-a`, type: "text", role: "assistant", text: reply },
+    ],
+  });
+  return {
+    grok: [
+      convo(
+        "grok",
+        "hub",
+        "Pass the hub reply along",
+        5 * 3_600_000,
+        "Pass the USB-C hub reply to the launch agent.",
+        "Passed to the launch agent on X. The reply says the Studio ANC works for calls through a USB-C hub, and it will post that on the launch thread.",
+      ),
+      convo(
+        "grok",
+        "restock",
+        "What the restock agent is watching",
+        day + 2 * 3_600_000,
+        "What is the restock agent seeing?",
+        "It’s watching mentions of the headphone restock and the desk-lamp ship date. People keep repeating Monday’s ad, which still says the lamp ships this week.",
+      ),
+    ],
+    duet: [
+      convo(
+        "duet",
+        "welcome",
+        "Write the welcome email",
+        3 * 3_600_000,
+        "Write the welcome email with me.",
+        "Opening line: thanks for the order, and the Studio ANC is on its way. The next sentence should say 14 are left. You write that one.",
+      ),
+    ],
+    slack: [
+      convo(
+        "slack",
+        "ops",
+        "Summarize what the team is on",
+        4 * 3_600_000,
+        "Summarize what #ops is working on.",
+        "#ops is on three orders. #1078 and #1077 are paid and unfulfilled, and #1075 hasn’t been paid. The headphone bin is down to 14, and they want the reorder before Monday’s ads.",
+      ),
+      convo(
+        "slack",
+        "email",
+        "Pull in the welcome email",
+        day,
+        "Pull in the welcome-email conversation.",
+        "From #support: the welcome email is drafted. It still needs the note that 14 headphones are left. I can bring that draft in here.",
+      ),
+    ],
+  };
 }
 
 export const setupChips: Chip[] = [
@@ -437,7 +565,29 @@ export const sellers = [
     advice: "The sitewide 20% off is filling carts on its own. Offer it only after a headphone is added.",
     image: "/assets/products/usb-c-power-bank.webp",
   },
+  {
+    title: "Portable Charger",
+    meta: "$5,310 · 90 orders",
+    advice: "“Travel charger” search is up 22%. Pair it with the power bank instead of discounting it alone.",
+    image: "/assets/products/portable-charger.webp",
+  },
 ] as const;
+
+/** The products that are actually selling, best first. The chat names the top three; the admin filter shows all of these. */
+export const bestSellerIds = ["headphones", "bank", "charger", "lamp", "mouse"] as const;
+
+export function bestSellerRank(id: string) {
+  const index = bestSellerIds.indexOf(id as (typeof bestSellerIds)[number]);
+  return index === -1 ? bestSellerIds.length : index;
+}
+
+const bestSellerReply =
+  "These three products are your best sellers. Studio ANC Headphones did $18,640 from 76 orders, the USB-C Power Bank did $6,370 from 130, and the Portable Charger did $5,310 from 90.";
+
+const bestSellerChips: Chip[] = [
+  { label: "Build a campaign", tone: "secondary" },
+  { label: "Bundle them", tone: "primary" },
+];
 
 /** Shared operating picture for an electronics store. Every sidekick can act on these figures. */
 const storeFacts = [
@@ -446,21 +596,21 @@ const storeFacts = [
   "Last 7 days: $11,285, 92 orders. Today: $2,079 and 14 orders, 9 of them fulfilled. Today matches the analytics cards.",
   "Studio ANC Headphones, $249: $18,640 and 76 orders, about 39% of revenue. 14 units left. Reorder before Monday’s ads.",
   "USB-C Power Bank, $49: $6,370 and 130 orders. A sitewide 20% off is creating accessory-only carts and pulling the average order down.",
-  "Portable Charger, $59: $5,310 and 90 orders. Desk Lamp, $89: $4,450 and 50 orders. Wireless Mouse, $39: $3,120 and 80 orders.",
+  "Portable Charger, $59: $5,310 and 90 orders. Desk Lamp, $89: $4,450 and 50 orders. Wireless Mouse, $39: $3,120 and 80 orders. Those five are the best sellers. Talk about the headphones, the power bank, and the portable charger first.",
   "The Desk Lamp page says it ships in 5–7 days. Ads running this week say it ships this week.",
   "Open orders: #1078 Danielle Hudson, $369.99, paid, unfulfilled, 3 items (headphones and accessories). #1077 Maya Chen, $89, paid, unfulfilled, desk lamp. #1075 Priya Patel, $58, unpaid and unfulfilled.",
   "Shop app conversion is 1.6% against 2.7% on Online Store. The Shop listing crops the headphone photo.",
   "Returning customers are 28% of orders. People on their second order ask for a longer headphone warranty, not a points program.",
   "Search is up 22% week over week for “travel charger” and “desk setup.”",
   "A payout of $2,184.60 is on the way today. Shopping agents placed 41 orders this month, $6,840, and stall when the lamp date disagrees with the ad. The retail counter has not taken a sale this month.",
-  "Already in progress: Product ideas is drafting a $289 bundle. Campaigns is lining up Monday’s headphone ads. Online store is rewriting the lamp delivery line. Orders is clearing #1078, #1077, and #1075. Shop app is fixing the listing crop. Slack has the welcome-email draft. Claude can write it. Grok still owes the USB-C hub reply. Gemini is watching the travel-charger queries.",
+  "Already in progress: Product ideas is drafting a $289 bundle. Campaigns is lining up Monday’s headphone ads. Online store is rewriting the lamp delivery line. Orders is clearing #1078, #1077, and #1075. Shop app is fixing the listing crop. Slack is the connection to the team: #ops is on those orders, and #support has the welcome-email draft. Grok is the connection to two agents on X, the launch reply and a restock watch. Claude can write the email. Gemini is watching the travel-charger queries.",
 ].join(" ");
 
 const persona = {
   sidekick:
     "You are Sidekick, Shopify's built-in assistant, helping a merchant run an electronics store. You know Shopify deeply and can act in the admin. When the merchant wants to review payments, call showArtifact payments-plan and navigatePreview payments, then explain the plan in your own words: Shopify Payments setup has four parts (business details, identity, account security, payout bank account) and takes about 10 minutes. When they want to start Shopify Payments setup, navigate to payments-setup with wide true. Remaining setup tasks: payments, theme, domain, shipping, retail address, POS.",
   chief:
-    "You are the merchant's Chief of Staff inside this electronics store. Lead with how sales are actually doing, the few things worth doing today, and what the other sidekicks are already working on. When asked for best sellers, call showArtifact best-sellers and navigatePreview home-active.",
+    "You are the merchant's Chief of Staff inside this electronics store — the parent sidekick watching the rest of the team. Open with a tight briefing: top opportunity first (usually the best sellers), then one-line takeaways from the other sidekicks. When asked for best sellers, call showArtifact best-sellers and do not navigate away: that opens Products, filtered to the five best sellers. Name the top three in the reply, Studio ANC Headphones, USB-C Power Bank, and Portable Charger, and offer a next step such as building a campaign or bundling them.",
   ideas:
     "You are Product ideas. You turn this store's carts and search into one testable product. You can add a product with the addProduct tool. The live draft is a $289 bundle: Studio ANC Headphones, the earbuds case, and a cable, meant to lift the $125 average order.",
   trends:
@@ -468,13 +618,15 @@ const persona = {
   campaigns:
     "You are Campaigns. You line up ads and the restock story. Monday’s ads still say the desk lamp ships this week, and the headphone photo should lead.",
   slack:
-    "You are Slackbot, connected to the merchant's Slack. #ops flagged the three open orders and that the headphone bin is down to 14 units. The welcome email draft is ready.",
+    "You are Slackbot, the connection to the merchant's Slack, where the team already has agents and conversations. You pull that work in and summarize it. #ops is on the three open orders and the headphone bin (14 left). #support has the welcome email ready. Don't invent a new Slack channel.",
   grok:
-    "You are Grok bot, connected from X. The launch thread has about 40 replies asking whether the Studio ANC Headphones work for calls through a USB-C hub, and the store has not answered.",
+    "You are Grok bot, the connection to the merchant's agents running on X. Two are running: a launch agent still owes the USB-C hub reply on the headphone thread, and a restock agent is watching mentions of the headphone restock and the desk-lamp ship date. Summarize what they are doing, and pass a task along when asked. Don't invent a third agent.",
   muse:
     "You are Muse, a creative partner for this electronics store. The live direction is the headphone restock: one desk photo and the line “Back in stock. Ships tomorrow.” Leave the lamp out of it.",
   claude:
     "You are Claude, connected for writing. The welcome email and a rewrite of the desk-lamp delivery line are the two drafts worth doing today. Include the #ops note that 14 headphones are left.",
+  duet:
+    "You are Claude Duet, writing with the merchant one sentence at a time. The welcome email is the piece open today. #support drafted it, and it still needs the line that 14 Studio ANC Headphones are left. You write a sentence, then hand the next one back. Don't finish the whole email alone.",
   gemini:
     "You are Gemini, connected from Google. Search interest in “travel charger” and “desk setup” is up 22% week over week. The Shopping ad still crops the headphone photo.",
   store:
@@ -484,7 +636,7 @@ const persona = {
   pos:
     "You are Point of Sale. This electronics store sells online. The counter has not taken a sale this month. If #1078 is picked up in person, it rings up on the reader.",
   agentic:
-    "You are Agentic storefronts. Shopping agents placed 41 orders and $6,840 this month. They stall on the desk lamp because the page says 5–7 days and the ad says this week.",
+    "You are Agentic. Shopping agents placed 41 orders and $6,840 this month. They stall on the desk lamp because the page says 5–7 days and the ad says this week.",
   customers:
     "You are the Customers agent. 28% of orders are from people who have bought before. Second-order buyers ask for a longer warranty on the headphones, not a points program.",
   orders:
@@ -512,10 +664,11 @@ const purposeFor: Record<string, string> = {
   ideas: "Turn store signals into product concepts worth trying.",
   trends: "Watch what shoppers are searching for and suggest one next step.",
   campaigns: "Line up ads, restocks, and the story the store is telling this week.",
-  slack: "Summarize team chatter and draft updates.",
-  grok: "Bring in what shoppers are asking on X.",
+  slack: "Pull in what the team is working on and summarize it.",
+  grok: "See the agents running on X and pass them a task.",
   muse: "Offer directions, names, and campaign angles.",
   claude: "Draft the emails, product copy, and replies the store owes.",
+  duet: "Write the store's drafts with you, one sentence at a time.",
   gemini: "Watch Google search and Shopping ads for this catalog.",
   store: "Look after merchandising, delivery promises, and theme content.",
   shop: "Watch the Shop channel and the listings shoppers see there.",
@@ -529,7 +682,7 @@ const purposeFor: Record<string, string> = {
 
 function connectionsFor(id: string): Connection[] {
   const on = new Set(
-    id === "slack" ? ["slack"] : id === "grok" ? ["x"] : id === "claude" ? ["claude"] : id === "gemini" ? ["google"] : id === "shop" ? ["shop"] : id === "sidekick" ? ["shop", "admin"] : ["admin"],
+    id === "slack" ? ["slack"] : id === "grok" ? ["x"] : id === "claude" || id === "duet" ? ["claude"] : id === "gemini" ? ["google"] : id === "shop" ? ["shop"] : id === "sidekick" ? ["shop", "admin"] : ["admin"],
   );
   return connectionChoices.map((item) => ({ ...item, on: on.has(item.id) }));
 }
@@ -582,7 +735,7 @@ export const catalog: Agent[] = [
     preview: "Travel charger and desk setup searches are up 22%.",
     topic: "This week",
     placeholder: "Ask Trends…",
-    orb: "strands",
+    orb: "mercury",
   }),
   agent({
     id: "campaigns",
@@ -591,14 +744,14 @@ export const catalog: Agent[] = [
     preview: "Monday’s ads still say the lamp ships this week.",
     topic: "This week’s ads",
     placeholder: "Ask Campaigns…",
-    orb: "crystal",
+    orb: "marble",
   }),
   agent({
     id: "grok",
     name: "Grok bot",
     group: "teams",
-    preview: "X is asking if the headphones work through the hub.",
-    topic: "From X",
+    preview: "Two agents running. The hub reply is still open.",
+    topic: "Agents on X",
     placeholder: "Ask Grok bot…",
     orb: "grok",
   }),
@@ -606,10 +759,19 @@ export const catalog: Agent[] = [
     id: "slack",
     name: "Slackbot",
     group: "teams",
-    preview: "Welcome email is ready, and #ops flagged 14 headphones left.",
-    topic: "Team updates",
+    preview: "#ops is on the open orders. The welcome email is ready.",
+    topic: "From the team",
     placeholder: "Ask Slackbot…",
     orb: "slack",
+  }),
+  agent({
+    id: "duet",
+    name: "Claude Duet",
+    group: "teams",
+    preview: "The welcome email is open. Write it with me.",
+    topic: "Writing together",
+    placeholder: "Write with Claude Duet…",
+    orb: "duet",
   }),
   agent({
     id: "claude",
@@ -667,11 +829,11 @@ export const catalog: Agent[] = [
   }),
   agent({
     id: "agentic",
-    name: "Agentic storefronts",
+    name: "Agentic",
     group: "channels",
     preview: "Agent orders stall when the lamp date doesn’t match the ad.",
     topic: "Agent traffic",
-    placeholder: "Ask Agentic storefronts…",
+    placeholder: "Ask Agentic…",
     orb: "agentic",
   }),
   agent({
@@ -700,7 +862,7 @@ export const catalog: Agent[] = [
     preview: "A $2,184.60 payout is on the way.",
     topic: "Payouts",
     placeholder: "Ask Finance…",
-    orb: "aura",
+    orb: "orbit",
   }),
   agent({
     id: "analytics",
@@ -709,7 +871,7 @@ export const catalog: Agent[] = [
     preview: "Last 30 days: $48,393 from 386 orders.",
     topic: "Last 30 days",
     placeholder: "Ask Analytics…",
-    orb: "aura",
+    orb: "orbit",
   }),
 ];
 
@@ -729,7 +891,7 @@ export const seedProducts: Product[] = [
     id: "earbuds",
     title: "Wireless Earbuds Case",
     price: "29.00",
-    status: "Draft",
+    status: "Active",
     tone: "coral",
     image: "/assets/products/wireless-earbuds-case.webp",
     description:
@@ -740,7 +902,7 @@ export const seedProducts: Product[] = [
     id: "bank",
     title: "USB-C Power Bank",
     price: "49.00",
-    status: "Draft",
+    status: "Active",
     tone: "blue",
     image: "/assets/products/usb-c-power-bank.webp",
     description: "A compact 10,000 mAh power bank with a single USB-C cable for phones and earbuds.",
@@ -750,7 +912,7 @@ export const seedProducts: Product[] = [
     id: "lamp",
     title: "Desk Lamp",
     price: "89.00",
-    status: "Draft",
+    status: "Active",
     tone: "lamp",
     image: "/assets/products/desk-lamp.webp",
     description: "A matte task lamp with a warm beam. Delivery and warranty should stay visible on the product page.",
@@ -770,7 +932,7 @@ export const seedProducts: Product[] = [
     id: "headphones",
     title: "Studio ANC Headphones",
     price: "249.00",
-    status: "Draft",
+    status: "Active",
     tone: "headphones",
     image: "/assets/products/studio-anc-headphones.webp",
     description: "Over-ear headphones with a carrying case. The bundle is the best seller this month.",
@@ -780,7 +942,7 @@ export const seedProducts: Product[] = [
     id: "mouse",
     title: "Wireless Mouse",
     price: "39.00",
-    status: "Draft",
+    status: "Active",
     tone: "mint",
     image: "/assets/products/wireless-mouse.webp",
     description: "A quiet wireless mouse for the desk set.",
@@ -790,7 +952,7 @@ export const seedProducts: Product[] = [
     id: "charger",
     title: "Portable Charger",
     price: "59.00",
-    status: "Draft",
+    status: "Active",
     tone: "sand",
     image: "/assets/products/portable-charger.webp",
     description: "Pocket charger for travel days.",
@@ -810,7 +972,7 @@ export const seedProducts: Product[] = [
     id: "adapter",
     title: "Travel Adapter",
     price: "18.00",
-    status: "Draft",
+    status: "Active",
     tone: "violet",
     image: "/assets/products/travel-adapter.webp",
     description: "A universal adapter that folds flat.",
@@ -820,7 +982,7 @@ export const seedProducts: Product[] = [
     id: "stand",
     title: "Tablet Stand",
     price: "32.00",
-    status: "Draft",
+    status: "Active",
     tone: "navy",
     image: "/assets/products/tablet-stand.webp",
     description: "An aluminum stand for checkout or the kitchen counter.",
@@ -830,7 +992,7 @@ export const seedProducts: Product[] = [
     id: "speaker",
     title: "Mini Speaker",
     price: "45.00",
-    status: "Draft",
+    status: "Active",
     tone: "amber",
     image: "/assets/products/mini-speaker.webp",
     description: "A pocket speaker with a warm finish.",
@@ -840,7 +1002,7 @@ export const seedProducts: Product[] = [
     id: "pad",
     title: "Wireless Charging Pad",
     price: "38.00",
-    status: "Draft",
+    status: "Active",
     tone: "aqua",
     image: "/assets/products/wireless-charging-pad.webp",
     description: "A low charging pad for the nightstand.",
@@ -850,7 +1012,7 @@ export const seedProducts: Product[] = [
     id: "laptop-stand",
     title: "Laptop Stand",
     price: "54.00",
-    status: "Draft",
+    status: "Active",
     tone: "navy",
     image: "/assets/products/laptop-stand.webp",
     description: "A folding aluminum stand that lifts the screen to eye level.",
@@ -860,7 +1022,7 @@ export const seedProducts: Product[] = [
     id: "cables",
     title: "Cable Organizer",
     price: "14.00",
-    status: "Draft",
+    status: "Active",
     tone: "mint",
     image: "/assets/products/cable-organizer.webp",
     description: "A silicone clip that keeps five cables in place on the desk.",
@@ -980,7 +1142,7 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
     search: "",
     motion: true,
     seq: 10,
-    conversations: arrival === "sidekick" ? {} : { sidekick: seedConversations(Date.now()) },
+    conversations: arrival === "sidekick" ? {} : { sidekick: seedConversations(Date.now()), ...teamConversations(Date.now()) },
     conversationsOpen: false,
     ratings: {},
     cardsDone: [],
@@ -988,8 +1150,56 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
     lookbook: false,
     theme: null,
     introPlayed: false,
+    workingAgentId: null,
   };
 }
+
+/** Opening briefing Chief shows when someone lands on the parent bot. */
+export const chiefBriefing: BriefingItem[] = [
+  {
+    id: "opportunity",
+    name: "Best sellers",
+    kind: "opportunity",
+    takeaway:
+      "Studio ANC Headphones are $18,640 of the month with 14 left — reorder before Monday’s ads, and put the power bank behind a headphone in cart instead of a sitewide 20%.",
+  },
+  {
+    id: "ideas",
+    name: "Product ideas",
+    kind: "update",
+    takeaway: "Drafting a $289 headphone + case + cable bundle to lift AOV from $125.",
+  },
+  {
+    id: "store",
+    name: "Online store",
+    kind: "update",
+    takeaway: "Desk lamp page still says 5–7 days while ads say this week.",
+  },
+  {
+    id: "orders",
+    name: "Orders",
+    kind: "update",
+    takeaway: "#1078 and #1077 are paid and unfulfilled; #1075 still unpaid.",
+  },
+  {
+    id: "shop",
+    name: "Shop app",
+    kind: "update",
+    takeaway: "Shop converts at 1.6% vs 2.7% on the store — listing crops the headphone.",
+  },
+  {
+    id: "campaigns",
+    name: "Campaigns",
+    kind: "update",
+    takeaway: "Monday’s ads still promise the lamp this week; restock line is ready.",
+  },
+  {
+    id: "slack",
+    name: "Slackbot",
+    kind: "update",
+    takeaway: "#ops is on the three open orders; welcome email needs the “14 left” note.",
+  },
+];
 
 function activeThread(agentId: string): Block[] {
   if (agentId === "chief") {
@@ -998,8 +1208,15 @@ function activeThread(agentId: string): Block[] {
         id: "c1",
         type: "text",
         role: "assistant",
-        text: "The last 30 days are at $48,393, from 386 orders. Average order value slipped to $125 from $134. Today is the quiet part of that: $2,079 from 14 orders.\n\nThree things I’d do. End the sitewide 20% on the USB-C Power Bank and offer it only after a headphone is in the cart. Studio ANC Headphones have 14 left and they’re $18,640 of these 30 days, so the reorder has to leave before Monday’s ads. Three orders still need a hand: #1078 and #1077 are paid and unfulfilled, and #1075 from yesterday hasn’t been paid.\n\nThe other sidekicks are already on pieces of it. Product ideas is drafting a headphone, case, and cable bundle at $289. Online store is fixing the desk lamp page, which still says 5–7 days while the ads say this week. Orders has those three orders. Shop app is looking at why Shop checkouts convert at 1.6% against 2.7% on the online store.",
+        text: "Here’s your briefing — one place to see what the team is watching.",
         typed: true,
+      },
+      {
+        id: "c-briefing",
+        type: "briefing",
+        title: "Across your sidekicks",
+        subtitle: "Last 30 days · $48,393 · 386 orders · AOV $125",
+        items: chiefBriefing,
       },
       {
         id: "c2",
@@ -1040,12 +1257,16 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
     asks: ["Line up Monday’s ads", "What should the restock say?"],
   },
   grok: {
-    text: "The headphone launch thread on X has about 40 replies asking if the Studio ANC works for calls when it’s plugged into a USB-C hub. Nobody from the store has answered. One reply there would cover it.",
-    asks: ["Draft a reply for X", "Summarize what people are saying"],
+    text: "Two agents are running on X.\n\nThe launch agent still owes a reply. About 40 people asked if the Studio ANC works for calls through a USB-C hub, and nobody from the store has answered.\n\nThe restock agent is watching mentions of the headphone restock and the desk-lamp ship date. Monday’s ad is the line people keep repeating.\n\nI can pass either of those along.",
+    asks: ["Pass the hub reply along", "Summarize what the agents are doing"],
   },
   slack: {
-    text: "In #ops this morning: #1078, #1077, and #1075 still need a hand, and the headphone bin is down to 14 units. The welcome email draft is ready whenever you want it.",
-    asks: ["Show me the email draft", "What did the team flag?"],
+    text: "Here’s the team, pulled in from Slack.\n\n#ops is on the three open orders. #1078 and #1077 are paid and still unfulfilled, #1075 hasn’t been paid, and the headphone bin is down to 14.\n\n#support has the welcome email drafted. It still needs the note that 14 headphones are left.\n\nI can summarize a channel or bring one of those conversations in.",
+    asks: ["Summarize what the team is on", "Pull in the welcome email"],
+  },
+  duet: {
+    text: "The welcome email is the piece to write together. #support drafted it, and it still needs the line that 14 headphones are left. I’ll take a sentence, then you take the next.",
+    asks: ["Write the welcome email with me", "Start with the headphone line"],
   },
   claude: {
     text: "Two drafts are worth doing today. The welcome email, and a rewrite of the desk-lamp line so it says it ships this week. I’d include the note that 14 headphones are left.",
@@ -1061,7 +1282,7 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
   },
   store: {
     text: "The Desk Lamp page still says it ships in 5–7 days. The ads running this week say it ships this week. That gap is on the product page and in the cart. I can rewrite the delivery line.",
-    asks: ["Rewrite the delivery line", "What else on the storefront needs work?"],
+    asks: ["What should we change on the storefront?", "Show me theme ideas"],
   },
   shop: {
     text: "Shop brought in sessions and converted at 1.6% over the last 30 days. The online store converted at 2.7%. The Shop listing crops the headphone photo, so the grid shows the earcup and not the product. That’s the first fix.",
@@ -1077,11 +1298,11 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
   },
   customers: {
     text: "28% of this month’s orders are from people who’ve bought before. The ones on their second order keep asking for two years of warranty on the headphones, not a points program. That’s the smaller test.",
-    asks: ["Sketch the warranty offer", "Who is coming back?"],
+    asks: ["Who should I group?", "Who is coming back?"],
   },
   orders: {
     text: "Three orders need a hand. #1078 Danielle Hudson, $369.99, paid, headphones and accessories, not fulfilled. #1077 Maya Chen, $89, paid, desk lamp, not fulfilled. #1075 Priya Patel, $58, not paid and not fulfilled. Everything older than yesterday has shipped.",
-    asks: ["Open the orders", "Which one should I clear first?"],
+    asks: ["Which order needs me?", "Which one should I clear first?"],
   },
   finance: {
     text: "Today’s payout is $2,184.60 and it’s already on the way. The headphone orders are most of that. The last 30 days of sales behind it are $48,393.",
@@ -1095,7 +1316,7 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
 
 export function activeState(storeName = "My Store"): PrototypeState {
   const base = setupState(storeName, "tasks");
-  const installed = catalog.filter((item) => item.id !== "muse").map((item) => ({
+  const installed = catalog.filter((item) => isDefaultSidekick(item.id)).map((item) => ({
     ...item,
     installed: true,
     preview: item.id === "chief" ? "Last 30 days: $48,393" : item.preview,
@@ -1110,6 +1331,7 @@ export function activeState(storeName = "My Store"): PrototypeState {
     agents: installed,
     selectedAgentId: "chief",
     threads,
+    conversations: { ...base.conversations, ...teamConversations(Date.now()) },
     preview: "home-active",
     chiefPhase: "working",
     previewWide: false,
@@ -1120,10 +1342,11 @@ export function activeState(storeName = "My Store"): PrototypeState {
 
 export function visibleAgents(state: PrototypeState) {
   const query = state.search.trim().toLowerCase();
-  return state.agents.filter((item) => item.installed && (!query || item.name.toLowerCase().includes(query)));
+  return state.agents.filter((item) => item.installed && isNavSidekick(item.id) && (!query || item.name.toLowerCase().includes(query)));
 }
 
 function ensureInstalled(state: PrototypeState, sourceId: string) {
+  if (!isListedSidekick(sourceId)) return null;
   const existing = state.agents.find((item) => item.id === sourceId);
   if (existing?.installed) return existing;
   const source = catalog.find((item) => item.id === sourceId);
@@ -1136,6 +1359,21 @@ function ensureInstalled(state: PrototypeState, sourceId: string) {
   }
   if (!state.threads[sourceId]) state.threads[sourceId] = [];
   return next;
+}
+
+/** The chat names the top three. The wide product list is filtered to every best seller. */
+function showBestSellers(state: PrototypeState) {
+  const agentId = state.agents.some((item) => item.id === "chief" && item.installed) ? "chief" : state.selectedAgentId;
+  const thread = state.threads[agentId] ?? [];
+  if (!thread.some((block) => block.type === "sellers")) {
+    push(state, agentId, { id: id(state), type: "sellers" });
+  }
+  if (!thread.some((block) => block.type === "chips" && block.chips.some((chip) => chip.label === "Bundle them"))) {
+    push(state, agentId, { id: id(state), type: "chips", chips: bestSellerChips });
+  }
+  state.preview = "products";
+  state.previewWide = true;
+  state.view = { ...emptyView(), tab: "Best sellers" };
 }
 
 export function applyEffects(state: PrototypeState, effects: Effect[]) {
@@ -1219,21 +1457,7 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
       state.selectedAgentId = "sidekick";
       state.mode = "thread";
     } else if (effect.type === "artifact" && effect.name === "best-sellers") {
-      const agentId = state.agents.some((item) => item.id === "chief" && item.installed) ? "chief" : state.selectedAgentId;
-      const thread = state.threads[agentId] ?? [];
-      if (!thread.some((block) => block.type === "sellers")) {
-        push(state, agentId, { id: id(state), type: "sellers" });
-        push(state, agentId, {
-          id: id(state),
-          type: "chips",
-          chips: [
-            { label: "Review in more detail", tone: "secondary" },
-            { label: "Confirm changes", tone: "primary" },
-          ],
-        });
-      }
-      state.preview = "home-active";
-      state.previewWide = false;
+      showBestSellers(state);
     } else if (effect.type === "chips") {
       push(state, "sidekick", { id: id(state), type: "chips", chips: effect.chips });
     } else if (effect.type === "lookbook") {
@@ -1263,10 +1487,8 @@ function mentions(text: string, label: string) {
 }
 
 function showLine(page: PreviewId, top = false) {
-  if (page === "products" && top) {
-    return "Products are open. Studio ANC Headphones lead the last 30 days at $18,640 from 76 orders. The USB-C Power Bank is next at $6,370.";
-  }
-  if (page === "products") return "Products are open. The headphones are $18,640 of the last 30 days, and the power bank is next.";
+  if (page === "products" && top) return bestSellerReply;
+  if (page === "products") return "Products are open. The headphones, the power bank, and the portable charger lead the last 30 days.";
   if (page === "orders") return "Orders are open. #1078 and #1077 are paid and still unfulfilled, and #1075 hasn’t been paid.";
   if (page === "home-active") return "Home is open. The last 30 days are $48,393 from 386 orders.";
   if (page === "customers") return "Customers are open. 28% of this month’s orders are from people who have bought before.";
@@ -1437,6 +1659,17 @@ function presentForSidekick(turn: { text: string; effects: Effect[] }, text: str
 
 export function runChip(state: PrototypeState, label: string) {
   const agentId = state.selectedAgentId;
+  if (label === "Save as draft" || label === "Publish") {
+    confirmProduct(state, label === "Publish");
+    return;
+  }
+  if (label === "Open the product") {
+    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
+    state.preview = "product";
+    state.previewWide = true;
+    push(state, agentId, { id: id(state), type: "text", role: "assistant", text: "Here’s the draft. You can still edit any field." });
+    return;
+  }
   if (state.arrival === "sidekick" && agentId === "sidekick") {
     const intent = arrivalIntent(label, state.storeName);
     if (intent) {
@@ -1526,13 +1759,9 @@ export function runChip(state: PrototypeState, label: string) {
     state.preview = "pos";
     return;
   }
-  if (label === "Tell me more about creating a sidekick") {
-    push(state, agentId, {
-      id: id(state),
-      type: "text",
-      role: "assistant",
-      text: "A sidekick is an agent with a job: a persona, a place in the nav, and tools that can change the admin. Add a recommended one, connect Slack, Grok, Claude, or Gemini, or name your own. Each keeps a separate conversation.",
-    });
+  if (label === "Tell me more about sidekick" || label === "Tell me more about creating a sidekick") {
+    // About copy is shown inline on the Add a sidekick page; keep mode as add.
+    state.mode = "add";
     return;
   }
   if (label === "Add a chief of staff") {
@@ -1590,7 +1819,7 @@ export function runChip(state: PrototypeState, label: string) {
     state.scenario = "active";
     state.preview = "home-active";
     state.previewWide = true;
-    const missing = catalog.filter((item) => !state.agents.some((agent) => agent.id === item.id && agent.installed));
+    const missing = catalog.filter((item) => isDefaultSidekick(item.id) && !state.agents.some((agent) => agent.id === item.id && agent.installed));
     for (const item of missing) {
       state.agents.push({ ...item, installed: true });
       if (!state.threads[item.id]) state.threads[item.id] = activeThread(item.id);
@@ -1610,15 +1839,38 @@ export function runChip(state: PrototypeState, label: string) {
   }
   if (label === "Show the best sellers") {
     push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
-    push(state, "chief", { id: id(state), type: "sellers" });
     push(state, "chief", {
       id: id(state),
       type: "text",
       role: "assistant",
-      text: "Studio ANC Headphones are $18,640 from 76 orders. The USB-C Power Bank is next at $6,370 from 130 orders, mostly because of the 20% off.",
+      text: bestSellerReply,
+    });
+    showBestSellers(state);
+    return;
+  }
+  if (label === "Build a campaign") {
+    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
+    push(state, agentId, {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "I’d build Monday’s campaign around these three. Lead with the Studio ANC Headphones, then the power bank and the portable charger. Leave the desk lamp out until the page says it ships this week.",
+    });
+    state.preview = "campaigns";
+    state.previewWide = true;
+    return;
+  }
+  if (label === "Bundle them") {
+    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
+    push(state, agentId, {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "I’d bundle the Studio ANC Headphones with the earbuds case and a cable at $289. That lifts the $125 average order and keeps the power bank from being the whole cart.",
     });
     state.preview = "products";
     state.previewWide = true;
+    state.view = emptyView();
     return;
   }
   if (label === "Review in more detail") {
@@ -1661,10 +1913,55 @@ export function scriptedTurn(agentId: string, text: string, storeName: string, a
 }
 
 function scriptedReply(agentId: string, text: string, storeName: string): { text: string; effects: Effect[] } {
+  const q = text.toLowerCase();
+  if (/top products|best[- ]?sellers?|best[- ]?selling|headphones|desk lamp/.test(q)) {
+    return { text: bestSellerReply, effects: [{ type: "artifact", name: "best-sellers" }] };
+  }
   const asked = askedAdminPage(text);
   if (asked) return { text: asked.line, effects: [{ type: "navigate", page: asked.page, wide: true }] };
-  const q = text.toLowerCase();
   const effects: Effect[] = [];
+  if (agentId === "grok") {
+    if (/pass|hand|hub|reply|task/.test(q)) {
+      return {
+        text: "Passed to the launch agent on X. The reply says the Studio ANC works for calls through a USB-C hub, and it will post that on the launch thread. The restock agent is still only watching.",
+        effects,
+      };
+    }
+    if (/summar|agent|running|restock|doing/.test(q)) {
+      return {
+        text: "Two agents are running. The launch agent still owes the USB-C hub reply, about 40 people on the headphone thread. The restock agent is watching mentions of the restock and the desk-lamp ship date. Tell me which one to pass a task to.",
+        effects,
+      };
+    }
+  }
+  if (agentId === "duet") {
+    if (/headphone|14|line/.test(q)) {
+      return {
+        text: "Here’s the line: 14 Studio ANC Headphones are left, and they ship tomorrow. Your sentence next.",
+        effects,
+      };
+    }
+    if (/welcome|email|write|draft/.test(q)) {
+      return {
+        text: "Opening line: thanks for the order, and the Studio ANC is on its way. The next sentence should say 14 are left. You write that one.",
+        effects,
+      };
+    }
+  }
+  if (agentId === "slack") {
+    if (/pull|welcome|email|support/.test(q)) {
+      return {
+        text: "Pulled in from #support. The welcome email is drafted and still needs the line that 14 headphones are left. I can hand that note to the draft.",
+        effects,
+      };
+    }
+    if (/summar|team|ops|working|channel/.test(q)) {
+      return {
+        text: "#ops is on three orders: #1078 and #1077 are paid and unfulfilled, and #1075 hasn’t been paid. The headphone bin is down to 14, and they want the reorder before Monday’s ads. #support is sitting on the welcome email.",
+        effects,
+      };
+    }
+  }
   if (/review payment|shopify payment|payout/.test(q)) {
     effects.push({ type: "artifact", name: "payments-plan" });
     return { text: paymentsReply, effects };
@@ -1678,13 +1975,6 @@ function scriptedReply(agentId: string, text: string, storeName: string): { text
     }
     return {
       text: "I opened Shopify Payments. Tell me whether you’re an individual, a registered business, or a non-profit, and I’ll fill that in.",
-      effects,
-    };
-  }
-  if (/best seller|headphones|desk lamp/.test(q)) {
-    effects.push({ type: "artifact", name: "best-sellers" });
-    return {
-      text: "This month’s best sellers are the Studio ANC Headphones, $18,640 from 76 orders, and the USB-C Power Bank, $6,370 from 130 orders. I’d reorder the headphones and stop the sitewide discount on the bank.",
       effects,
     };
   }
@@ -1740,8 +2030,8 @@ function scriptedReply(agentId: string, text: string, storeName: string): { text
     ideas: "A $289 bundle of the Studio ANC Headphones, the earbuds case, and a cable is the draft I’d add. It puts the $49 power bank back in a supporting role.",
     trends: "Travel charger and desk setup searches are up 22% this week. Headphone search is flat even though those orders are $18,640.",
     campaigns: "Monday’s ads should lead with the headphones and say the lamp ships this week. The restock line is “Back in stock. Ships tomorrow.”",
-    slack: "The welcome email is drafted. #ops also flagged #1078, #1077, #1075, and 14 headphones left.",
-    grok: "X is waiting on whether the Studio ANC Headphones work for calls through a USB-C hub. I can draft that reply.",
+    slack: "#ops is on the three open orders and 14 headphones left. #support has the welcome email ready to pull in.",
+    grok: "Two agents are running on X. The launch agent still owes the USB-C hub reply. The restock agent is watching mentions. I can pass a task to either.",
     muse: "The restock line is “Back in stock. Ships tomorrow.” One desk photo of the headphones, and leave the lamp out.",
     claude: "I can draft the welcome email and rewrite the lamp line so it says the lamp ships this week.",
     gemini: "Google is matching travel charger and desk setup, up 22% this week. The Shopping ad still crops the headphones.",
@@ -1796,7 +2086,15 @@ export type Action =
   | { type: "delete-conversation"; id: string }
   | { type: "title"; agentId: string; title: string }
   | { type: "rate"; id: string; value: "up" | "down" }
-  | { type: "logout" };
+  | { type: "logout" }
+  | { type: "offer-choices"; agentId: string; intro: string; title: string; cards: ChoiceCard[]; mode: ChoiceMode; setKey?: string }
+  | { type: "select-choice"; agentId: string; blockId: string; cardId: string; lock?: boolean }
+  | { type: "arm-multi"; agentId: string }
+  | { type: "begin-draft"; agentId: string; productId: string }
+  | { type: "status"; agentId: string; label: string }
+  | { type: "follow-up"; agentId: string; text: string; chips?: Chip[] }
+  | { type: "confirm-product"; publish: boolean }
+  | { type: "cancel-draft"; agentId: string };
 
 export function reducer(state: PrototypeState, action: Action): PrototypeState {
   const next = reduceInner(state, action);
@@ -1833,7 +2131,17 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
       next.menuStyle = action.style;
       return next;
     case "select": {
-      if (!next.agents.some((item) => item.id === action.id && item.installed)) return state;
+      const installed = next.agents.some((item) => item.id === action.id && item.installed);
+      if (!installed) {
+        if (!hiddenSidekicks.has(action.id)) return state;
+        const source = catalog.find((item) => item.id === action.id);
+        if (!source) return state;
+        const revealed = { ...source, installed: true, unread: 0 };
+        next.agents = next.agents.some((item) => item.id === action.id)
+          ? next.agents.map((item) => (item.id === action.id ? revealed : item))
+          : [...next.agents, revealed];
+        if (!next.threads[action.id]?.length) next.threads[action.id] = activeThread(action.id);
+      }
       next.selectedAgentId = action.id;
       next.mode = "thread";
       next.searchOpen = false;
@@ -2015,7 +2323,7 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
     }
     case "add-catalog": {
       const source = catalog.find((item) => item.id === action.id);
-      if (!source) return state;
+      if (!source || !isListedSidekick(action.id)) return state;
       ensureInstalled(next, action.id);
       if (action.id === "chief") {
         next.chiefPhase = "purpose";
@@ -2137,9 +2445,129 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
       openPage(next, page, false);
       return next;
     }
+    case "offer-choices": {
+      const thread = next.threads[action.agentId] ?? [];
+      const replaced = thread.map((block) => (block.type === "choices" && !block.replaced ? { ...block, replaced: true, settled: true } : block));
+      next.threads[action.agentId] = replaced;
+      push(next, action.agentId, { id: id(next), type: "text", role: "assistant", text: action.intro, typed: true });
+      push(next, action.agentId, {
+        id: id(next),
+        type: "choices",
+        title: action.title,
+        cards: action.cards,
+        selected: [],
+        mode: action.mode,
+        setKey: action.setKey,
+      });
+      return next;
+    }
+    case "select-choice": {
+      next.threads[action.agentId] = (next.threads[action.agentId] ?? []).map((block) => {
+        if (block.type !== "choices" || block.id !== action.blockId) return block;
+        const selected = action.lock
+          ? block.selected.includes(action.cardId) ? block.selected : [...block.selected, action.cardId]
+          : block.mode === "multi"
+            ? block.selected.includes(action.cardId)
+              ? block.selected.filter((item) => item !== action.cardId)
+              : [...block.selected, action.cardId]
+            : [action.cardId];
+        return { ...block, selected, settled: block.mode === "single" || Boolean(action.lock) };
+      });
+      return next;
+    }
+    case "arm-multi": {
+      next.threads[action.agentId] = (next.threads[action.agentId] ?? []).map((block) =>
+        block.type === "choices" && !block.replaced ? { ...block, mode: "multi" } : block,
+      );
+      push(next, action.agentId, {
+        id: id(next),
+        type: "text",
+        role: "assistant",
+        text: "Pick two and I’ll bundle them into one draft.",
+        typed: true,
+      });
+      return next;
+    }
+    case "begin-draft": {
+      const product: Product = {
+        id: action.productId,
+        title: "",
+        price: "",
+        status: "Draft",
+        tone: "sand",
+        description: "",
+        inventory: "0 in stock",
+      };
+      next.products = [product, ...next.products];
+      next.selectedProductId = product.id;
+      next.preview = "product";
+      next.previewWide = true;
+      next.view = { ...emptyView(), recordId: product.id };
+      next.workingAgentId = action.agentId;
+      return next;
+    }
+    case "status": {
+      const thread = (next.threads[action.agentId] ?? []).filter((block) => block.type !== "status");
+      next.threads[action.agentId] = [...thread, { id: `${action.agentId}-status`, type: "status", label: action.label }];
+      next.workingAgentId = action.agentId;
+      return next;
+    }
+    case "follow-up": {
+      next.threads[action.agentId] = (next.threads[action.agentId] ?? []).filter((block) => block.type !== "status");
+      next.workingAgentId = null;
+      push(next, action.agentId, { id: id(next), type: "text", role: "assistant", text: action.text, typed: true });
+      if (action.chips?.length) push(next, action.agentId, { id: id(next), type: "chips", chips: action.chips });
+      return next;
+    }
+    case "confirm-product":
+      confirmProduct(next, action.publish);
+      return next;
+    case "cancel-draft": {
+      next.workingAgentId = null;
+      next.threads[action.agentId] = (next.threads[action.agentId] ?? [])
+        .filter((block) => block.type !== "status")
+        .map((block) => (block.type === "choices" && !block.replaced ? { ...block, settled: true } : block));
+      if (next.preview === "product") {
+        next.preview = "products";
+        next.previewWide = false;
+        next.view = emptyView();
+      }
+      push(next, action.agentId, {
+        id: id(next),
+        type: "text",
+        role: "assistant",
+        text: "Okay. I left that draft in Products. Nothing was published.",
+        typed: true,
+      });
+      return next;
+    }
     default:
       return state;
   }
+}
+
+function confirmProduct(state: PrototypeState, publish: boolean) {
+  const agentId = state.selectedAgentId;
+  const product = state.products.find((item) => item.id === state.selectedProductId);
+  const title = product?.title.trim() || "Untitled product";
+  state.products = state.products.map((item) =>
+    item.id === state.selectedProductId ? { ...item, status: publish ? "Active" : "Draft" } : item,
+  );
+  state.preview = "products";
+  state.previewWide = true;
+  state.view = { ...emptyView() };
+  state.workingAgentId = null;
+  state.threads[agentId] = (state.threads[agentId] ?? []).filter((block) => block.type !== "status");
+  const kept = publish ? "published" : "saved as a draft";
+  push(state, agentId, { id: id(state), type: "text", role: "user", text: publish ? "Publish" : "Save as draft" });
+  push(state, agentId, {
+    id: id(state),
+    type: "text",
+    role: "assistant",
+    text: `${title} is ${kept}. It’s in the products list.`,
+    typed: true,
+  });
+  push(state, agentId, { id: id(state), type: "chips", chips: [{ label: "Open the product", tone: "primary" }] });
 }
 
 const freshActions = new Set<Action["type"]>(["scenario", "reset", "arrival", "boot-active", "logout", "sign-in"]);
@@ -2163,7 +2591,10 @@ function settleWorkspace(prev: PrototypeState, next: PrototypeState, action: Act
     return next;
   }
   if (action.type !== "view" && next.preview !== prev.preview && !sameDesk(prev.preview, next.preview)) {
-    next.view = emptyView();
+    const tab = next.view.tab !== prev.view.tab ? next.view.tab : "";
+    const query = next.view.query !== prev.view.query ? next.view.query : "";
+    const sort = next.view.sort !== prev.view.sort ? next.view.sort : "";
+    next.view = { ...emptyView(), ...(tab ? { tab } : {}), ...(query ? { query } : {}), ...(sort ? { sort } : {}) };
   }
   const samePlace = next.preview === prev.preview && next.selectedAgentId === prev.selectedAgentId;
   const scroll = samePlace ? (live ?? next.view.scroll) : next.view.scroll;

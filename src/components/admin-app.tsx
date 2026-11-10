@@ -7,6 +7,7 @@ import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn } from "@/components/chat-column";
 import { Orb } from "@/components/marks";
 import { OrbAudioProvider } from "@/components/orb-audio";
+import { DesignSystem } from "@/components/design-system";
 import { PreviewColumn } from "@/components/preview-column";
 import { SearchPalette } from "@/components/search-palette";
 import {
@@ -27,8 +28,12 @@ import {
   type Segment,
   type PrototypeState,
 } from "@/lib/prototype";
+import { bundleOf, draftOf, interpret, type ChoiceCard, type DraftSpec } from "@/lib/choices";
 import { segmentsOf, sourcesOf } from "@/lib/turn";
+import type { Chip, Product } from "@/lib/prototype";
 import { emptyWork, readWorkSnapshot, saveWork, subscribeWork } from "@/lib/workspace";
+import { useShellLayout } from "@/hooks/use-shell-layout";
+import { SHELL } from "@/lib/shell-layout";
 
 const bootMs = 1500;
 
@@ -41,7 +46,11 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   const [booting, setBooting] = useState(true);
   const [offline, setOffline] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [agentsDrawerOpen, setAgentsDrawerOpen] = useState(false);
+  const [adminSheetOpen, setAdminSheetOpen] = useState(false);
   const [palette, setPalette] = useState<{ open: boolean; scope?: string }>({ open: false });
+  const [design, setDesign] = useState(false);
+  const layout = useShellLayout();
   // The turn being streamed. Cleared in the same update that commits its reply, so the live view and
   // the committed message swap in one render instead of leaving a blank frame between them.
   const [live, setLive] = useState<{ agentId: string; from: number } | null>(null);
@@ -99,13 +108,6 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   useEffect(() => {
     panelsRef.current = { nav: panels.nav, preview: panels.preview };
   }, [panels.nav, panels.preview]);
-  const [viewport, setViewport] = useState(1440);
-  useEffect(() => {
-    const measure = () => setViewport(document.documentElement.clientWidth);
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
   // The title is introduced where it will sit once both sidebars are in, so the room opens around it and the words never move.
   const [seenStage, setSeenStage] = useState(stage);
   const [settling, setSettling] = useState(false);
@@ -131,7 +133,16 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
       node.classList.add("conversation-settle");
     }
     placed.current = { stage, left: stage ? left : placed.current.left };
-  }, [stage, viewport, state.motion, booting]);
+  }, [stage, layout.width, state.motion, booting]);
+
+  // When the layout band changes, collapse the rail on tight surfaces and clear overlays that no longer apply.
+  const [seenLayoutMode, setSeenLayoutMode] = useState(layout.mode);
+  if (layout.mode !== seenLayoutMode) {
+    setSeenLayoutMode(layout.mode);
+    if (layout.preferNavCollapsed) setSidebarOpen(false);
+    if (layout.agents === "rail") setAgentsDrawerOpen(false);
+    if (layout.admin === "docked") setAdminSheetOpen(false);
+  }
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -140,6 +151,10 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
       if (key === "b") {
         event.preventDefault();
         if (!panelsRef.current.nav) return;
+        if (layout.agents === "drawer") {
+          setAgentsDrawerOpen((open) => !open);
+          return;
+        }
         setSidebarOpen((open) => !open);
       } else if (key === "k") {
         event.preventDefault();
@@ -149,7 +164,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [layout.agents]);
 
   const chat = useChat({
     transport,
@@ -176,6 +191,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     pending.done = true;
     setLive(null);
     const text = replyText(message);
+    const bestSellers = /top products|best[- ]?sellers?|best[- ]?selling/i.test(pending.text);
     const scripted = scriptedEffects(message);
     setOffline(scripted !== null || !text);
     const effects = focusAskedPage(pending.text, scripted ?? effectsFrom(message, applied.current));
@@ -183,7 +199,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     const sources = sourcesOf(message);
     let answer = text;
     setState((current) => {
-      if (!text) {
+      if (!text || bestSellers) {
         const script = scriptedTurn(pending.agentId, pending.text, current.storeName, current.arrival);
         answer = script.text;
         const withScript = reducer(current, { type: "commit", agentId: pending.agentId, text: script.text });
@@ -215,6 +231,134 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   const busy = live !== null;
   const liveAgentId = live?.agentId ?? null;
 
+  const fillTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (fillTimer.current) window.clearTimeout(fillTimer.current);
+    },
+    [],
+  );
+  const confirmChips: Chip[] = [
+    { label: "Save as draft", tone: "primary" },
+    { label: "Publish", tone: "secondary" },
+  ];
+
+  function finishFill(agentId: string, title: string) {
+    setState((prev) =>
+      reducer(prev, {
+        type: "follow-up",
+        agentId,
+        text: `${title} is filled in on the product form. Save it as a draft, or publish it. You can still edit any field.`,
+        chips: confirmChips,
+      }),
+    );
+  }
+
+  function startFill(agentId: string, spec: DraftSpec) {
+    if (fillTimer.current) window.clearTimeout(fillTimer.current);
+    const productId = `choice-${Date.now().toString(36)}`;
+    setState((prev) => reducer(prev, { type: "begin-draft", agentId, productId }));
+    const steps: { label: string; patch?: Partial<Product>; draft?: Record<string, string> }[] = [
+      { label: "Entering the title", patch: { title: spec.title } },
+      { label: "Writing the description", patch: { description: spec.description } },
+      { label: "Setting the price", patch: { price: spec.price } },
+      { label: "Adding the photo", patch: { image: spec.image } },
+      { label: "Adding the default variant", patch: { inventory: "14 in stock" }, draft: { variant: "Default", quantity: "14" } },
+    ];
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      setState((prev) => {
+        let next = prev;
+        for (const step of steps) {
+          next = reducer(next, { type: "status", agentId, label: step.label });
+          if (step.patch) next = reducer(next, { type: "update-product", id: productId, patch: step.patch });
+          if (step.draft && next.selectedAgentId === agentId) next = reducer(next, { type: "view", patch: { draft: step.draft } });
+        }
+        return next;
+      });
+      finishFill(agentId, spec.title);
+      return;
+    }
+    let index = 0;
+    const run = () => {
+      const step = steps[index];
+      setState((prev) => {
+        let next = reducer(prev, { type: "status", agentId, label: step.label });
+        if (step.patch) next = reducer(next, { type: "update-product", id: productId, patch: step.patch });
+        if (step.draft && next.selectedAgentId === agentId) next = reducer(next, { type: "view", patch: { draft: step.draft } });
+        return next;
+      });
+      index += 1;
+      fillTimer.current = window.setTimeout(index < steps.length ? run : () => finishFill(agentId, spec.title), 720);
+    };
+    fillTimer.current = window.setTimeout(run, 420);
+  }
+
+  function placeChoice(agentId: string, card: ChoiceCard) {
+    const draft = draftOf(card);
+    if (draft) {
+      startFill(agentId, draft);
+      return;
+    }
+    if (fillTimer.current) window.clearTimeout(fillTimer.current);
+    setState((prev) => {
+      let next = reducer(prev, { type: "status", agentId, label: card.kind === "segment" ? "Creating the segment" : "Opening it in the admin" });
+      if (card.kind === "segment") {
+        next = reducer(next, { type: "preview", page: "customers", wide: true });
+        next = reducer(next, { type: "view", patch: { draft: { segment: card.title, names: (card.names ?? []).join("|") } } });
+      } else if (card.kind === "order") {
+        next = reducer(next, { type: "preview", page: "orders", wide: true });
+        next = reducer(next, { type: "view", patch: { recordId: card.orderId ?? "", draft: { action: card.action ?? "" } } });
+      } else {
+        next = reducer(next, { type: "preview", page: "online-store", wide: true });
+        next = reducer(next, { type: "view", patch: { draft: { note: card.note ?? card.pitch } } });
+      }
+      return next;
+    });
+    const done =
+      card.kind === "segment"
+        ? `${card.title} is created. The customer list is filtered to it.`
+        : card.kind === "order"
+          ? `${card.action ?? card.title} is ready on the order.`
+          : `Online Store is open. ${card.note ?? card.pitch}`;
+    fillTimer.current = window.setTimeout(() => {
+      setState((prev) => reducer(prev, { type: "follow-up", agentId, text: done }));
+    }, 780);
+  }
+
+  function choose(blockId: string, cardId: string) {
+    const agentId = state.selectedAgentId;
+    const block = (state.threads[agentId] ?? []).find((item) => item.type === "choices" && item.id === blockId);
+    if (!block || block.type !== "choices" || block.settled || block.replaced) return;
+    const card = block.cards.find((item) => item.id === cardId);
+    if (!card) return;
+    if (block.mode === "multi") {
+      dispatch({ type: "select-choice", agentId, blockId, cardId });
+      return;
+    }
+    setState((prev) =>
+      reducer(reducer(prev, { type: "user", agentId, text: card.title }), { type: "select-choice", agentId, blockId, cardId }),
+    );
+    placeChoice(agentId, card);
+  }
+
+  function bundleChoices(blockId: string) {
+    const agentId = state.selectedAgentId;
+    const block = (state.threads[agentId] ?? []).find((item) => item.type === "choices" && item.id === blockId);
+    if (!block || block.type !== "choices" || block.settled) return;
+    const cards = block.cards.filter((card) => block.selected.includes(card.id));
+    if (cards.length < 2) return;
+    const bundled = bundleOf(cards);
+    const last = cards[cards.length - 1];
+    setState((prev) =>
+      reducer(
+        reducer(prev, { type: "user", agentId, text: `Bundle ${cards.map((card) => card.title).join(" and ")}` }),
+        { type: "select-choice", agentId, blockId, cardId: last.id, lock: true },
+      ),
+    );
+    placeChoice(agentId, bundled);
+  }
+
   function send(text: string, target?: string) {
     const current = state;
     if (!target && text.trim() === "Create my own sidekick") {
@@ -223,6 +367,72 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     }
     const agentId = target ?? (current.mode === "add" ? "sidekick" : current.selectedAgentId);
     const thread = current.threads[agentId] ?? [];
+    const intent = interpret(agentId, text, thread);
+    if (intent) {
+      if (intent.kind === "offer") {
+        setState((prev) =>
+          reducer(
+            reducer(prev, { type: "user", agentId, text }),
+            { type: "offer-choices", agentId, intro: intent.intro, title: intent.title, cards: intent.cards, mode: intent.mode, setKey: intent.setKey },
+          ),
+        );
+        return;
+      }
+      if (intent.kind === "pick") {
+        const block = [...thread].reverse().find((item) => item.type === "choices" && !item.replaced);
+        if (block && block.type === "choices") {
+          setState((prev) =>
+            reducer(
+              reducer(prev, { type: "user", agentId, text: intent.card.title }),
+              { type: "select-choice", agentId, blockId: block.id, cardId: intent.card.id },
+            ),
+          );
+          if (block.mode === "single") placeChoice(agentId, intent.card);
+          return;
+        }
+      }
+      if (intent.kind === "arm-multi") {
+        setState((prev) => reducer(reducer(prev, { type: "user", agentId, text }), { type: "arm-multi", agentId }));
+        return;
+      }
+      if (intent.kind === "bundle") {
+        const block = [...thread].reverse().find((item) => item.type === "choices" && !item.replaced);
+        if (block && block.type === "choices") {
+          const bundled = bundleOf(intent.cards);
+          setState((prev) =>
+            reducer(
+              reducer(prev, { type: "user", agentId, text: `Bundle ${intent.cards.map((card) => card.title).join(" and ")}` }),
+              { type: "select-choice", agentId, blockId: block.id, cardId: intent.cards[intent.cards.length - 1].id, lock: true },
+            ),
+          );
+          placeChoice(agentId, bundled);
+          return;
+        }
+      }
+      if (intent.kind === "regen") {
+        const open = [...thread].reverse().find((item) => item.type === "choices" && !item.replaced);
+        const seed = agentId === "customers" ? "who should i group" : agentId === "orders" ? "which order needs me" : agentId === "store" ? "show me theme ideas" : "what else could we sell";
+        const again = interpret(agentId, seed, open?.type === "choices" ? [open] : []);
+        const offer = again?.kind === "offer" ? again : null;
+        if (offer && offer.kind === "offer") {
+          setState((prev) =>
+            reducer(
+              reducer(prev, { type: "user", agentId, text }),
+              { type: "offer-choices", agentId, intro: "Here’s a different set.", title: offer.title, cards: offer.cards, mode: offer.mode, setKey: offer.setKey },
+            ),
+          );
+          return;
+        }
+      }
+      if (intent.kind === "confirm") {
+        dispatch({ type: "confirm-product", publish: intent.publish });
+        return;
+      }
+      if (intent.kind === "cancel") {
+        setState((prev) => reducer(reducer(prev, { type: "user", agentId, text }), { type: "cancel-draft", agentId }));
+        return;
+      }
+    }
     const transcript = thread.flatMap((block) => (block.type === "text" ? [{ role: block.role, content: block.text }] : []));
     const first = !thread.some((block) => block.type === "text" && block.role === "user");
     turn.current = { agentId, text, done: false, first };
@@ -271,31 +481,81 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     );
   }
 
+  const agentsDrawer = layout.agents === "drawer";
+  const adminSheet = layout.admin === "sheet";
+  const showAgentRail = panels.nav && !agentsDrawer;
+  const navOpen = sidebarOpen;
+  const agentsDrawerVisible = agentsDrawer && agentsDrawerOpen;
+  const adminSheetVisible = adminSheet && adminSheetOpen;
+  const dockedAdminWidth =
+    layout.allowAdminWide && state.previewWide ? SHELL.adminWide : Math.min(layout.adminWidth, SHELL.adminNarrow);
+
   return (
     <OrbAudioProvider>
     <div
       data-shell={stage ? "conversation" : settling ? "reveal" : "workspace"}
-      className="fade-in p-partial-theme-admin-next-dark relative flex h-dvh min-w-[1180px] gap-1 bg-[#0c0d0c] p-1 text-white"
+      data-layout={layout.mode}
+      className={`fade-in p-partial-theme-admin-next-dark relative flex h-dvh gap-1 bg-[#0c0d0c] text-white ${
+        layout.mode === "mobile" ? "p-0" : "p-1"
+      }`}
     >
-        <AgentNav
-          present={panels.nav}
-          state={state}
-          navOpen={sidebarOpen}
-          onToggleNav={() => setSidebarOpen((open) => !open)}
-          onSettings={() => dispatch({ type: "rail", id: "settings" })}
-          onLogout={logout}
-          onSelect={(id) => dispatch({ type: "select", id })}
-          onAdd={() => dispatch({ type: "toggle-add" })}
-          onSearch={() => dispatch({ type: "toggle-search" })}
-          onQuery={(query) => dispatch({ type: "search", query })}
-          onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
-          onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
-          onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
-        />
+      {design ? (
+        <DesignSystem onBack={() => setDesign(false)} />
+      ) : (
+      <>
+        {showAgentRail ? (
+          <AgentNav
+            present={panels.nav}
+            state={state}
+            presentation="rail"
+            navOpen={navOpen}
+            onToggleNav={() => setSidebarOpen((open) => !open)}
+            onSettings={() => dispatch({ type: "rail", id: "settings" })}
+            onLogout={logout}
+            onSelect={(id) => dispatch({ type: "select", id })}
+            onAdd={() => dispatch({ type: "toggle-add" })}
+            onSearch={() => dispatch({ type: "toggle-search" })}
+            onQuery={(query) => dispatch({ type: "search", query })}
+            onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
+            onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
+            onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
+            onDesignSystem={() => setDesign(true)}
+          />
+        ) : null}
+        {agentsDrawer ? (
+          <AgentNav
+            present
+            state={state}
+            presentation="drawer"
+            drawerOpen={agentsDrawerVisible}
+            onCloseDrawer={() => setAgentsDrawerOpen(false)}
+            navOpen
+            onToggleNav={() => setAgentsDrawerOpen(false)}
+            onSettings={() => {
+              setAgentsDrawerOpen(false);
+              dispatch({ type: "rail", id: "settings" });
+            }}
+            onLogout={logout}
+            onSelect={(id) => dispatch({ type: "select", id })}
+            onAdd={() => {
+              setAgentsDrawerOpen(false);
+              dispatch({ type: "toggle-add" });
+            }}
+            onSearch={() => dispatch({ type: "toggle-search" })}
+            onQuery={(query) => dispatch({ type: "search", query })}
+            onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
+            onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
+            onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
+            onDesignSystem={() => {
+              setAgentsDrawerOpen(false);
+              setDesign(true);
+            }}
+          />
+        ) : null}
         <div
           aria-hidden
           className="rail-reveal my-3 shrink-0 bg-white/10"
-          style={{ width: 1, opacity: panels.nav ? 1 : 0 }}
+          style={{ width: showAgentRail && panels.nav ? 1 : 0, opacity: showAgentRail && panels.nav ? 1 : 0 }}
         />
         <div ref={chatRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
         <ChatColumn
@@ -303,6 +563,11 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
           liveSegments={liveAgentId === agent.id ? liveSegments : null}
           offline={offline}
           busy={busy && liveAgentId === agent.id}
+          chrome={layout.chatChrome}
+          showAdminButton={adminSheet && panels.preview}
+          adminOpen={adminSheetVisible}
+          onOpenAgents={agentsDrawer ? () => setAgentsDrawerOpen(true) : undefined}
+          onOpenAdmin={adminSheet && panels.preview ? () => setAdminSheetOpen((open) => !open) : undefined}
           onSwitch={(id) => dispatch({ type: "select", id })}
           onAddAgent={() => dispatch({ type: "toggle-add" })}
           locked={busy}
@@ -321,12 +586,21 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
           onRate={(id, value) => dispatch({ type: "rate", id, value })}
           onIntroduced={() => setRoom(true)}
           onIntroFinished={() => dispatch({ type: "intro-seen" })}
+          onChoose={choose}
+          onBundle={bundleChoices}
         />
         </div>
       <PreviewColumn
         present={panels.preview}
+        presentation={adminSheet ? "sheet" : "docked"}
+        sheetOpen={adminSheetVisible}
+        sheetEdge={layout.adminSheetEdge}
+        dockWidth={dockedAdminWidth}
+        onCloseSheet={() => setAdminSheetOpen(false)}
         state={state}
-        onPreview={(page, wide) => dispatch({ type: "preview", page, wide })}
+        onPreview={(page, wide) =>
+          dispatch({ type: "preview", page, wide: Boolean(wide) && layout.allowAdminWide })
+        }
         onView={(patch) => dispatch({ type: "view", patch })}
         onChip={(label) => dispatch({ type: "chip", label })}
         onCard={(id) => {
@@ -361,6 +635,8 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         />
       ) : null}
       <span className="sr-only">{agent.name}</span>
+      </>
+      )}
     </div>
     </OrbAudioProvider>
   );

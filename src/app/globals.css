@@ -113,6 +113,106 @@ body {
   animation: page-in 320ms var(--ease-emphasized);
 }
 
+/* Section titles: the parent word shrinks upward and the next title takes its place. */
+html.vt-titles::view-transition-group(*) {
+  animation-duration: 560ms;
+  animation-timing-function: cubic-bezier(0.2, 0.75, 0.2, 1);
+}
+
+html.vt-titles::view-transition-old(*),
+html.vt-titles::view-transition-new(*) {
+  mix-blend-mode: normal;
+}
+
+html.vt-titles::view-transition-group(root),
+html.vt-titles::view-transition-old(root),
+html.vt-titles::view-transition-new(root) {
+  animation: none;
+}
+
+html.vt-titles::view-transition-group(.title-word),
+html.vt-titles::view-transition-group(section-actions) {
+  z-index: 1;
+}
+
+html.vt-titles::view-transition-old(admin-body) {
+  animation: none;
+  opacity: 0;
+}
+
+html.vt-titles::view-transition-new(admin-body) {
+  animation: none;
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+  overflow: clip;
+}
+
+html.vt-titles::view-transition-old(section-actions),
+html.vt-titles::view-transition-new(section-actions) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right center;
+  animation-duration: 160ms;
+}
+
+html.vt-titles::view-transition-old(.title-word),
+html.vt-titles::view-transition-new(.title-word) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: left center;
+  mix-blend-mode: normal;
+}
+
+/* The engine also runs a plus-lighter blend. Keeping only the fade leaves the shrinking word crisp. */
+html.vt-titles::view-transition-old(.title-word) {
+  animation-name: -ua-view-transition-fade-out;
+}
+
+html.vt-titles::view-transition-new(.title-word) {
+  animation-name: -ua-view-transition-fade-in;
+}
+
+html.vt-titles::view-transition-new(*):only-child {
+  animation: title-grow 560ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+}
+
+html.vt-titles::view-transition-old(*):only-child {
+  animation: title-leave 560ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+}
+
+@keyframes title-grow {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes title-leave {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.86);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.vt-titles::view-transition-group(*),
+  html.vt-titles::view-transition-new(*):only-child,
+  html.vt-titles::view-transition-old(*):only-child {
+    animation: none;
+  }
+}
+
 /* iOS-style sheet: the page behind settles back, and the next level rises over it. */
 .sheet-recede {
   transform-origin: top center;
@@ -368,6 +468,12 @@ body {
   animation: choice-in 640ms var(--ease-emphasized) both;
 }
 
+.choice-block {
+  display: block;
+  width: 100%;
+  animation: choice-in 640ms var(--ease-emphasized) both;
+}
+
 .nav-settle {
   transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
 }
@@ -379,6 +485,69 @@ body {
 
 .panel-settle {
   transition: width 300ms cubic-bezier(0.2, 0.8, 0, 1), opacity 200ms ease;
+}
+
+/* Responsive shell overlays — agents drawer + admin sheet */
+.shell-scrim {
+  animation: shell-scrim-in 180ms ease both;
+}
+
+.shell-agents-drawer {
+  animation: shell-drawer-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.shell-admin-sheet-bottom {
+  animation: shell-sheet-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.shell-admin-sheet-end {
+  animation: shell-sheet-end 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes shell-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shell-drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes shell-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes shell-sheet-end {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-scrim,
+  .shell-agents-drawer,
+  .shell-admin-sheet-bottom,
+  .shell-admin-sheet-end {
+    animation: none;
+  }
 }
 
 .panel-reveal {
@@ -462,6 +631,7 @@ body {
   .intro-rest,
   .stage-in,
   .choice-in,
+  .choice-block,
   .shimmer-text {
     animation: none;
   }
@@ -621,6 +791,11 @@ body {
     background: transparent;
   }
 
+  /* Orbit draws glow past the avatar circle — don't clip it. */
+  .orb.voice-slot-glow {
+    overflow: visible;
+  }
+
   .voice-orb-fit {
     position: absolute;
     top: 0;
@@ -631,6 +806,12 @@ body {
     transform: scale(var(--fit));
     transform-origin: top left;
     pointer-events: none;
+    background: transparent;
+  }
+
+  .voice-orb-fit canvas,
+  .voice-orb canvas {
+    background-color: transparent !important;
   }
 
 }

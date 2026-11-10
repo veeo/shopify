@@ -17,6 +17,7 @@ import {
 } from '@/voiceorbs/lib/orb-state';
 import { mixHex, mixRgb, rgbToHex, shadeHex, tintHex, type Rgb } from '@/voiceorbs/lib/orb-color';
 import { useOrbAnimator, type OrbFrame } from '@/voiceorbs/lib/use-orb-animator';
+import { useOnScreen } from '@/voiceorbs/lib/use-in-view';
 import { useReducedMotion } from '@/voiceorbs/lib/use-reduced-motion';
 import { useWebGLSupport } from '@/voiceorbs/lib/use-webgl-support';
 
@@ -32,7 +33,9 @@ interface PaperHost {
 }
 
 const GL_ATTRIBUTES: WebGLContextAttributes = {
+  alpha: true,
   antialias: false,
+  premultipliedAlpha: true,
   powerPreference: 'low-power',
 };
 
@@ -57,9 +60,9 @@ type MercuryTune = {
 };
 
 const TUNE: Record<OrbState, MercuryTune> = {
-  idle: { flow: 0.32, repetition: 2.4, distortion: 0.08, contour: 0.42, softness: 0.26, outer: 0.08, inner: 0.15, beat: 0, beatRate: 0.3, error: 0 },
-  hover: { flow: 0.5, repetition: 2.5, distortion: 0.16, contour: 0.5, softness: 0.2, outer: 0.12, inner: 0.3, beat: 0, beatRate: 0.3, error: 0 },
-  selected: { flow: 0.4, repetition: 2.45, distortion: 0.12, contour: 0.46, softness: 0.22, outer: 0.1, inner: 0.2, beat: 0, beatRate: 0.3, error: 0 },
+  idle: { flow: 0.5, repetition: 2.4, distortion: 0.08, contour: 0.42, softness: 0.26, outer: 0.08, inner: 0.15, beat: 0, beatRate: 0.3, error: 0 },
+  hover: { flow: 0.5, repetition: 2.4, distortion: 0.08, contour: 0.42, softness: 0.26, outer: 0.08, inner: 0.15, beat: 0, beatRate: 0.3, error: 0 },
+  selected: { flow: 0.5, repetition: 2.4, distortion: 0.08, contour: 0.42, softness: 0.26, outer: 0.08, inner: 0.15, beat: 0, beatRate: 0.3, error: 0 },
   connecting: { flow: 0.4, repetition: 2.2, distortion: 0.1, contour: 0.36, softness: 0.3, outer: 0.1, inner: 0.1, beat: 0.6, beatRate: 0.28, error: 0 },
   listening: { flow: 0.9, repetition: 2.7, distortion: 0.18, contour: 0.55, softness: 0.12, outer: 0.14, inner: 0.95, beat: 0, beatRate: 0.3, error: 0 },
   thinking: { flow: 0.6, repetition: 3, distortion: 0.22, contour: 0.55, softness: 0.22, outer: 0.08, inner: 0.35, beat: 0.45, beatRate: 0.5, error: 0 },
@@ -99,7 +102,15 @@ export const MercuryOrb = ({
   const clockRef = useRef({ phase: 0, shader: 0, beat: 0, repetition: TUNE[state].repetition, colors: '' });
   const reduced = useReducedMotion();
   const webgl = useWebGLSupport();
-  const showShader = webgl === true;
+  const screen = useOnScreen();
+  const onScreen = screen.on;
+  const showShader = webgl === true && onScreen;
+  const [revealed, setRevealed] = useState(false);
+  const [revealKey, setRevealKey] = useState(showShader);
+  if (revealKey !== showShader) {
+    setRevealKey(showShader);
+    setRevealed(false);
+  }
   const [seed] = useState(() => {
     const tune = TUNE[state];
     const colors = liveColors(colorFrom, colorTo, tune.error);
@@ -108,6 +119,7 @@ export const MercuryOrb = ({
 
   const setRootRef = (node: HTMLDivElement | null) => {
     rootRef.current = node;
+    screen.ref(node);
     if (typeof ref === 'function') {
       ref(node);
     } else if (ref) {
@@ -164,6 +176,18 @@ export const MercuryOrb = ({
   useOrbAnimator(rootRef, { state, levelRef, speed, onFrame });
 
   useEffect(() => {
+    if (!showShader) return;
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => setRevealed(true));
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, [showShader]);
+
+  useEffect(() => {
     if (state !== 'error' || reduced) return;
     const el = sphereRef.current;
     if (!el) return;
@@ -208,7 +232,6 @@ export const MercuryOrb = ({
         borderRadius: '50%',
         opacity: state === 'disabled' ? 0.5 : 1,
         filter: state === 'disabled' ? 'grayscale(0.85)' : 'grayscale(0)',
-        scale: 'calc(1 + var(--orb-outer, 0) * 0.02)',
         transition: 'opacity 0.6s ease-out, filter 0.6s ease-out',
       }}
     >
@@ -233,6 +256,7 @@ export const MercuryOrb = ({
         }}
       >
         {showShader ? (
+          <div style={{ position: 'absolute', inset: 0, opacity: revealed ? 1 : 0, background: 'transparent' }}>
           <LiquidMetal
             ref={bindShader}
             width={size}
@@ -254,6 +278,7 @@ export const MercuryOrb = ({
             maxPixelCount={size * size * MAX_PIXEL_RATIO * MAX_PIXEL_RATIO}
             webGlContextAttributes={GL_ATTRIBUTES}
           />
+          </div>
         ) : (
           <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: '50%' }}>
             {fallbackLayers.map((layer) => (

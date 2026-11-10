@@ -2,18 +2,21 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChipButton, Orb } from "@/components/marks";
+import { ChipButton, Orb, ShopifyMark } from "@/components/marks";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Markdown } from "@/components/markdown";
+import { ArtifactRow, ChoiceCards } from "@/components/choice-cards";
 import { useOrbAudioPublish } from "@/components/orb-audio";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { pageMeta } from "@/lib/admin-nav";
 import {
   canonicalOrb,
   catalog,
+  colorCombosFor,
   exemptAvatarAgents,
+  isListedSidekick,
+  isNavSidekick,
   isVoiceOrb,
-  orbColorPresets,
   paymentSteps,
   purposes,
   sellers,
@@ -41,6 +44,11 @@ export function ChatColumn({
   busy,
   locked,
   offline,
+  chrome = "desktop",
+  showAdminButton = false,
+  adminOpen = false,
+  onOpenAgents,
+  onOpenAdmin,
   onChip,
   onSend,
   onStop,
@@ -58,12 +66,20 @@ export function ChatColumn({
   onAddAgent,
   onIntroduced,
   onIntroFinished,
+  onChoose,
+  onBundle,
 }: {
   state: PrototypeState;
   liveSegments: LiveSegment[] | null;
   busy: boolean;
   locked: boolean;
   offline: boolean;
+  /** Desktop keeps the classic header; compact/mobile add logo + admin affordances. */
+  chrome?: "desktop" | "compact" | "mobile";
+  showAdminButton?: boolean;
+  adminOpen?: boolean;
+  onOpenAgents?: () => void;
+  onOpenAdmin?: () => void;
   onChip: (label: string) => void;
   onSend: (text: string) => void;
   onStop: () => void;
@@ -81,6 +97,8 @@ export function ChatColumn({
   onAddAgent: () => void;
   onIntroduced?: () => void;
   onIntroFinished?: () => void;
+  onChoose: (blockId: string, cardId: string) => void;
+  onBundle: (blockId: string) => void;
 }) {
   const agent = selectedAgent(state);
   const purpose = state.selectedAgentId === "chief" && state.chiefPhase === "purpose" && state.mode === "thread";
@@ -125,11 +143,30 @@ export function ChatColumn({
     if (node.scrollHeight - node.scrollTop - node.clientHeight < 240) node.scrollTop = node.scrollHeight;
   }, [thread.length, liveLength, busy]);
 
+  const mobileChrome = chrome === "mobile";
+  const tightChrome = chrome !== "desktop";
+
   return (
-    <section data-opening={stage ? beat : "workspace"} className="relative flex min-h-0 min-w-0 flex-1 flex-col px-8 pb-3 pt-7">
+    <section
+      data-opening={stage ? beat : "workspace"}
+      data-chat-chrome={chrome}
+      className={`relative flex min-h-0 min-w-0 flex-1 flex-col pb-3 ${
+        mobileChrome ? "px-4 pt-[max(1rem,env(safe-area-inset-top))]" : tightChrome ? "px-5 pt-6" : "px-8 pt-7"
+      }`}
+    >
       <div className="flex min-h-0 flex-1 flex-col">
-          <header className="relative mb-6 flex items-start justify-between gap-4">
-            <h1 className="min-w-0 flex-1 text-[25px] font-medium leading-8 tracking-[-0.75px]">
+          <header className={`relative mb-5 flex items-start gap-3 ${tightChrome ? "justify-between" : "justify-between gap-4"}`}>
+            {mobileChrome && onOpenAgents ? (
+              <button
+                type="button"
+                aria-label="Open sidekicks"
+                onClick={onOpenAgents}
+                className="press mt-0.5 grid size-8 shrink-0 place-items-center rounded-full hover:bg-white/[0.08]"
+              >
+                <ShopifyMark />
+              </button>
+            ) : null}
+            <h1 className={`min-w-0 flex-1 font-medium tracking-[-0.75px] ${mobileChrome ? "text-[22px] leading-7" : "text-[25px] leading-8"}`}>
               {writing ? (
                 <TitleIntro
                   motion={state.motion}
@@ -161,6 +198,19 @@ export function ChatColumn({
                 </span>
               )}
             </h1>
+            {showAdminButton && onOpenAdmin ? (
+              <button
+                type="button"
+                aria-label={adminOpen ? "Close admin" : "Open admin"}
+                aria-pressed={adminOpen}
+                onClick={onOpenAdmin}
+                className={`press mt-0.5 grid size-8 shrink-0 place-items-center rounded-full transition-colors hover:bg-white/[0.08] ${
+                  adminOpen ? "bg-white/[0.1]" : ""
+                }`}
+              >
+                <PIcon name="LayoutSidebarRight" size={18} />
+              </button>
+            ) : null}
             {listing ? (
               <ChatsMenu
                 agentName={agent.name}
@@ -196,7 +246,7 @@ export function ChatColumn({
             className={`${state.motion && !stage ? "page-in" : ""} scroll-thin min-h-0 flex-1 overflow-y-auto pb-4`}
           >
             {state.mode === "add" ? (
-              <AddGrid onAdd={onAddCatalog} onChip={onChip} />
+              <AddGrid onAdd={onAddCatalog} onCreate={onCreate} />
             ) : state.mode === "create" ? (
               <CreateForm onCreate={onCreate} onBack={() => onChip("Browse sidekicks")} />
             ) : purpose ? (
@@ -226,6 +276,8 @@ export function ChatColumn({
                         if (!locked) onSend(text);
                       }}
                       onCreate={onCreate}
+                      onChoose={onChoose}
+                      onBundle={onBundle}
                     />
                   ),
                 )}
@@ -631,7 +683,7 @@ const pageSuggestions: Record<string, string[]> = {
 
 export function suggestionsFor(state: PrototypeState) {
   if (state.mode === "create") return [];
-  if (state.mode === "add") return ["Tell me more about creating a sidekick", "Which sidekick should I add first?", "Create my own sidekick", "What can sidekicks do?"];
+  if (state.mode === "add") return ["Which sidekick should I add first?", "What can sidekicks do?"];
   if (sidekickStage(state)) return [];
   if (state.lookbook && !state.theme) return [];
   if (state.theme) return ["I have something to sell", "Write a headline for the homepage", "Change the colors", "What should we do next?"];
@@ -703,7 +755,6 @@ export function Composer({
   const fileInput = useRef<HTMLInputElement>(null);
   const recognition = useRef<SpeechRecognitionLike | null>(null);
   const recording = useRef<Recording | null>(null);
-  const meter = useRef<HTMLSpanElement>(null);
   const base = useRef("");
   const heard = useRef("");
   const showSuggestions = focused && !draft.trim() && !busy && !plusOpen && !switchOpen;
@@ -723,21 +774,9 @@ export function Composer({
   const avatarAgent = state.mode === "add" || state.mode === "create" ? (state.agents.find((item) => item.id === "sidekick") ?? agent) : agent;
   useOrbAudioPublish(
     liveAgentId,
-    voiceOpen ? null : listening ? "listening" : transcribing || busy ? "thinking" : null,
+    voiceOpen ? null : listening ? "listening" : transcribing || busy || state.workingAgentId === liveAgentId ? "thinking" : null,
     () => (listening ? (recording.current?.level() ?? 0) : 0),
   );
-
-  useEffect(() => {
-    if (!listening) return;
-    let frame = 0;
-    const draw = () => {
-      const level = recording.current?.level() ?? 0;
-      meter.current?.style.setProperty("--level", level.toFixed(3));
-      frame = requestAnimationFrame(draw);
-    };
-    frame = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(frame);
-  }, [listening]);
 
   function submit(text = draft) {
     const value = text.trim();
@@ -924,18 +963,7 @@ export function Composer({
           ) : (
             <Orb id={agent.orb} agentId={agent.id} size={ORB_SIZE.composer} presence="selected" colorFrom={agent.orbFrom} colorTo={agent.orbTo} />
           )}
-          {listening ? (
-            <span ref={meter} className="ml-1.5 flex h-5 items-center gap-[3px] text-[12px] text-[#8e8f8b]" style={{ "--level": 0 } as React.CSSProperties}>
-              {[0.5, 0.85, 1, 0.7, 0.45].map((weight, index) => (
-                <span
-                  key={index}
-                  className="w-[3px] rounded-full bg-[#ff6d5e] transition-[height] duration-75"
-                  style={{ height: `calc(4px + var(--level) * ${Math.round(weight * 16)}px)` }}
-                />
-              ))}
-              <span className="ml-1.5">Listening</span>
-            </span>
-          ) : transcribing ? (
+          {transcribing ? (
             <span className="ml-1.5 flex items-center gap-1.5 text-[12px] text-[#8e8f8b]">
               <Spinner />
               <span className="shimmer-text">Transcribing</span>
@@ -1126,7 +1154,7 @@ function SidekickSwitcher({
   onPick: (id: string) => void;
   onAdd?: () => void;
 }) {
-  const agents = state.agents.filter((item) => item.installed);
+  const agents = state.agents.filter((item) => item.installed && isNavSidekick(item.id));
   return (
     <Popover id="sidekick-switcher" onDismiss={onDismiss} className="bottom-[calc(100%+8px)] left-0 w-64 origin-bottom-left p-1.5">
       <p className="px-2 pb-1 pt-1.5 text-[12px] text-[#8e8f8b]">Switch sidekick</p>
@@ -1183,7 +1211,7 @@ function PlusMenu({
 }) {
   const [sub, setSub] = useState<"mention" | "skills" | "apps" | null>(null);
   const [generate, setGenerate] = useState(true);
-  const agents = state.agents.filter((item) => item.installed);
+  const agents = state.agents.filter((item) => item.installed && isNavSidekick(item.id));
   const row = `flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left ${light ? "text-[12px] text-[#303030] hover:bg-[#f1f1f1]" : "text-[13px] text-white hover:bg-white/[0.07]"}`;
   const divider = `my-1 h-px ${light ? "bg-[#ebebeb]" : "bg-white/10"}`;
 
@@ -1498,10 +1526,23 @@ function Popover({
   );
 }
 
-function avatarChoices(agent: Agent): { id: OrbId; label: string }[] {
-  if (exemptAvatarAgents.has(agent.id)) return [{ id: agent.orb, label: agent.name }];
-  if (agent.group === "tools") return [{ id: "aura", label: voiceOrbLabel.aura }];
-  return voiceOrbIds.filter((id) => id !== "aura").map((id) => ({ id, label: voiceOrbLabel[id] }));
+/** Recommended orb first, then every voice style. Branded marks stay available for teams and channels. */
+function orbChoices(agent: Agent): { id: OrbId; label: string }[] {
+  const seen = new Set<string>();
+  const choices: { id: OrbId; label: string }[] = [];
+  const push = (id: OrbId, label: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    choices.push({ id, label });
+  };
+  if (exemptAvatarAgents.has(agent.id)) {
+    push(agent.id as OrbId, agent.name);
+  } else {
+    const recommended = canonicalOrb(agent.orb);
+    push(recommended, isVoiceOrb(recommended) ? voiceOrbLabel[recommended] : agent.name);
+  }
+  for (const id of voiceOrbIds) push(id, voiceOrbLabel[id]);
+  return choices;
 }
 
 function EditSidekick({
@@ -1516,11 +1557,12 @@ function EditSidekick({
   const [name, setName] = useState(agent.name);
   const [purpose, setPurpose] = useState(agent.purpose);
   const [orb, setOrb] = useState<OrbId>(canonicalOrb(agent.orb));
-  const starting = isVoiceOrb(canonicalOrb(agent.orb)) ? voiceOrbTint[canonicalOrb(agent.orb) as keyof typeof voiceOrbTint] : voiceOrbTint.plasma;
+  const initialOrb = canonicalOrb(agent.orb);
+  const starting = isVoiceOrb(initialOrb) ? voiceOrbTint[initialOrb] : voiceOrbTint.plasma;
   const [colorFrom, setColorFrom] = useState(agent.orbFrom ?? starting.from);
   const [colorTo, setColorTo] = useState(agent.orbTo ?? starting.to);
-  const [connections, setConnections] = useState(agent.connections);
   const voice = isVoiceOrb(orb);
+  const combos = voice ? colorCombosFor(orb) : [];
   const field = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white outline-none placeholder:text-[#8e8f8b] focus:border-white/30";
   return createPortal(
     <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" role="presentation" onMouseDown={onClose}>
@@ -1531,7 +1573,7 @@ function EditSidekick({
         onMouseDown={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
-          onSave({ name, purpose, orb, connections, ...(voice ? { orbFrom: colorFrom, orbTo: colorTo } : {}) });
+          onSave({ name, purpose, orb, connections: agent.connections, ...(voice ? { orbFrom: colorFrom, orbTo: colorTo } : {}) });
         }}
       >
         <div className="flex items-center justify-between gap-3">
@@ -1543,11 +1585,11 @@ function EditSidekick({
           </button>
         </div>
         <fieldset>
-          <legend className="mb-2 text-[12px] text-[#8e8f8b]">Avatar</legend>
+          <legend className="mb-2 text-[12px] text-[#8e8f8b]">Orb</legend>
           <div className="flex flex-wrap gap-2">
-            {avatarChoices(agent).map((choice) => (
+            {orbChoices(agent).map((choice) => (
               <button
-                key={choice.id}
+                key={`${choice.id}-${choice.label}`}
                 type="button"
                 aria-label={choice.label}
                 aria-pressed={orb === choice.id}
@@ -1555,9 +1597,8 @@ function EditSidekick({
                   if (choice.id === orb) return;
                   setOrb(choice.id);
                   if (isVoiceOrb(choice.id)) {
-                    const tint = voiceOrbTint[choice.id];
-                    setColorFrom(tint.from);
-                    setColorTo(tint.to);
+                    setColorFrom(voiceOrbTint[choice.id].from);
+                    setColorTo(voiceOrbTint[choice.id].to);
                   }
                 }}
                 className={`press rounded-full ${orb === choice.id ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-80 hover:opacity-100"}`}
@@ -1576,46 +1617,24 @@ function EditSidekick({
         {voice ? (
           <fieldset>
             <legend className="mb-2 text-[12px] text-[#8e8f8b]">Color</legend>
-            <div className="flex flex-wrap gap-2">
-              {orbColorPresets.map((preset) => {
-                const selected = colorFrom.toLowerCase() === preset.from && colorTo.toLowerCase() === preset.to;
+            <div className="flex flex-wrap items-center gap-2">
+              {combos.map((combo) => {
+                const selected = colorFrom.toLowerCase() === combo.from.toLowerCase() && colorTo.toLowerCase() === combo.to.toLowerCase();
                 return (
                   <button
-                    key={preset.name}
+                    key={combo.name}
                     type="button"
-                    aria-label={preset.name}
+                    aria-label={combo.name}
                     aria-pressed={selected}
                     onClick={() => {
-                      setColorFrom(preset.from);
-                      setColorTo(preset.to);
+                      setColorFrom(combo.from);
+                      setColorTo(combo.to);
                     }}
-                    className={`size-7 rounded-full ${selected ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : ""}`}
-                    style={{ background: `linear-gradient(135deg, ${preset.from}, ${preset.to})` }}
+                    className={`press size-7 rounded-full ${selected ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-90 hover:opacity-100"}`}
+                    style={{ background: `linear-gradient(135deg, ${combo.from}, ${combo.to})` }}
                   />
                 );
               })}
-            </div>
-            <div className="mt-3 flex gap-3">
-              <label className="flex items-center gap-2 text-[12px] text-[#8e8f8b]">
-                From
-                <input
-                  type="color"
-                  aria-label="Color from"
-                  value={colorFrom}
-                  onChange={(event) => setColorFrom(event.target.value)}
-                  className="h-7 w-9 cursor-pointer rounded-md border border-white/15 bg-transparent p-0.5"
-                />
-              </label>
-              <label className="flex items-center gap-2 text-[12px] text-[#8e8f8b]">
-                To
-                <input
-                  type="color"
-                  aria-label="Color to"
-                  value={colorTo}
-                  onChange={(event) => setColorTo(event.target.value)}
-                  className="h-7 w-9 cursor-pointer rounded-md border border-white/15 bg-transparent p-0.5"
-                />
-              </label>
             </div>
           </fieldset>
         ) : null}
@@ -1627,29 +1646,6 @@ function EditSidekick({
           Purpose
           <textarea value={purpose} rows={3} onChange={(event) => setPurpose(event.target.value)} className={`${field} resize-none leading-5`} />
         </label>
-        <fieldset>
-          <legend className="mb-1 text-[12px] text-[#8e8f8b]">Connections</legend>
-          <ul className="flex flex-col">
-            {connections.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 border-t border-white/10 py-2 first:border-t-0">
-                <span className="text-[13px]">{item.label}</span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={item.on}
-                  aria-label={`${item.label} ${item.on ? "on" : "off"}`}
-                  onClick={() => setConnections((list) => list.map((entry) => (entry.id === item.id ? { ...entry, on: !entry.on } : entry)))}
-                  className={`relative h-5 w-9 shrink-0 rounded-full ${item.on ? "bg-[#5631f4]" : "bg-white/15"}`}
-                >
-                  <span
-                    className="absolute top-0.5 size-4 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
-                    style={{ left: item.on ? 18 : 2, transition: "left 160ms ease" }}
-                  />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </fieldset>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="press rounded-full px-3 py-1.5 text-[13px] text-[#c4c4c4] hover:bg-white/10 hover:text-white">
             Cancel
@@ -1681,6 +1677,8 @@ function BlockView({
   onChip,
   onAsk,
   onCreate,
+  onChoose,
+  onBundle,
 }: {
   block: Block;
   answer: boolean;
@@ -1690,6 +1688,8 @@ function BlockView({
   onChip: (label: string) => void;
   onAsk: (text: string) => void;
   onCreate: (name: string, purpose: string) => void;
+  onChoose: (blockId: string, cardId: string) => void;
+  onBundle: (blockId: string) => void;
 }) {
   if (block.type === "text" && block.role === "user") {
     return (
@@ -1701,6 +1701,29 @@ function BlockView({
     );
   }
   if (block.type === "text") return <AssistantText block={block} answer={answer} rating={rating} onRate={onRate} />;
+  if (block.type === "status") {
+    return (
+      <p role="status" aria-live="polite" className="rise flex items-center gap-2 py-1 text-[13px] text-[#c6c6c6]">
+        <span className="size-1.5 animate-pulse rounded-full bg-white motion-reduce:animate-none" />
+        {block.label}
+      </p>
+    );
+  }
+  if (block.type === "choices") {
+    return (
+      <ChoiceCards
+        title={block.title}
+        cards={block.cards}
+        selected={block.selected}
+        mode={block.mode}
+        settled={block.settled}
+        replaced={block.replaced}
+        onPick={(cardId) => onChoose(block.id, cardId)}
+        onBundle={() => onBundle(block.id)}
+        onDifferent={() => onAsk("Show me different options")}
+      />
+    );
+  }
   if (block.type === "chips") {
     const opening = block.id === "arrive-chips";
     return (
@@ -1757,16 +1780,78 @@ function BlockView({
           </p>
         </div>
         {sellers.map((item) => (
-          <div key={item.title} className="flex items-center gap-4">
-            <img src={item.image} alt="" className="size-24 rounded-2xl object-cover shadow-[inset_0_0_4px_rgba(255,255,255,0.2)]" />
-            <div>
-              <p className="text-[15px] text-[#8e8f8b]">
-                {item.title} · {item.meta}
-              </p>
-              <p className="mt-1 text-[15px] leading-[1.4]">{item.advice}</p>
-            </div>
+          <div key={item.title} className="flex flex-wrap items-center gap-3">
+            <ArtifactRow image={item.image} title={item.title} meta={item.meta} body={item.advice} />
           </div>
         ))}
+      </div>
+    );
+  }
+  if (block.type === "briefing") {
+    return (
+      <div className="rise my-2 max-w-[560px] overflow-hidden rounded-[20px] border border-white/10 bg-[#171817]">
+        {block.title || block.subtitle ? (
+          <div className="border-b border-white/10 px-4 py-3">
+            {block.title ? (
+              <p className="text-[13px] font-medium tracking-[-0.13px] text-white">{block.title}</p>
+            ) : null}
+            {block.subtitle ? (
+              <p className="mt-0.5 text-[12px] leading-[1.35] tracking-[-0.12px] text-[#8e8f8b]">{block.subtitle}</p>
+            ) : null}
+          </div>
+        ) : null}
+        <ul className="flex flex-col">
+          {block.items.map((item, index) => {
+            const agent = catalog.find((entry) => entry.id === item.id);
+            const lead = item.kind === "opportunity";
+            return (
+              <li
+                key={item.id}
+                className={`rise flex items-start gap-3 px-4 py-3 ${index ? "border-t border-white/[0.06]" : ""} ${
+                  lead ? "bg-white/[0.04]" : ""
+                }`}
+                style={{ animationDelay: `${80 + index * 45}ms`, animationFillMode: "backwards" }}
+              >
+                {lead ? (
+                  <img
+                    src="/assets/products/studio-anc-headphones.webp"
+                    alt=""
+                    className="mt-0.5 size-10 shrink-0 rounded-xl object-cover shadow-[inset_0_0_4px_rgba(255,255,255,0.18)]"
+                  />
+                ) : (
+                  <span className="mt-0.5 grid size-10 shrink-0 place-items-center">
+                    <Orb
+                      id={agent?.orb ?? (item.id as OrbId)}
+                      agentId={agent?.id}
+                      size={ORB_SIZE.nav}
+                      colorFrom={agent?.orbFrom}
+                      colorTo={agent?.orbTo}
+                    />
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`text-[13px] font-semibold leading-[1.3] tracking-[-0.13px] ${
+                        lead ? "text-white" : "text-[#e8e8e8]"
+                      }`}
+                    >
+                      {item.name}
+                    </span>
+                    {lead ? (
+                      <span className="rounded-md bg-[#2a2b29] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.04em] text-[#b5b5b5]">
+                        Top opportunity
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="mt-1 block text-[13px] leading-[1.4] tracking-[-0.13px] text-[#c6c6c6]">
+                    {item.takeaway}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     );
   }
@@ -1774,7 +1859,15 @@ function BlockView({
   return null;
 }
 
-function CreateForm({ onCreate, onBack }: { onCreate: (name: string, purpose: string) => void; onBack: () => void }) {
+function CreateForm({
+  onCreate,
+  onBack,
+  backLabel = "Back",
+}: {
+  onCreate: (name: string, purpose: string) => void;
+  onBack: () => void;
+  backLabel?: string;
+}) {
   const form = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
   function fieldValue(name: string) {
@@ -1808,7 +1901,7 @@ function CreateForm({ onCreate, onBack }: { onCreate: (name: string, purpose: st
               Add sidekick
             </s-button>
             <s-button variant="secondary" onClick={onBack}>
-              Back
+              {backLabel}
             </s-button>
           </s-stack>
         </s-stack>
@@ -1819,7 +1912,7 @@ function CreateForm({ onCreate, onBack }: { onCreate: (name: string, purpose: st
 
 const addSections: { label: string; ids: string[] }[] = [
   { label: "Recommended", ids: ["chief", "ideas", "trends", "campaigns"] },
-  { label: "Team", ids: ["grok", "slack", "claude", "gemini"] },
+  { label: "Team", ids: ["grok", "slack", "muse", "gemini", "duet"] },
   { label: "Channels", ids: ["store", "shop", "pos", "agentic"] },
   { label: "Tools", ids: ["customers", "orders", "finance", "analytics"] },
 ];
@@ -1832,60 +1925,97 @@ const addCopy: Record<string, string> = {
   slack: "Connect Slack for #ops, drafts, and what the team flagged.",
   grok: "Connect Grok for what shoppers are asking on X.",
   claude: "Connect Claude to draft emails, product copy, and replies.",
+  duet: "Write with Claude, one sentence at a time.",
   gemini: "Connect Google’s Gemini for search and Shopping ads.",
+  muse: "Connect Muse for directions, names, and the line a campaign should use.",
   store: "The online store: theme, product pages, and delivery promises.",
   shop: "The Shop channel and the listings shoppers see there.",
   pos: "Point of Sale for the counter, pickup, and in-person sales.",
-  agentic: "Agentic storefronts, where shopping agents find and buy.",
+  agentic: "Agentic, where shopping agents find and buy.",
   customers: "Buyers, repeat orders, and what they ask for next.",
   orders: "Fulfillment, payment, and the orders that still need a hand.",
   finance: "Payouts, fees, and what is on the way to the bank.",
   analytics: "Sales, sessions, and conversion for the period that’s open.",
 };
 
-function AddGrid({ onAdd, onChip }: { onAdd: (id: string) => void; onChip: (label: string) => void }) {
+const sidekickAbout =
+  "A sidekick is an agent with a job: a persona, a place in the nav, and tools that can change the admin. Add a recommended one, connect Slack, Grok, Claude, or Gemini, or name your own. Each keeps a separate conversation.";
+
+function AddGrid({
+  onAdd,
+  onCreate,
+}: {
+  onAdd: (id: string) => void;
+  onCreate: (name: string, purpose: string) => void;
+}) {
+  // Stay on Add a sidekick: hide the catalog for about/create, then offer it again at the end.
+  const [pane, setPane] = useState<"catalog" | "about" | "create">("catalog");
+
   return (
-    <div className="max-w-[720px]">
-      <p className="mb-5 max-w-[560px] text-[15px] leading-[1.4] text-white">
+    <div className="max-w-[640px]">
+      <p className="max-w-[560px] text-[15px] leading-[1.4] text-white">
         Sidekicks are AI agents that get things done for you. Start with a recommended one, connect a team bot, or add a channel or tool.
       </p>
-      {addSections.map((section) => {
-        const cards = section.ids.flatMap((id) => catalog.filter((item) => item.id === id));
-        return (
-          <section key={section.label} className="mb-6">
-            <p className="mb-3 flex items-center gap-0.5 text-[15px] text-[#8e8f8b]">
-              {section.label} <PIcon name="ChevronDown" size={20} />
-            </p>
-            <div className="grid grid-cols-3 gap-3">
-              {cards.map((card, index) => {
-                const connect = card.group === "teams";
-                return (
-                  <article
-                    key={card.id}
-                    className="rise flex flex-col gap-4 rounded-3xl bg-[#1a1b1a] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-colors duration-150 hover:bg-[#1f201f]"
-                    style={{ animationDelay: `${index * 40}ms`, animationFillMode: "backwards" }}
-                  >
-                    <Orb id={card.orb} size={ORB_SIZE.card} agentId={card.id} colorFrom={card.orbFrom} colorTo={card.orbTo} />
-                    <div className="min-h-[92px]">
-                      <p className="text-[15px] leading-[1.4]">{card.name}</p>
-                      <p className="text-[13px] leading-[1.4] text-[#9a9a9a]">{addCopy[card.id]}</p>
-                    </div>
-                    <div className="mt-auto">
-                      <s-button inlineSize="fill" onClick={() => onAdd(card.id)}>
-                        {connect ? "Connect" : "Add"}
-                      </s-button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
-      <div className="flex flex-wrap gap-2">
-        <ChipButton label="Tell me more about creating a sidekick" tone="secondary" onClick={() => onChip("Tell me more about creating a sidekick")} />
-        <ChipButton label="Create my own sidekick" tone="primary" onClick={() => onChip("Create my own sidekick")} />
-      </div>
+
+      {pane === "catalog" ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <ChipButton label="Tell me more about sidekick" tone="secondary" onClick={() => setPane("about")} />
+          <ChipButton label="Create my own sidekick" tone="primary" onClick={() => setPane("create")} />
+        </div>
+      ) : null}
+
+      {pane === "about" ? (
+        <div className="mt-6 max-w-[560px]">
+          <p className="text-[15px] leading-[1.45] text-white">{sidekickAbout}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <ChipButton label="Create my own sidekick" tone="primary" onClick={() => setPane("create")} />
+            <ChipButton label="Browse sidekicks" tone="secondary" onClick={() => setPane("catalog")} />
+          </div>
+        </div>
+      ) : null}
+
+      {pane === "create" ? (
+        <div className="mt-6">
+          <CreateForm onCreate={onCreate} onBack={() => setPane("catalog")} backLabel="Browse sidekicks" />
+        </div>
+      ) : null}
+
+      {pane === "catalog" ? (
+        <div className="mt-8">
+          {addSections.map((section) => {
+            const rows = section.ids.flatMap((id) => (isListedSidekick(id) ? catalog.filter((item) => item.id === id) : []));
+            if (rows.length === 0) return null;
+            return (
+              <section key={section.label} className="mb-6">
+                <p className="mb-2 text-[15px] text-[#8e8f8b]">{section.label}</p>
+                <div className="overflow-hidden rounded-2xl bg-[#1a1b1a] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+                  {rows.map((row, index) => {
+                    const connect = row.group === "teams";
+                    return (
+                      <div
+                        key={row.id}
+                        className={`rise flex items-center gap-3 px-3 py-2.5 ${index > 0 ? "border-t border-white/[0.06]" : ""}`}
+                        style={{ animationDelay: `${index * 40}ms`, animationFillMode: "backwards" }}
+                      >
+                        <span className="grid size-9 shrink-0 place-items-center">
+                          <Orb id={row.orb} size={ORB_SIZE.nav} agentId={row.id} colorFrom={row.orbFrom} colorTo={row.orbTo} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[14px] leading-5">{row.name}</p>
+                          <p className="text-[13px] leading-[1.4] text-[#9a9a9a]">{addCopy[row.id]}</p>
+                        </div>
+                        <span className="shrink-0">
+                          <s-button onClick={() => onAdd(row.id)}>{connect ? "Connect" : "Add"}</s-button>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

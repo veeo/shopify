@@ -254,6 +254,14 @@ export const settingsNav: SettingsRow[] = [
 
 const allNav = [...mainNav, ...channelNav];
 
+/** Two admin pages that share a section, such as Products and Collections. Product details and settings use their own headers. */
+export function sharesSection(from: PreviewId, to: PreviewId) {
+  if (from === to || from === "product" || to === "product" || from === "payments-setup" || to === "payments-setup") return false;
+  const left = navFor(from);
+  const right = navFor(to);
+  return left.id === right.id && left.id !== "home" && left.id !== "settings";
+}
+
 /** The top-level nav item (and child page, if any) that a preview page belongs to. */
 export function navFor(page: PreviewId): { id: string; child: PreviewId | null } {
   if (page === "home-setup" || page === "home-active") return { id: "home", child: null };

@@ -224,6 +224,7 @@ export function TwistScene({
   const invalidateRef = useRef<() => void>(() => {});
   const reduced = useReducedMotion();
   const [active, setActive] = useState(true);
+  const [painted, setPainted] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -243,13 +244,15 @@ export function TwistScene({
       gl={{ alpha: true, antialias: true }}
       dpr={[1, 1.5]}
       resize={{ offsetSize: true }}
-      style={{ width: '100%', height: '100%', display: 'block' }}
+      style={{ width: '100%', height: '100%', display: 'block', background: 'transparent', opacity: painted ? 1 : 0 }}
       onCreated={({ gl, invalidate }) => {
         invalidateRef.current = invalidate;
         gl.toneMapping = THREE.NoToneMapping;
         gl.outputColorSpace = THREE.LinearSRGBColorSpace;
         gl.setClearColor(0x000000, 0);
+        gl.domElement.style.background = 'transparent';
         invalidate();
+        requestAnimationFrame(() => setPainted(true));
       }}
     >
       <TwistMesh frameRef={frameRef} colorFrom={colorFrom} colorTo={colorTo} custom={custom} />

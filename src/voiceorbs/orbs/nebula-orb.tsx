@@ -32,13 +32,13 @@ const GLOW: Record<OrbState, number> = {
 
 const CORE_SCALE: Record<OrbState, number> = {
   idle: 0.94,
-  hover: 0.98,
-  selected: 0.96,
-  connecting: 0.97,
-  listening: 1.02,
-  thinking: 0.99,
-  speaking: 1.03,
-  error: 1,
+  hover: 0.94,
+  selected: 0.94,
+  connecting: 0.94,
+  listening: 0.94,
+  thinking: 0.94,
+  speaking: 0.94,
+  error: 0.94,
   disabled: 0.9,
 };
 

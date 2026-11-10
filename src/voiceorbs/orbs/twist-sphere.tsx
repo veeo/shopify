@@ -4,6 +4,7 @@
 import dynamic from 'next/dynamic';
 import { useRef } from 'react';
 import { orbVars, type OrbProps } from '@/voiceorbs/lib/orb-state';
+import { useOnScreen } from '@/voiceorbs/lib/use-in-view';
 import { useOrbAnimator } from '@/voiceorbs/lib/use-orb-animator';
 import { OrbBoundary, SphereFallback } from '@/voiceorbs/orbs/orb-boundary';
 
@@ -27,12 +28,15 @@ export const TwistSphere = ({
   ref,
 }: OrbProps) => {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const screen = useOnScreen();
+  const onScreen = screen.on;
   const { frameRef } = useOrbAnimator(hostRef, { state, levelRef, speed });
   const custom = !(same(colorFrom, DEFAULT_FROM) && same(colorTo, DEFAULT_TO));
   return (
     <div
       ref={(node) => {
         hostRef.current = node;
+        screen.ref(node);
         if (typeof ref === 'function') ref(node);
         else if (ref) ref.current = node;
       }}
@@ -48,7 +52,11 @@ export const TwistSphere = ({
       }}
     >
       <OrbBoundary fallback={<SphereFallback from={colorFrom} to={colorTo} />}>
-        <TwistScene frameRef={frameRef} colorFrom={colorFrom} colorTo={colorTo} custom={custom} engaged={state !== 'idle' && state !== 'disabled'} />
+        {onScreen ? (
+          <TwistScene frameRef={frameRef} colorFrom={colorFrom} colorTo={colorTo} custom={custom} engaged />
+        ) : (
+          <SphereFallback from={colorFrom} to={colorTo} />
+        )}
       </OrbBoundary>
     </div>
   );

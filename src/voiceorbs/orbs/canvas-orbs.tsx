@@ -15,78 +15,85 @@ const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
 
 const css = (rgb: Rgb, alpha = 1) => `rgba(${rgb[0] | 0}, ${rgb[1] | 0}, ${rgb[2] | 0}, ${alpha})`;
 
-function sphereShade(ctx: CanvasRenderingContext2D, size: number, from: Rgb, to: Rgb, light = 0.55) {
-  const c = size / 2;
-  const r = c * 0.92;
-  const body = ctx.createRadialGradient(c - r * 0.32, c - r * 0.38, r * 0.08, c, c, r);
-  body.addColorStop(0, css(mix(from, [255, 255, 255], light)));
-  body.addColorStop(0.42, css(mix(from, to, 0.45)));
-  body.addColorStop(1, css(mix(to, [8, 10, 18], 0.55)));
-  ctx.fillStyle = body;
-  ctx.beginPath();
-  ctx.arc(c, c, r, 0, Math.PI * 2);
-  ctx.fill();
-  const rim = ctx.createRadialGradient(c, c, r * 0.72, c, c, r);
-  rim.addColorStop(0, 'rgba(255,255,255,0)');
-  rim.addColorStop(1, css(mix(to, [255, 255, 255], 0.35), 0.55));
-  ctx.fillStyle = rim;
-  ctx.beginPath();
-  ctx.arc(c, c, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.beginPath();
-  ctx.ellipse(c - r * 0.28, c - r * 0.34, r * 0.18, r * 0.1, -0.6, 0, Math.PI * 2);
-  ctx.fill();
+/** Extra canvas past the circle so the electric rim can leave the ball. */
+const CRYSTAL_PAD = 0.34;
+
+function unit(n: number) {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
 }
 
-function drawCrystal(ctx: CanvasRenderingContext2D, size: number, frame: OrbFrame, from: Rgb, to: Rgb, pointer: Pointer) {
-  const c = size / 2;
-  const r = c * 0.9;
+function drawCrystalBall(ctx: CanvasRenderingContext2D, canvasSize: number, ball: number, frame: OrbFrame, from: Rgb, to: Rgb) {
+  const c = canvasSize / 2;
+  const r = ball * 0.48;
   const level = frame.reduced ? 0 : frame.level;
-  ctx.clearRect(0, 0, size, size);
-  ctx.save();
+  const pace = frame.reduced ? 0 : 1;
+  const t = frame.time * pace;
+  const spark = mix(to, [255, 255, 255], 0.88);
+  const dustColor = mix(from, [255, 255, 255], 0.55);
+  ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+  const glass = ctx.createRadialGradient(c - r * 0.2, c - r * 0.28, r * 0.1, c, c + r * 0.1, r);
+  glass.addColorStop(0, 'rgba(255,255,255,0.05)');
+  glass.addColorStop(0.55, css(mix(dustColor, [0, 0, 0], 0.92), 0.35));
+  glass.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = glass;
   ctx.beginPath();
   ctx.arc(c, c, r, 0, Math.PI * 2);
-  ctx.clip();
-  sphereShade(ctx, size, mix(from, [20, 24, 40], 0.55), mix(to, [180, 220, 255], 0.25), 0.35);
-  const dust = 10;
-  for (let i = 0; i < dust; i += 1) {
-    const speed = 0.35 + level * 1.6 + (i % 3) * 0.15;
-    const ang = frame.time * speed + i * 0.9;
-    const orbit = r * (0.25 + (i % 5) * 0.12) * (1 + level * 0.15);
-    const x = c + Math.cos(ang) * orbit + pointer.x * r * 0.18;
-    const y = c + Math.sin(ang * 0.8) * orbit * 0.72 + pointer.y * r * 0.18;
-    ctx.fillStyle = css(i % 2 ? to : from, 0.35 + level * 0.5);
-    ctx.beginPath();
-    ctx.arc(x, y, Math.max(0.8, size * 0.012), 0, Math.PI * 2);
-    ctx.fill();
+  ctx.fill();
+
+  const count = 240;
+  for (let i = 0; i < count; i += 1) {
+    const depth = Math.pow(unit(i + 1), 0.55);
+    const yNorm = -0.15 + depth * 1.05;
+    const half = Math.sqrt(Math.max(0, 1 - yNorm * yNorm));
+    const spin = t * (0.12 + unit(i + 3) * 0.28) * (unit(i + 7) < 0.5 ? -1 : 1);
+    const ang = unit(i + 19) * Math.PI * 2 + spin;
+    const reach = half * (0.08 + unit(i + 11) * 0.9);
+    const x = c + Math.cos(ang) * reach * r;
+    const rise = ((t * (0.05 + unit(i + 5) * 0.12) + unit(i + 13)) % 1) * r * 0.18;
+    const y = c + yNorm * r - rise * (0.25 + level);
+    if (Math.hypot(x - c, y - c) > r * 0.96) continue;
+    const alpha = 0.35 + unit(i + 17) * 0.65;
+    ctx.fillStyle = css(i % 6 === 0 ? spark : dustColor, alpha);
+    const speck = Math.max(2.2, ball * (0.012 + unit(i + 23) * 0.016));
+    ctx.fillRect(x - speck / 2, y - speck / 2, speck, speck);
   }
-  ctx.restore();
-  const cracks = 2 + Math.round(level * 2);
+
+  ctx.save();
+  ctx.translate(c, c);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  for (let i = 0; i < cracks; i += 1) {
-    const base = frame.time * (0.4 + level) + i * 1.7;
-    ctx.beginPath();
-    const steps = 5;
-    for (let s = 0; s <= steps; s += 1) {
-      const t = s / steps;
-      const ang = base + t * 1.1 + Math.sin(base * 3 + s) * 0.25;
-      const rad = r * (0.72 + t * 0.26);
-      const x = c + Math.cos(ang) * rad;
-      const y = c + Math.sin(ang) * rad;
-      if (s === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = css(mix(to, [255, 255, 255], 0.45), 0.25 + level * 0.7);
-    ctx.lineWidth = Math.max(1, size * (0.012 + level * 0.012));
-    ctx.stroke();
+  const crack = (ang: number, center: number, width: number) => {
+    const d = Math.atan2(Math.sin(ang - center), Math.cos(ang - center));
+    const x = d / width;
+    return Math.exp(-x * x);
+  };
+  ctx.beginPath();
+  const steps = 100;
+  for (let i = 0; i <= steps; i += 1) {
+    const ang = (i / steps) * Math.PI * 2;
+    const wobble = Math.sin(ang * 5 + t * 1.1) * r * 0.008;
+    const flare = crack(ang, t * 0.7, 0.16) + crack(ang, -t * 0.45 + 2.2, 0.12) * 0.7;
+    const rad = r + wobble + flare * r * (0.1 + level * 0.05);
+    const x = Math.cos(ang) * rad;
+    const y = Math.sin(ang) * rad;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
   }
+  ctx.closePath();
+  ctx.strokeStyle = css(spark, 0.4);
+  ctx.lineWidth = Math.max(4, r * 0.06);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.96)';
+  ctx.lineWidth = Math.max(1.7, r * 0.026);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawStrands(ctx: CanvasRenderingContext2D, size: number, frame: OrbFrame, from: Rgb, to: Rgb) {
   const c = size / 2;
-  const r = c * 0.9;
+  const r = c * 0.99;
   const level = frame.reduced ? 0.04 : frame.level;
   ctx.clearRect(0, 0, size, size);
   ctx.save();
@@ -124,14 +131,14 @@ function drawStrands(ctx: CanvasRenderingContext2D, size: number, frame: OrbFram
 
 function drawIridescence(ctx: CanvasRenderingContext2D, size: number, frame: OrbFrame, from: Rgb, to: Rgb) {
   const c = size / 2;
-  const r = c * 0.9;
+  const r = c * 0.99;
   const level = frame.reduced ? 0 : frame.level;
   ctx.clearRect(0, 0, size, size);
   ctx.save();
   ctx.beginPath();
   ctx.arc(c, c, r, 0, Math.PI * 2);
   ctx.clip();
-  const turn = frame.time * (0.25 + level * 1.4);
+  const turn = frame.time * (0.7 + level * 0.8);
   for (let i = 0; i < 3; i += 1) {
     const g = ctx.createConicGradient(turn + i * 0.8, c, c);
     g.addColorStop(0, css(from, 0.85));
@@ -222,6 +229,69 @@ function CanvasOrb({
   );
 }
 
-export const CrystalOrb = (props: OrbProps) => <CanvasOrb {...props} label={props.label ?? 'Crystal orb'} draw={drawCrystal} />;
+export function CrystalOrb({
+  state = 'idle',
+  size = 144,
+  speed = 1,
+  colorFrom = '#ffffff',
+  colorTo = '#d4d4d8',
+  levelRef,
+  label = 'Crystalized ball',
+  className,
+  ref,
+}: OrbProps) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const from = hexToRgb(colorFrom);
+  const to = hexToRgb(colorTo);
+  const canvasSize = size * (1 + CRYSTAL_PAD * 2);
+
+  useOrbAnimator(hostRef, {
+    state,
+    levelRef,
+    speed,
+    onFrame: (frame) => {
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (!canvas || !ctx) return;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const px = Math.max(64, Math.round(canvasSize * dpr));
+      if (canvas.width !== px) {
+        canvas.width = px;
+        canvas.height = px;
+      }
+      ctx.setTransform(px / canvasSize, 0, 0, px / canvasSize, 0, 0);
+      drawCrystalBall(ctx, canvasSize, size, frame, from, to);
+    },
+  });
+
+  return (
+    <div
+      ref={(node) => {
+        hostRef.current = node;
+        if (typeof ref === 'function') ref(node);
+        else if (ref) ref.current = node;
+      }}
+      role="img"
+      aria-label={label}
+      data-state={state}
+      className={className}
+      style={{ ...orbVars({ size, speed, colorFrom, colorTo }), width: size, height: size, position: 'relative', overflow: 'visible' }}
+    >
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: 'absolute',
+          width: canvasSize,
+          height: canvasSize,
+          left: -size * CRYSTAL_PAD,
+          top: -size * CRYSTAL_PAD,
+          display: 'block',
+          pointerEvents: 'none',
+        }}
+      />
+    </div>
+  );
+}
 export const StrandsOrb = (props: OrbProps) => <CanvasOrb {...props} label={props.label ?? 'Strands orb'} draw={drawStrands} />;
 export const IridescenceOrb = (props: OrbProps) => <CanvasOrb {...props} label={props.label ?? 'Iridescence orb'} draw={drawIridescence} />;
