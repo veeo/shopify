@@ -1744,6 +1744,74 @@ function BlockView({
       </div>
     );
   }
+  if (block.type === "briefing") {
+    return (
+      <div className="rise my-2 max-w-[560px] overflow-hidden rounded-[20px] border border-white/10 bg-[#171817]">
+        {block.title || block.subtitle ? (
+          <div className="border-b border-white/10 px-4 py-3">
+            {block.title ? (
+              <p className="text-[13px] font-medium tracking-[-0.13px] text-white">{block.title}</p>
+            ) : null}
+            {block.subtitle ? (
+              <p className="mt-0.5 text-[12px] leading-[1.35] tracking-[-0.12px] text-[#8e8f8b]">{block.subtitle}</p>
+            ) : null}
+          </div>
+        ) : null}
+        <ul className="flex flex-col">
+          {block.items.map((item, index) => {
+            const agent = catalog.find((entry) => entry.id === item.id);
+            const lead = item.kind === "opportunity";
+            return (
+              <li
+                key={item.id}
+                className={`rise flex items-start gap-3 px-4 py-3 ${index ? "border-t border-white/[0.06]" : ""} ${
+                  lead ? "bg-white/[0.04]" : ""
+                }`}
+                style={{ animationDelay: `${80 + index * 45}ms`, animationFillMode: "backwards" }}
+              >
+                {lead ? (
+                  <img
+                    src="/assets/products/studio-anc-headphones.webp"
+                    alt=""
+                    className="mt-0.5 size-10 shrink-0 rounded-xl object-cover shadow-[inset_0_0_4px_rgba(255,255,255,0.18)]"
+                  />
+                ) : (
+                  <span className="mt-0.5 grid size-10 shrink-0 place-items-center">
+                    <Orb
+                      id={agent?.orb ?? (item.id as OrbId)}
+                      agentId={agent?.id}
+                      size={ORB_SIZE.nav}
+                      colorFrom={agent?.orbFrom}
+                      colorTo={agent?.orbTo}
+                    />
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`text-[13px] font-semibold leading-[1.3] tracking-[-0.13px] ${
+                        lead ? "text-white" : "text-[#e8e8e8]"
+                      }`}
+                    >
+                      {item.name}
+                    </span>
+                    {lead ? (
+                      <span className="rounded-md bg-[#2a2b29] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.04em] text-[#b5b5b5]">
+                        Top opportunity
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="mt-1 block text-[13px] leading-[1.4] tracking-[-0.13px] text-[#c6c6c6]">
+                    {item.takeaway}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
   if (block.type === "create") return <CreateForm onCreate={onCreate} onBack={() => onChip("Browse sidekicks")} />;
   return null;
 }

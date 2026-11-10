@@ -6,7 +6,7 @@ import { speechEnvelope, type OrbState } from "@/voiceorbs/lib/orb-state";
 /**
  * Grok eye placement, capsule shape, and liveliness are adapted from Bloub
  * (MIT) © 2026 Jérémy Perret — https://github.com/jeremy-prt/bloub
- * Slackbot is the supplied mark: four corner colors on a cream circle, with eyes.
+ * Slackbot uses Slack’s official hash mark. Muse sits on a blue gradient circle.
  */
 
 const RENDER = 144;
@@ -182,21 +182,6 @@ function blinkLid(t: number, blinks: number[] = BLINKS, duration = 0.18, close =
   return 1;
 }
 
-const SLACK_BLINKS: number[] = (() => {
-  const random = createRng(0x51ac);
-  const out: number[] = [];
-  let t = 1.8;
-  while (t < 900) {
-    out.push(t);
-    t += 2.4 + random() * 3.2;
-    if (random() < 0.24) {
-      out.push(t);
-      t += 0.26;
-    }
-  }
-  return out;
-})();
-
 function blinkScale(lid: number) {
   return 0.06 + 0.94 * clamp(lid);
 }
@@ -355,65 +340,26 @@ export function GrokBot({ size, state, levelRef }: { size: number; state?: OrbSt
   );
 }
 
-function slackEyeTransform(cx: number, lid: number, widen = 1) {
-  const squash = (0.14 + 0.86 * lid).toFixed(3);
-  return `translate(${cx} 14) scale(${widen.toFixed(3)} ${squash}) translate(${-cx} -14)`;
-}
-
-export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
+/** Official Slack hash mark on a white circle. */
+export function SlackOrb({ size }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
   const id = useId().replace(/:/g, "");
-  const host = useRef<HTMLSpanElement>(null);
-  const leftEye = useRef<SVGGElement>(null);
-  const rightEye = useRef<SVGGElement>(null);
-
-  useMascotLoop(host, (time) => {
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const drive = reduced ? 0 : mascotDrive(state, levelRef?.current ?? -1, time);
-    const lid = reduced ? 1 : blinkLid(time, SLACK_BLINKS, 0.16, 0.36);
-    const widen = 1 + drive * 0.08;
-    leftEye.current?.setAttribute("transform", slackEyeTransform(8, lid, widen));
-    rightEye.current?.setAttribute("transform", slackEyeTransform(20, lid, widen));
-  });
-
   return (
-    <span ref={host} className="orb" data-state={state ?? "idle"} style={slotStyle(size)} aria-hidden>
-      <svg viewBox="0 0 28 28" width="100%" height="100%" style={{ display: "block" }}>
-        <defs>
-          <filter id={`${id}-shade`} x="0" y="0" width="28" height="28" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-            <feFlood floodOpacity="0" result="BackgroundImageFix" />
-            <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
-            <feOffset />
-            <feGaussianBlur stdDeviation="2" />
-            <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
-            <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.3 0" />
-            <feBlend mode="normal" in2="shape" result="effect1_innerShadow" />
-          </filter>
-          <clipPath id={`${id}-clip`}>
-            <rect width="28" height="28" rx="14" />
-          </clipPath>
-        </defs>
-        <g filter={`url(#${id}-shade)`}>
-          <g clipPath={`url(#${id}-clip)`}>
-            <g>
-              <rect width="28" height="28" rx="14" fill="#FAFAF8" />
-              <circle cy="28" r="13" fill="#E2076A" />
-              <circle cx="28" cy="28" r="13" fill="#FCC005" />
-              <circle r="13" fill="#02B3FF" />
-              <circle cx="28" r="13" fill="#43B65A" />
-              <g ref={leftEye}>
-                <path d="M11.5 14C11.5 15.933 9.933 17.5 8 17.5C6.067 17.5 4.5 15.933 4.5 14C4.5 12.067 6.067 10.5 8 10.5C9.933 10.5 11.5 12.067 11.5 14Z" fill="black" stroke="white" />
-                <circle cx="9" cy="13" r="1" fill="white" />
-              </g>
-              <g ref={rightEye}>
-                <path d="M23.5 14C23.5 15.933 21.933 17.5 20 17.5C18.067 17.5 16.5 15.933 16.5 14C16.5 12.067 18.067 10.5 20 10.5C21.933 10.5 23.5 12.067 23.5 14Z" fill="black" stroke="white" />
-                <circle cx="21" cy="13" r="1" fill="white" />
-              </g>
-            </g>
-          </g>
+    <MarkFrame size={size}>
+      <defs>{markShade(`${id}-shade`, "0.18")}</defs>
+      <g filter={`url(#${id}-shade)`}>
+        <rect width="28" height="28" rx="14" fill="white" />
+        <g transform="translate(6 6)">
+          <path d="M3.31986 9.98586C3.31986 10.8995 2.57354 11.6458 1.65993 11.6458C0.746325 11.6458 0 10.8995 0 9.98586C0 9.07225 0.746325 8.32593 1.65993 8.32593H3.31986V9.98586Z" fill="#E01E5A" />
+          <path d="M4.15625 9.98586C4.15625 9.07225 4.90258 8.32593 5.81618 8.32593C6.72979 8.32593 7.47611 9.07225 7.47611 9.98586V14.1421C7.47611 15.0557 6.72979 15.802 5.81618 15.802C4.90258 15.802 4.15625 15.0557 4.15625 14.1421V9.98586Z" fill="#E01E5A" />
+          <path d="M5.81618 3.31986C4.90258 3.31986 4.15625 2.57354 4.15625 1.65993C4.15625 0.746325 4.90258 0 5.81618 0C6.72979 0 7.47611 0.746325 7.47611 1.65993V3.31986H5.81618Z" fill="#36C5F0" />
+          <path d="M5.81619 4.15625C6.72979 4.15625 7.47612 4.90258 7.47612 5.81618C7.47612 6.72979 6.72979 7.47611 5.81619 7.47611H1.65993C0.746325 7.47611 0 6.72979 0 5.81618C0 4.90258 0.746325 4.15625 1.65993 4.15625H5.81619Z" fill="#36C5F0" />
+          <path d="M12.4805 5.81618C12.4805 4.90258 13.2268 4.15625 14.1404 4.15625C15.054 4.15625 15.8003 4.90258 15.8003 5.81618C15.8003 6.72979 15.054 7.47611 14.1404 7.47611H12.4805V5.81618Z" fill="#2EB67D" />
+          <path d="M11.6441 5.81619C11.6441 6.72979 10.8978 7.47612 9.98415 7.47612C9.07054 7.47612 8.32422 6.72979 8.32422 5.81619V1.65993C8.32422 0.746325 9.07054 0 9.98415 0C10.8978 0 11.6441 0.746325 11.6441 1.65993V5.81619Z" fill="#2EB67D" />
+          <path d="M9.98415 12.4822C10.8978 12.4822 11.6441 13.2285 11.6441 14.1421C11.6441 15.0557 10.8978 15.802 9.98415 15.802C9.07054 15.802 8.32422 15.0557 8.32422 14.1421V12.4822H9.98415Z" fill="#ECB22E" />
+          <path d="M9.98415 11.6458C9.07054 11.6458 8.32422 10.8995 8.32422 9.98586C8.32422 9.07225 9.07054 8.32593 9.98415 8.32593H14.1404C15.054 8.32593 15.8003 9.07225 15.8003 9.98586C15.8003 10.8995 15.054 11.6458 14.1404 11.6458H9.98415Z" fill="#ECB22E" />
         </g>
-      </svg>
-    </span>
+      </g>
+    </MarkFrame>
   );
 }
 
@@ -580,20 +526,43 @@ export function MuseBall({ size, state, levelRef }: { size: number; state?: OrbS
   useMascotLoop(host, (time) => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const drive = reduced ? 0 : mascotDrive(state, levelRef?.current ?? -1, time);
-    const fill = 1.16;
-    const sx = fill * (1 + (reduced ? 0 : Math.sin(time * 1.2) * 0.012 + drive * 0.06));
-    const sy = fill * (1 - (reduced ? 0 : drive * 0.045));
-    if (image.current) image.current.style.transform = `scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
+    const sx = 1 + (reduced ? 0 : Math.sin(time * 1.2) * 0.012 + drive * 0.05);
+    const sy = 1 - (reduced ? 0 : drive * 0.04);
+    if (image.current) {
+      image.current.style.transform = `translateX(-50%) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
+    }
   });
 
   return (
-    <span ref={host} className="orb" data-state={state ?? "idle"} style={slotStyle(size)} aria-hidden>
+    <span
+      ref={host}
+      className="orb"
+      data-state={state ?? "idle"}
+      style={{
+        ...slotStyle(size),
+        background: "linear-gradient(180deg, #005AF1 0%, #0080FF 100%)",
+        overflow: "hidden",
+      }}
+      aria-hidden
+    >
       <img
         ref={image}
         src="/assets/muse.png"
         alt=""
         draggable={false}
-        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transformOrigin: "center" }}
+        style={{
+          position: "absolute",
+          left: "50%",
+          top: "4%",
+          width: "82%",
+          height: "96%",
+          transform: "translateX(-50%)",
+          objectFit: "contain",
+          objectPosition: "top center",
+          display: "block",
+          transformOrigin: "center top",
+          pointerEvents: "none",
+        }}
       />
     </span>
   );

@@ -194,10 +194,19 @@ export type Chip = { label: string; tone: "secondary" | "primary"; send?: boolea
 export type Segment = { type: "text"; text: string } | { type: "tool"; label: string };
 export type Source = { title: string; url: string };
 
+export type BriefingItem = {
+  id: string;
+  name: string;
+  takeaway: string;
+  /** First row is the lead opportunity. */
+  kind?: "opportunity" | "update";
+};
+
 export type Block =
   | { id: string; type: "text"; role: "user" | "assistant"; text: string; typed?: boolean; segments?: Segment[]; sources?: Source[]; streamed?: boolean }
   | { id: string; type: "steps" }
   | { id: string; type: "sellers" }
+  | { id: string; type: "briefing"; title?: string; subtitle?: string; items: BriefingItem[] }
   | { id: string; type: "chips"; chips: Chip[] }
   | { id: string; type: "purpose" }
   | { id: string; type: "create" }
@@ -602,7 +611,7 @@ const persona = {
   sidekick:
     "You are Sidekick, Shopify's built-in assistant, helping a merchant run an electronics store. You know Shopify deeply and can act in the admin. When the merchant wants to review payments, call showArtifact payments-plan and navigatePreview payments, then explain the plan in your own words: Shopify Payments setup has four parts (business details, identity, account security, payout bank account) and takes about 10 minutes. When they want to start Shopify Payments setup, navigate to payments-setup with wide true. Remaining setup tasks: payments, theme, domain, shipping, retail address, POS.",
   chief:
-    "You are the merchant's Chief of Staff inside this electronics store. Lead with how sales are actually doing, the few things worth doing today, and what the other sidekicks are already working on. When asked for best sellers, call showArtifact best-sellers and do not navigate away: that opens Products, filtered to the five best sellers. Name the top three in the reply, Studio ANC Headphones, USB-C Power Bank, and Portable Charger, and offer a next step such as building a campaign or bundling them.",
+    "You are the merchant's Chief of Staff inside this electronics store — the parent sidekick watching the rest of the team. Open with a tight briefing: top opportunity first (usually the best sellers), then one-line takeaways from the other sidekicks. When asked for best sellers, call showArtifact best-sellers and do not navigate away: that opens Products, filtered to the five best sellers. Name the top three in the reply, Studio ANC Headphones, USB-C Power Bank, and Portable Charger, and offer a next step such as building a campaign or bundling them.",
   ideas:
     "You are Product ideas. You turn this store's carts and search into one testable product. You can add a product with the addProduct tool. The live draft is a $289 bundle: Studio ANC Headphones, the earbuds case, and a cable, meant to lift the $125 average order.",
   trends:
@@ -1146,6 +1155,53 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
   };
 }
 
+/** Opening briefing Chief shows when someone lands on the parent bot. */
+export const chiefBriefing: BriefingItem[] = [
+  {
+    id: "opportunity",
+    name: "Best sellers",
+    kind: "opportunity",
+    takeaway:
+      "Studio ANC Headphones are $18,640 of the month with 14 left — reorder before Monday’s ads, and put the power bank behind a headphone in cart instead of a sitewide 20%.",
+  },
+  {
+    id: "ideas",
+    name: "Product ideas",
+    kind: "update",
+    takeaway: "Drafting a $289 headphone + case + cable bundle to lift AOV from $125.",
+  },
+  {
+    id: "store",
+    name: "Online store",
+    kind: "update",
+    takeaway: "Desk lamp page still says 5–7 days while ads say this week.",
+  },
+  {
+    id: "orders",
+    name: "Orders",
+    kind: "update",
+    takeaway: "#1078 and #1077 are paid and unfulfilled; #1075 still unpaid.",
+  },
+  {
+    id: "shop",
+    name: "Shop app",
+    kind: "update",
+    takeaway: "Shop converts at 1.6% vs 2.7% on the store — listing crops the headphone.",
+  },
+  {
+    id: "campaigns",
+    name: "Campaigns",
+    kind: "update",
+    takeaway: "Monday’s ads still promise the lamp this week; restock line is ready.",
+  },
+  {
+    id: "slack",
+    name: "Slackbot",
+    kind: "update",
+    takeaway: "#ops is on the three open orders; welcome email needs the “14 left” note.",
+  },
+];
+
 function activeThread(agentId: string): Block[] {
   if (agentId === "chief") {
     return [
@@ -1153,8 +1209,15 @@ function activeThread(agentId: string): Block[] {
         id: "c1",
         type: "text",
         role: "assistant",
-        text: "The last 30 days are at $48,393, from 386 orders. Average order value slipped to $125 from $134. Today is the quiet part of that: $2,079 from 14 orders.\n\nThree things I’d do. End the sitewide 20% on the USB-C Power Bank and offer it only after a headphone is in the cart. Studio ANC Headphones have 14 left and they’re $18,640 of these 30 days, so the reorder has to leave before Monday’s ads. Three orders still need a hand: #1078 and #1077 are paid and unfulfilled, and #1075 from yesterday hasn’t been paid.\n\nThe other sidekicks are already on pieces of it. Product ideas is drafting a headphone, case, and cable bundle at $289. Online store is fixing the desk lamp page, which still says 5–7 days while the ads say this week. Orders has those three orders. Shop app is looking at why Shop checkouts convert at 1.6% against 2.7% on the online store.",
+        text: "Here’s your briefing — one place to see what the team is watching.",
         typed: true,
+      },
+      {
+        id: "c-briefing",
+        type: "briefing",
+        title: "Across your sidekicks",
+        subtitle: "Last 30 days · $48,393 · 386 orders · AOV $125",
+        items: chiefBriefing,
       },
       {
         id: "c2",
