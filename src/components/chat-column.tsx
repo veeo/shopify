@@ -15,7 +15,8 @@ import {
   exemptAvatarAgents,
   isListedSidekick,
   isVoiceOrb,
-  orbColorPresets,
+  orbColorPair,
+  orbSwatches,
   paymentSteps,
   purposes,
   sellers,
@@ -1527,8 +1528,12 @@ function EditSidekick({
   const starting = isVoiceOrb(canonicalOrb(agent.orb)) ? voiceOrbTint[canonicalOrb(agent.orb) as keyof typeof voiceOrbTint] : voiceOrbTint.plasma;
   const [colorFrom, setColorFrom] = useState(agent.orbFrom ?? starting.from);
   const [colorTo, setColorTo] = useState(agent.orbTo ?? starting.to);
-  const [connections, setConnections] = useState(agent.connections);
   const voice = isVoiceOrb(orb);
+  const applyColor = (hex: string) => {
+    const pair = orbColorPair(hex);
+    setColorFrom(pair.from);
+    setColorTo(pair.to);
+  };
   const field = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white outline-none placeholder:text-[#8e8f8b] focus:border-white/30";
   return createPortal(
     <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" role="presentation" onMouseDown={onClose}>
@@ -1539,7 +1544,7 @@ function EditSidekick({
         onMouseDown={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
-          onSave({ name, purpose, orb, connections, ...(voice ? { orbFrom: colorFrom, orbTo: colorTo } : {}) });
+          onSave({ name, purpose, orb, connections: agent.connections, ...(voice ? { orbFrom: colorFrom, orbTo: colorTo } : {}) });
         }}
       >
         <div className="flex items-center justify-between gap-3">
@@ -1563,9 +1568,8 @@ function EditSidekick({
                   if (choice.id === orb) return;
                   setOrb(choice.id);
                   if (isVoiceOrb(choice.id)) {
-                    const tint = voiceOrbTint[choice.id];
-                    setColorFrom(tint.from);
-                    setColorTo(tint.to);
+                    setColorFrom(voiceOrbTint[choice.id].from);
+                    setColorTo(voiceOrbTint[choice.id].to);
                   }
                 }}
                 className={`press rounded-full ${orb === choice.id ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-80 hover:opacity-100"}`}
@@ -1584,43 +1588,30 @@ function EditSidekick({
         {voice ? (
           <fieldset>
             <legend className="mb-2 text-[12px] text-[#8e8f8b]">Color</legend>
-            <div className="flex flex-wrap gap-2">
-              {orbColorPresets.map((preset) => {
-                const selected = colorFrom.toLowerCase() === preset.from && colorTo.toLowerCase() === preset.to;
+            <div className="flex flex-wrap items-center gap-2">
+              {orbSwatches.map((swatch) => {
+                const pair = orbColorPair(swatch.color);
+                const selected = colorFrom.toLowerCase() === pair.from && colorTo.toLowerCase() === pair.to;
                 return (
                   <button
-                    key={preset.name}
+                    key={swatch.name}
                     type="button"
-                    aria-label={preset.name}
+                    aria-label={swatch.name}
                     aria-pressed={selected}
-                    onClick={() => {
-                      setColorFrom(preset.from);
-                      setColorTo(preset.to);
-                    }}
-                    className={`size-7 rounded-full ${selected ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : ""}`}
-                    style={{ background: `linear-gradient(135deg, ${preset.from}, ${preset.to})` }}
-                  />
+                    onClick={() => applyColor(swatch.color)}
+                    className={`press rounded-full ${selected ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-90 hover:opacity-100"}`}
+                  >
+                    <Orb id={orb} size={28} colorFrom={pair.from} colorTo={pair.to} />
+                  </button>
                 );
               })}
-            </div>
-            <div className="mt-3 flex gap-3">
-              <label className="flex items-center gap-2 text-[12px] text-[#8e8f8b]">
-                From
+              <label className="ml-1 flex items-center gap-2 text-[12px] text-[#8e8f8b]">
+                Fine tune
                 <input
                   type="color"
-                  aria-label="Color from"
+                  aria-label="Orb color"
                   value={colorFrom}
-                  onChange={(event) => setColorFrom(event.target.value)}
-                  className="h-7 w-9 cursor-pointer rounded-md border border-white/15 bg-transparent p-0.5"
-                />
-              </label>
-              <label className="flex items-center gap-2 text-[12px] text-[#8e8f8b]">
-                To
-                <input
-                  type="color"
-                  aria-label="Color to"
-                  value={colorTo}
-                  onChange={(event) => setColorTo(event.target.value)}
+                  onChange={(event) => applyColor(event.target.value)}
                   className="h-7 w-9 cursor-pointer rounded-md border border-white/15 bg-transparent p-0.5"
                 />
               </label>
@@ -1635,29 +1626,6 @@ function EditSidekick({
           Purpose
           <textarea value={purpose} rows={3} onChange={(event) => setPurpose(event.target.value)} className={`${field} resize-none leading-5`} />
         </label>
-        <fieldset>
-          <legend className="mb-1 text-[12px] text-[#8e8f8b]">Connections</legend>
-          <ul className="flex flex-col">
-            {connections.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 border-t border-white/10 py-2 first:border-t-0">
-                <span className="text-[13px]">{item.label}</span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={item.on}
-                  aria-label={`${item.label} ${item.on ? "on" : "off"}`}
-                  onClick={() => setConnections((list) => list.map((entry) => (entry.id === item.id ? { ...entry, on: !entry.on } : entry)))}
-                  className={`relative h-5 w-9 shrink-0 rounded-full ${item.on ? "bg-[#5631f4]" : "bg-white/15"}`}
-                >
-                  <span
-                    className="absolute top-0.5 size-4 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
-                    style={{ left: item.on ? 18 : 2, transition: "left 160ms ease" }}
-                  />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </fieldset>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="press rounded-full px-3 py-1.5 text-[13px] text-[#c4c4c4] hover:bg-white/10 hover:text-white">
             Cancel

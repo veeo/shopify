@@ -525,13 +525,19 @@ export function PosMark({ size }: { size: number }) {
       <defs>{markShade(`${id}-shade`, "0.35")}</defs>
       <g filter={`url(#${id}-shade)`}>
         <rect width="28" height="28" rx="14" fill="#111111" />
-        <rect x="8.5" y="8" width="11" height="8" rx="1.5" fill="white" />
-        <rect x="10" y="9.5" width="8" height="3" rx="0.6" fill="#111111" />
-        <rect x="11.2" y="17.2" width="5.6" height="1.7" rx="0.85" fill="white" />
+        <path fill="white" d={posStand} />
+        <path fill="#111111" d={posS} />
       </g>
     </MarkFrame>
   );
 }
+
+/** Sidewalk stand set out front of the store, with the Shopify S on the board. */
+const posStand =
+  "M9.15 8.15h9.7c.7 0 1.25.55 1.25 1.25v6.15c0 .7-.55 1.25-1.25 1.25h-9.7c-.7 0-1.25-.55-1.25-1.25V9.4c0-.7.55-1.25 1.25-1.25zM8.55 16.35 6.45 21.55h2.15l1.55-5.2H8.55zm10.9 0-1.55 5.2h2.15l-2.1-5.2h1.5z";
+
+const posS =
+  "M14.05 9.35c-1.2 0-2.05.68-2.05 1.55 0 .75.55 1.22 1.7 1.48.95.22 1.32.46 1.32 1 0 .6-.62 1.02-1.55 1.02-.88 0-1.48-.38-1.7-.9l-1 .45c.4.9 1.35 1.48 2.7 1.48 1.5 0 2.58-.85 2.58-2.05 0-.9-.62-1.45-1.82-1.72-.92-.22-1.25-.42-1.25-.9 0-.52.52-.9 1.3-.9.8 0 1.32.3 1.55.82l.98-.48c-.38-.85-1.25-1.4-2.36-1.4z";
 
 export function AgenticMark({ size }: { size: number }) {
   const id = useId().replace(/:/g, "");
@@ -539,18 +545,21 @@ export function AgenticMark({ size }: { size: number }) {
     <MarkFrame size={size}>
       <defs>{markShade(`${id}-shade`, "0.28")}</defs>
       <g filter={`url(#${id}-shade)`}>
-        <rect width="28" height="28" rx="14" fill="#FF3B14" />
-        <g transform="translate(6 6)">
-          <path fill="white" d={agenticGlyph} />
-        </g>
+        <rect width="28" height="28" rx="14" fill="#1A1C1F" />
+        <path fill="white" d={agenticSparkles} />
       </g>
     </MarkFrame>
   );
 }
 
-/** Spark over a bag. Drawn in a 16px box so it stays readable inside the circle and in the admin nav. */
-const agenticGlyph =
-  "M8 .7c.14.95.36 1.4.86 1.86.5.46 1.12.64 2.04.78-0.92.14-1.54.32-2.04.78-.5.46-.72.91-.86 1.86-.14-.95-.36-1.4-.86-1.86-.5-.46-1.12-.64-2.04-.78.92-.14 1.54-.32 2.04-.78.5-.46.72-.91.86-1.86ZM6.15 7.55V6.9a1.85 1.85 0 0 1 3.7 0v.65h-.95V6.9a.9.9 0 0 0-1.8 0v.65h-.95ZM4.25 7.7h7.5c.5 0 .9.4.9.9v4.85c0 .6-.5 1.1-1.1 1.1H4.45c-.6 0-1.1-.5-1.1-1.1V8.6c0-.5.4-.9.9-.9Z";
+/** Three sparkles. The usual AI mark, without a single rainbow star or a shopping bag. */
+const agenticSparkles = [sparkle(13.2, 13.4, 6.4), sparkle(20.2, 8.2, 2.7), sparkle(8.4, 19.6, 2.15)].join("");
+
+function sparkle(cx: number, cy: number, r: number) {
+  const b = r * 0.18;
+  const n = (value: number) => value.toFixed(2);
+  return `M${n(cx)} ${n(cy - r)}C${n(cx + b)} ${n(cy - b)} ${n(cx + b)} ${n(cy - b)} ${n(cx + r)} ${n(cy)}C${n(cx + b)} ${n(cy + b)} ${n(cx + b)} ${n(cy + b)} ${n(cx)} ${n(cy + r)}C${n(cx - b)} ${n(cy + b)} ${n(cx - b)} ${n(cy + b)} ${n(cx - r)} ${n(cy)}C${n(cx - b)} ${n(cy - b)} ${n(cx - b)} ${n(cy - b)} ${n(cx)} ${n(cy - r)}Z`;
+}
 
 export function MuseBall({ size, state, levelRef }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
   const host = useRef<HTMLSpanElement>(null);
