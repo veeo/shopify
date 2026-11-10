@@ -7,7 +7,7 @@ import { ORB_LOOK, presenceFor } from "@/voiceorbs/lib/orb-model";
 import { canonicalOrb, isVoiceOrb, type OrbId, type VoiceOrbId } from "@/lib/prototype";
 import { AgenticMark, ClaudeDuetMark, ClaudeMark, GeminiMark, GrokBot, MuseBall, OnlineStoreMark, PosMark, ShopAppMark, SlackOrb } from "@/components/team-marks";
 import { AuraField } from "@/voiceorbs/orbs/aura-field";
-import { BallOrb, MarbleOrb } from "@/voiceorbs/orbs/glass-orbs";
+import { MarbleOrb } from "@/voiceorbs/orbs/glass-orbs";
 import { MercuryOrb } from "@/voiceorbs/orbs/mercury-orb";
 import { PlasmaOrb } from "@/voiceorbs/orbs/plasma-orb";
 import { TwistSphere } from "@/voiceorbs/orbs/twist-sphere";
@@ -147,9 +147,6 @@ function VoiceOrb({
       break;
     case "marble":
       node = <MarbleOrb {...props} />;
-      break;
-    case "strands":
-      node = <BallOrb {...props} />;
       break;
     default:
       node = <PlasmaOrb {...props} />;
