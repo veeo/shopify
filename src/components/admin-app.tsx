@@ -14,6 +14,7 @@ import {
   personaFor,
   prototypeSnapshot,
   purposes,
+  focusAskedPage,
   reducer,
   scriptedTurn,
   selectedAgent,
@@ -154,7 +155,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     const text = replyText(message);
     const scripted = scriptedEffects(message);
     setOffline(scripted !== null || !text);
-    const effects = scripted ?? effectsFrom(message, applied.current);
+    const effects = focusAskedPage(pending.text, scripted ?? effectsFrom(message, applied.current));
     const segments = committedSegments(message);
     const sources = sourcesOf(message);
     let answer = text;

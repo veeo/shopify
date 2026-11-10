@@ -1,9 +1,12 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { useOrbAudio } from "@/components/orb-audio";
+import { useReducedMotion } from "@/voiceorbs/lib/use-reduced-motion";
+import { CrystalOrb, IridescenceOrb, StrandsOrb } from "@/voiceorbs/orbs/canvas-orbs";
+import { ORB_LOOK, presenceFor } from "@/voiceorbs/lib/orb-model";
 import { canonicalOrb, isVoiceOrb, type OrbId, type VoiceOrbId } from "@/lib/prototype";
-import { GrokBot, MuseBall, OnlineStoreMark, ShopAppMark, SlackOrb } from "@/components/team-marks";
+import { AgenticMark, ClaudeMark, GeminiMark, GrokBot, MuseBall, OnlineStoreMark, PosMark, ShopAppMark, SlackOrb } from "@/components/team-marks";
 import { AuraField } from "@/voiceorbs/orbs/aura-field";
 import { MercuryOrb } from "@/voiceorbs/orbs/mercury-orb";
 import { NebulaOrb } from "@/voiceorbs/orbs/nebula-orb";
@@ -34,31 +37,88 @@ export function Orb({
   agentId,
   colorFrom,
   colorTo,
+  presence = "rest",
+  hot = false,
 }: {
   id: OrbId;
   size?: number;
   agentId?: string;
   colorFrom?: string;
   colorTo?: string;
+  /** Rest or the selected agent's calmer live state. Audio and hover override this. */
+  presence?: "rest" | "selected";
+  /** Row hover, when the pointer is on the row rather than the orb itself. */
+  hot?: boolean;
 }) {
   const resolved = canonicalOrb(id);
   const audio = useOrbAudio(agentId);
-  if (isVoiceOrb(resolved)) {
-    return <VoiceOrb id={resolved} size={size} state={audio.state} levelRef={audio.levelRef} colorFrom={colorFrom} colorTo={colorTo} />;
-  }
-  switch (resolved) {
+  const [hover, setHover] = useState(false);
+  const reduced = useReducedMotion();
+  const state: OrbState = audio.state ?? (hover || hot ? "hover" : presence === "selected" ? "selected" : "idle");
+  const look = ORB_LOOK[presenceFor(state, reduced)];
+  const body = isVoiceOrb(resolved) ? (
+    <VoiceOrb id={resolved} size={size} state={state} levelRef={audio.levelRef} colorFrom={colorFrom} colorTo={colorTo} />
+  ) : (
+    mark(resolved, size, state, audio.levelRef, colorFrom, colorTo)
+  );
+  return (
+    <span
+      className="orb-host"
+      data-orb-state={state}
+      onPointerEnter={() => setHover(true)}
+      onPointerLeave={(event) => {
+        setHover(false);
+        event.currentTarget.dataset.px = "0";
+        event.currentTarget.dataset.py = "0";
+        event.currentTarget.style.setProperty("--tilt-x", "0deg");
+        event.currentTarget.style.setProperty("--tilt-y", "0deg");
+      }}
+      onPointerMove={(event) => {
+        if (reduced) return;
+        const box = event.currentTarget.getBoundingClientRect();
+        const x = (event.clientX - box.left) / box.width - 0.5;
+        const y = (event.clientY - box.top) / box.height - 0.5;
+        event.currentTarget.dataset.px = x.toFixed(3);
+        event.currentTarget.dataset.py = y.toFixed(3);
+        event.currentTarget.style.setProperty("--tilt-x", `${(-y * 8).toFixed(2)}deg`);
+        event.currentTarget.style.setProperty("--tilt-y", `${(x * 8).toFixed(2)}deg`);
+      }}
+      style={{
+        display: "grid",
+        width: size,
+        height: size,
+        transform: `scale(${look.scale}) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg))`,
+        transition: "transform 180ms cubic-bezier(0.2, 0.8, 0, 1)",
+        transformStyle: "preserve-3d",
+      }}
+    >
+      {body}
+    </span>
+  );
+}
+
+function mark(id: OrbId, size: number, state: OrbState, levelRef: RefObject<number> | undefined, colorFrom?: string, colorTo?: string) {
+  switch (id) {
     case "grok":
-      return <GrokBot size={size} state={audio.state} levelRef={audio.levelRef} />;
+      return <GrokBot size={size} state={state} levelRef={levelRef} />;
     case "muse":
-      return <MuseBall size={size} state={audio.state} levelRef={audio.levelRef} />;
+      return <MuseBall size={size} state={state} levelRef={levelRef} />;
     case "slack":
-      return <SlackOrb size={size} state={audio.state} levelRef={audio.levelRef} />;
+      return <SlackOrb size={size} state={state} levelRef={levelRef} />;
     case "store":
       return <OnlineStoreMark size={size} />;
     case "shop":
       return <ShopAppMark size={size} />;
+    case "claude":
+      return <ClaudeMark size={size} />;
+    case "gemini":
+      return <GeminiMark size={size} />;
+    case "pos":
+      return <PosMark size={size} />;
+    case "agentic":
+      return <AgenticMark size={size} />;
     default:
-      return <VoiceOrb id="plasma" size={size} state={audio.state} levelRef={audio.levelRef} colorFrom={colorFrom} colorTo={colorTo} />;
+      return <VoiceOrb id="plasma" size={size} state={state} levelRef={levelRef} colorFrom={colorFrom} colorTo={colorTo} />;
   }
 }
 
@@ -102,6 +162,15 @@ function VoiceOrb({
       break;
     case "aura":
       node = <AuraField {...props} />;
+      break;
+    case "crystal":
+      node = <CrystalOrb {...props} />;
+      break;
+    case "strands":
+      node = <StrandsOrb {...props} />;
+      break;
+    case "iridescence":
+      node = <IridescenceOrb {...props} />;
       break;
     default:
       node = <PlasmaOrb {...props} />;

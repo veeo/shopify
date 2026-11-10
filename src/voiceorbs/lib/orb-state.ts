@@ -3,6 +3,8 @@ import type { CSSProperties, Ref, RefObject } from 'react';
 
 export type OrbState =
   | 'idle'
+  | 'hover'
+  | 'selected'
   | 'connecting'
   | 'listening'
   | 'thinking'
@@ -50,10 +52,13 @@ export type OrbMotion = 'ripple' | 'pulse' | 'flow' | 'none';
 
 export const stateMotion = (state: OrbState): OrbMotion => {
   switch (state) {
+    case 'hover':
+    case 'selected':
+      return 'flow';
     case 'listening':
       return 'ripple';
     case 'thinking':
-      return 'pulse';
+      return 'flow';
     case 'speaking':
       return 'flow';
     default:
@@ -65,12 +70,16 @@ const wave = (x: number): number => 0.5 - 0.5 * Math.cos(x);
 
 export const stateEnergy = (state: OrbState, t: number): number => {
   switch (state) {
+    case 'hover':
+      return 0.28 + 0.08 * wave(t * 3.2);
+    case 'selected':
+      return 0.14 + 0.06 * wave(t * 1.4);
     case 'listening':
-      return 0.4 + 0.32 * wave(t * 17) + 0.18 * wave(t * 8.2 + 3);
+      return speechEnvelope(t);
     case 'speaking':
-      return 0.3 + 0.24 * wave(t * 12.4) + 0.16 * wave(t * 6 + 1.2);
+      return speechEnvelope(t + 0.4);
     case 'thinking':
-      return 0.24 + 0.2 * wave(t * 4.8);
+      return 0.22 + 0.2 * wave(t * 2.6);
     case 'connecting':
       return 0.12 + 0.1 * wave(t * 3.2);
     case 'error':
@@ -96,13 +105,24 @@ export const ERROR_RATE = 10;
 
 export const stateRate = (state: OrbState): number => {
   if (state === 'idle' || state === 'disabled') return SETTLE_RATE;
+  if (state === 'hover') return 18;
+  if (state === 'selected') return 8;
   if (state === 'error') return ERROR_RATE;
   return ENTER_RATE;
+};
+
+/** Irregular peaks, used when the speech engine has no audio samples. */
+export const speechEnvelope = (t: number): number => {
+  const syllable = Math.pow(Math.max(0, Math.sin(t * 8.6 + Math.sin(t * 2.3) * 2.2)), 1.6);
+  const phrase = 0.42 + 0.58 * wave(t * 1.35 + 0.6);
+  return Math.min(1, syllable * phrase * 1.2);
 };
 
 export const createStateMix = (initial: OrbState = 'idle'): StateMix => {
   const weights: StateWeights = {
     idle: 0,
+    hover: 0,
+    selected: 0,
     connecting: 0,
     listening: 0,
     thinking: 0,

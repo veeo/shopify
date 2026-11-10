@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
-import type { OrbState } from "@/voiceorbs/lib/orb-state";
+import { speechEnvelope, type OrbState } from "@/voiceorbs/lib/orb-state";
 
 /**
  * Grok eye placement, capsule shape, and liveliness are adapted from Bloub
@@ -252,9 +252,16 @@ function capsulePath(w: number, h: number) {
 
 const GROK_R = 67;
 
+function mascotDrive(state: OrbState | undefined, level: number, time: number) {
+  if (state === "listening" || state === "speaking") return level >= 0 ? clamp(level) : speechEnvelope(time);
+  if (state === "thinking" || state === "connecting") return 0.2 + 0.12 * Math.sin(time * 2.4);
+  if (state === "hover") return 0.22;
+  return 0;
+}
+
 function grokFrame(t: number, state: OrbState | undefined, level: number, reduced: boolean) {
-  const live = level >= 0 ? clamp(level) : 0;
-  const voiced = level >= 0 && (state === "listening" || state === "speaking");
+  const live = reduced ? 0 : mascotDrive(state, level, t);
+  const voiced = live > 0.02 && (state === "listening" || state === "speaking" || state === "thinking");
   let expression = grokExpression(reduced ? 0 : t);
   if (!reduced && (state === "thinking" || state === "connecting")) expression = blendExpression(expression, GROK_EXPRESSIONS.attentif, 0.45);
   if (voiced) {
@@ -293,8 +300,10 @@ function grokFrame(t: number, state: OrbState | undefined, level: number, reduce
       opacity: clamp(pose.depth / 0.12),
     };
   });
-  const breath = life.breath * (1 + (voiced ? live * 0.012 : 0));
-  const rig = `translate(${round(CENTER + life.driftX * GROK_R)} ${round(CENTER + life.driftY * GROK_R)}) scale(${round(breath)}) translate(${-CENTER} ${-CENTER})`;
+  const breath = life.breath;
+  const sx = breath * (1 + (reduced ? 0 : live * 0.07));
+  const sy = breath * (1 - (reduced ? 0 : live * 0.05));
+  const rig = `translate(${round(CENTER + life.driftX * GROK_R)} ${round(CENTER + life.driftY * GROK_R)}) scale(${round(sx)} ${round(sy)}) translate(${-CENTER} ${-CENTER})`;
   return { eyes, rig };
 }
 
@@ -350,9 +359,9 @@ export function GrokBot({ size, state, levelRef }: { size: number; state?: OrbSt
   );
 }
 
-function slackEyeTransform(cx: number, lid: number) {
+function slackEyeTransform(cx: number, lid: number, widen = 1) {
   const squash = (0.14 + 0.86 * lid).toFixed(3);
-  return `translate(${cx} 14) scale(1 ${squash}) translate(${-cx} -14)`;
+  return `translate(${cx} 14) scale(${widen.toFixed(3)} ${squash}) translate(${-cx} -14)`;
 }
 
 export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
@@ -364,14 +373,14 @@ export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbS
 
   useMascotLoop(host, (time) => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const level = levelRef?.current ?? -1;
-    const live = level >= 0 ? clamp(level) : 0;
-    const voiced = level >= 0 && (state === "listening" || state === "speaking");
-    const scale = reduced ? 1 : 1 + Math.sin(time / 3.6) * 0.012 + (voiced ? live * 0.04 : 0);
+    const drive = reduced ? 0 : mascotDrive(state, levelRef?.current ?? -1, time);
+    const sx = 1 + Math.sin(time / 3.6) * 0.012 + drive * 0.07;
+    const sy = 1 + Math.sin(time / 3.6) * 0.012 - drive * 0.05;
     const lid = reduced ? 1 : blinkLid(time, SLACK_BLINKS, 0.16, 0.36);
-    motion.current?.setAttribute("transform", `translate(14 14) scale(${scale.toFixed(3)}) translate(-14 -14)`);
-    leftEye.current?.setAttribute("transform", slackEyeTransform(8, lid));
-    rightEye.current?.setAttribute("transform", slackEyeTransform(20, lid));
+    const widen = 1 + drive * 0.08;
+    motion.current?.setAttribute("transform", `translate(14 14) scale(${sx.toFixed(3)} ${sy.toFixed(3)}) translate(-14 -14)`);
+    leftEye.current?.setAttribute("transform", slackEyeTransform(8, lid, widen));
+    rightEye.current?.setAttribute("transform", slackEyeTransform(20, lid, widen));
   });
 
   return (
@@ -484,18 +493,81 @@ export function ShopAppMark({ size }: { size: number }) {
   );
 }
 
+export function ClaudeMark({ size }: { size: number }) {
+  const id = useId().replace(/:/g, "");
+  return (
+    <MarkFrame size={size}>
+      <defs>{markShade(`${id}-shade`, "0.25")}</defs>
+      <g filter={`url(#${id}-shade)`}>
+        <rect width="28" height="28" rx="14" fill="#D97757" />
+        <path d="M14 8.2v11.6M8.2 14h11.6M9.9 9.9l8.2 8.2M18.1 9.9l-8.2 8.2" stroke="#FAF6F1" strokeWidth="1.7" strokeLinecap="round" />
+      </g>
+    </MarkFrame>
+  );
+}
+
+export function GeminiMark({ size }: { size: number }) {
+  const id = useId().replace(/:/g, "");
+  return (
+    <MarkFrame size={size}>
+      <defs>
+        {markShade(`${id}-shade`, "0.2")}
+        <linearGradient id={`${id}-spark`} x1="8" y1="6" x2="21" y2="22" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#4B90FF" />
+          <stop offset="0.55" stopColor="#A254FF" />
+          <stop offset="1" stopColor="#FF4E6A" />
+        </linearGradient>
+      </defs>
+      <g filter={`url(#${id}-shade)`}>
+        <rect width="28" height="28" rx="14" fill="white" />
+        <path d="M14 6.4c.35 2.7.85 4.05 2.15 5.15 1.3 1.1 3.15 1.55 5.45 1.85-2.3.3-4.15.75-5.45 1.85-1.3 1.1-1.8 2.45-2.15 5.15-.35-2.7-.85-4.05-2.15-5.15-1.3-1.1-3.15-1.55-5.45-1.85 2.3-.3 4.15-.75 5.45-1.85 1.3-1.1 1.8-2.45 2.15-5.15Z" fill={`url(#${id}-spark)`} />
+      </g>
+    </MarkFrame>
+  );
+}
+
+export function PosMark({ size }: { size: number }) {
+  const id = useId().replace(/:/g, "");
+  return (
+    <MarkFrame size={size}>
+      <defs>{markShade(`${id}-shade`, "0.35")}</defs>
+      <g filter={`url(#${id}-shade)`}>
+        <rect width="28" height="28" rx="14" fill="#111111" />
+        <rect x="8.5" y="8" width="11" height="8" rx="1.5" fill="white" />
+        <rect x="10" y="9.5" width="8" height="3" rx="0.6" fill="#111111" />
+        <rect x="11.2" y="17.2" width="5.6" height="1.7" rx="0.85" fill="white" />
+      </g>
+    </MarkFrame>
+  );
+}
+
+export function AgenticMark({ size }: { size: number }) {
+  const id = useId().replace(/:/g, "");
+  return (
+    <MarkFrame size={size}>
+      <defs>{markShade(`${id}-shade`, "0.3")}</defs>
+      <g filter={`url(#${id}-shade)`}>
+        <rect width="28" height="28" rx="14" fill="#312E81" />
+        <path d="M10.2 17.6 L17.4 11.4 M10.2 17.6 L17.6 18.4" stroke="white" strokeWidth="1.3" strokeLinecap="round" />
+        <circle cx="10.2" cy="17.6" r="1.7" fill="white" />
+        <circle cx="17.4" cy="11.4" r="1.7" fill="white" />
+        <circle cx="17.6" cy="18.4" r="1.7" fill="white" />
+      </g>
+    </MarkFrame>
+  );
+}
+
 export function MuseBall({ size, state, levelRef }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
   const host = useRef<HTMLSpanElement>(null);
   const image = useRef<HTMLImageElement>(null);
 
   useMascotLoop(host, (time) => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const level = levelRef?.current ?? -1;
-    const live = level >= 0 ? clamp(level) : 0;
-    const voiced = level >= 0 && (state === "listening" || state === "speaking");
+    const drive = reduced ? 0 : mascotDrive(state, levelRef?.current ?? -1, time);
     const fill = 1.16;
-    const scale = reduced ? fill : fill + Math.sin(time * 1.2) * 0.012 + (voiced ? live * 0.04 : 0);
-    if (image.current) image.current.style.transform = `scale(${scale.toFixed(3)})`;
+    const sx = fill * (1 + (reduced ? 0 : Math.sin(time * 1.2) * 0.012 + drive * 0.06));
+    const sy = fill * (1 - (reduced ? 0 : drive * 0.045));
+    if (image.current) image.current.style.transform = `scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
   });
 
   return (

@@ -126,10 +126,12 @@ const FRAGMENT = `
 
 const STATE_RATE: Record<OrbState, number> = {
   idle: 1,
+  hover: 1.2,
+  selected: 1.08,
   connecting: 1.15,
-  listening: 1.35,
-  thinking: 1.2,
-  speaking: 1.6,
+  listening: 1.45,
+  thinking: 1.15,
+  speaking: 1.7,
   error: 1.75,
   disabled: 0,
 };
@@ -177,14 +179,15 @@ function TwistMesh({
     const material = matRef.current;
     if (!material) return;
     const frame = frameRef.current;
-    const kick = frame.live ? frame.level : 0;
+    const kick = frame.reduced ? 0 : frame.level;
     const rate = frame.reduced ? 0 : STATE_RATE[frame.state];
     const tint = tintRef.current;
     elapsed.current += Math.min(delta, 0.1);
     material.uniforms.uTime.value = elapsed.current;
-    material.uniforms.uSpeed.value = 0.2 * rate * (1 + 0.85 * kick);
-    material.uniforms.uNoiseStrength.value = 0.2 + 0.32 * kick;
-    material.uniforms.uAmplitude.value = 6 + 2.4 * kick;
+    material.uniforms.uSpeed.value = 0.2 * rate * (1 + 1.1 * kick);
+    material.uniforms.uNoiseDensity.value = 1.5 + 0.8 * kick;
+    material.uniforms.uNoiseStrength.value = 0.16 + 0.55 * kick;
+    material.uniforms.uAmplitude.value = 4.5 + 7 * kick;
     material.uniforms.uFrom.value.copy(tint.from);
     material.uniforms.uTo.value.copy(tint.to);
     material.uniforms.uCustom.value = tint.custom;
@@ -209,13 +212,16 @@ export function TwistScene({
   colorFrom,
   colorTo,
   custom,
+  engaged,
 }: {
   frameRef: RefObject<OrbFrame>;
   colorFrom: string;
   colorTo: string;
   custom: boolean;
+  engaged: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const invalidateRef = useRef<() => void>(() => {});
   const reduced = useReducedMotion();
   const [active, setActive] = useState(true);
 
@@ -225,19 +231,25 @@ export function TwistScene({
     return observeActivity(canvas, setActive);
   }, []);
 
+  useEffect(() => {
+    invalidateRef.current();
+  }, [engaged, colorFrom, colorTo]);
+
   return (
     <Canvas
       ref={canvasRef}
-      frameloop={reduced || !active ? 'demand' : 'always'}
+      frameloop={reduced || !active || !engaged ? 'demand' : 'always'}
       camera={{ position: [0, 0, 3], fov: 75 }}
       gl={{ alpha: true, antialias: true }}
-      dpr={[1, 2]}
+      dpr={[1, 1.5]}
       resize={{ offsetSize: true }}
       style={{ width: '100%', height: '100%', display: 'block' }}
-      onCreated={({ gl }) => {
+      onCreated={({ gl, invalidate }) => {
+        invalidateRef.current = invalidate;
         gl.toneMapping = THREE.NoToneMapping;
         gl.outputColorSpace = THREE.LinearSRGBColorSpace;
         gl.setClearColor(0x000000, 0);
+        invalidate();
       }}
     >
       <TwistMesh frameRef={frameRef} colorFrom={colorFrom} colorTo={colorTo} custom={custom} />

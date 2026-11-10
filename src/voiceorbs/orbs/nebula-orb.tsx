@@ -12,27 +12,32 @@ import {
 } from '@/voiceorbs/lib/orb-state';
 import { useReducedMotion } from '@/voiceorbs/lib/use-reduced-motion';
 import { useWebGLSupport } from '@/voiceorbs/lib/use-webgl-support';
+import { OrbBoundary, SphereFallback } from '@/voiceorbs/orbs/orb-boundary';
 
 const NebulaScene = dynamic(() => import('./nebula-scene').then((m) => m.NebulaScene), {
   ssr: false,
 });
 
 const GLOW: Record<OrbState, number> = {
-  idle: 0.45,
-  connecting: 0.6,
-  listening: 0.85,
-  thinking: 0.65,
-  speaking: 0.95,
-  error: 0.7,
-  disabled: 0.2,
+  idle: 0.22,
+  hover: 0.32,
+  selected: 0.26,
+  connecting: 0.3,
+  listening: 0.34,
+  thinking: 0.28,
+  speaking: 0.36,
+  error: 0.4,
+  disabled: 0.12,
 };
 
 const CORE_SCALE: Record<OrbState, number> = {
   idle: 0.94,
+  hover: 0.98,
+  selected: 0.96,
   connecting: 0.97,
-  listening: 1.04,
+  listening: 1.02,
   thinking: 0.99,
-  speaking: 1.07,
+  speaking: 1.03,
   error: 1,
   disabled: 0.9,
 };
@@ -44,7 +49,7 @@ const glowLayer = (
   fade: string | undefined,
 ): CSSProperties => ({
   position: 'absolute',
-  inset: '-16%',
+  inset: '-8%',
   borderRadius: '50%',
   background: `radial-gradient(circle at 50% 44%, color-mix(in srgb, ${to} 32%, transparent) 0%, color-mix(in srgb, ${from} 20%, transparent) 44%, transparent 70%)`,
   opacity,
@@ -144,14 +149,16 @@ export const NebulaOrb = ({
             transition: reduced ? undefined : 'opacity 500ms ease',
           }}
         >
-          <NebulaScene
-            state={state}
-            speed={speed}
-            colorFrom={colorFrom}
-            colorTo={colorTo}
-            levelRef={levelRef}
-            onReady={handleReady}
-          />
+          <OrbBoundary fallback={<SphereFallback from={colorFrom} to={colorTo} />}>
+            <NebulaScene
+              state={state}
+              speed={speed}
+              colorFrom={colorFrom}
+              colorTo={colorTo}
+              levelRef={levelRef}
+              onReady={handleReady}
+            />
+          </OrbBoundary>
         </div>
       )}
     </div>

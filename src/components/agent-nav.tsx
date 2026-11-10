@@ -3,13 +3,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AccountMenu, initials, StoreMenu } from "@/components/admin-rail";
 import { IconButton, Orb, ShopifyMark } from "@/components/marks";
+import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Tip } from "@/components/chat-column";
 import { PIcon } from "@/components/polaris-icon";
 import { visibleAgents, type AgentGroup, type PrototypeState } from "@/lib/prototype";
 
 const groups: { id: AgentGroup; label: string | null }[] = [
   { id: "favorites", label: null },
-  { id: "teams", label: "Teams" },
+  { id: "teams", label: "Team" },
   { id: "channels", label: "Channels" },
   { id: "tools", label: "Tools" },
   { id: "hidden", label: "Hidden" },
@@ -56,6 +57,7 @@ export function AgentNav({
   const placed = useRef(new Map<string, { left: number; top: number }>());
   const skipSlide = useRef(true);
   const [sliding, setSliding] = useState(false);
+  const [hotId, setHotId] = useState<string | null>(null);
   const [revealing, setRevealing] = useState(false);
   const [seenPresent, setSeenPresent] = useState(present);
   if (seenPresent !== present) {
@@ -197,6 +199,8 @@ export function AgentNav({
                     aria-current={selected ? "page" : undefined}
                     aria-label={collapsed ? item.name : undefined}
                     onClick={() => onSelect(item.id)}
+                    onMouseEnter={() => setHotId(item.id)}
+                    onMouseLeave={() => setHotId((current) => (current === item.id ? null : current))}
                     className={
                       collapsed
                         ? `press relative grid size-[31px] place-items-center rounded-full ${
@@ -210,7 +214,15 @@ export function AgentNav({
                     }
                   >
                     <span className="relative grid size-[31px] shrink-0 place-items-center rounded-full">
-                      <Orb id={item.orb} agentId={item.id} size={31} colorFrom={item.orbFrom} colorTo={item.orbTo} />
+                      <Orb
+                        id={item.orb}
+                        agentId={item.id}
+                        size={ORB_SIZE.nav}
+                        colorFrom={item.orbFrom}
+                        colorTo={item.orbTo}
+                        presence={selected ? "selected" : "rest"}
+                        hot={hotId === item.id}
+                      />
                       {collapsed && item.unread > 0 ? (
                         <span className="absolute -right-1.5 -top-1.5 z-10 grid size-4 place-items-center rounded-full bg-[#5631f4] text-[10px] font-medium text-white ring-2 ring-[#0c0d0c]">
                           {item.unread}

@@ -193,8 +193,7 @@ export function VoiceMode({
         onClick={tapOrb}
         className="press relative grid size-14 shrink-0 place-items-center rounded-full"
       >
-        {phase === "listening" ? <span className="absolute inset-0 animate-ping rounded-full bg-white/[0.06]" /> : null}
-        <Orb id={agent.orb} agentId={agent.id} size={48} colorFrom={agent.orbFrom} colorTo={agent.orbTo} />
+        <Orb id={agent.orb} agentId={agent.id} size={48} presence="selected" colorFrom={agent.orbFrom} colorTo={agent.orbTo} />
       </button>
       <div className="min-w-0 flex-1" aria-live="polite">
         {phase === "unavailable" ? (

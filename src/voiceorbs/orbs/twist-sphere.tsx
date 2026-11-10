@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRef } from 'react';
 import { orbVars, type OrbProps } from '@/voiceorbs/lib/orb-state';
 import { useOrbAnimator } from '@/voiceorbs/lib/use-orb-animator';
+import { OrbBoundary, SphereFallback } from '@/voiceorbs/orbs/orb-boundary';
 
 const TwistScene = dynamic(() => import('./twist-scene').then((mod) => mod.TwistScene), { ssr: false });
 
@@ -46,7 +47,9 @@ export const TwistSphere = ({
         position: 'relative',
       }}
     >
-      <TwistScene frameRef={frameRef} colorFrom={colorFrom} colorTo={colorTo} custom={custom} />
+      <OrbBoundary fallback={<SphereFallback from={colorFrom} to={colorTo} />}>
+        <TwistScene frameRef={frameRef} colorFrom={colorFrom} colorTo={colorTo} custom={custom} engaged={state !== 'idle' && state !== 'disabled'} />
+      </OrbBoundary>
     </div>
   );
 };
