@@ -1816,7 +1816,7 @@ function CreateForm({ onCreate, onBack }: { onCreate: (name: string, purpose: st
 
 const addSections: { label: string; ids: string[] }[] = [
   { label: "Recommended", ids: ["chief", "ideas", "trends", "campaigns"] },
-  { label: "Team", ids: ["grok", "slack"] },
+  { label: "Team", ids: ["grok", "slack", "duet"] },
   { label: "Channels", ids: ["store", "shop"] },
   { label: "Tools", ids: ["customers", "orders", "finance", "analytics"] },
 ];
@@ -1829,6 +1829,7 @@ const addCopy: Record<string, string> = {
   slack: "Connect Slack for #ops, drafts, and what the team flagged.",
   grok: "Connect Grok for what shoppers are asking on X.",
   claude: "Connect Claude to draft emails, product copy, and replies.",
+  duet: "Write with Claude, one sentence at a time.",
   gemini: "Connect Google’s Gemini for search and Shopping ads.",
   store: "The online store: theme, product pages, and delivery promises.",
   shop: "The Shop channel and the listings shoppers see there.",

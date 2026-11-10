@@ -5,9 +5,9 @@ import { useOrbAudio } from "@/components/orb-audio";
 import { useReducedMotion } from "@/voiceorbs/lib/use-reduced-motion";
 import { ORB_LOOK, presenceFor } from "@/voiceorbs/lib/orb-model";
 import { canonicalOrb, isVoiceOrb, type OrbId, type VoiceOrbId } from "@/lib/prototype";
-import { AgenticMark, ClaudeMark, GeminiMark, GrokBot, MuseBall, OnlineStoreMark, PosMark, ShopAppMark, SlackOrb } from "@/components/team-marks";
+import { AgenticMark, ClaudeDuetMark, ClaudeMark, GeminiMark, GrokBot, MuseBall, OnlineStoreMark, PosMark, ShopAppMark, SlackOrb } from "@/components/team-marks";
 import { AuraField } from "@/voiceorbs/orbs/aura-field";
-import { FluidOrb, MarbleOrb } from "@/voiceorbs/orbs/glass-orbs";
+import { BallOrb, MarbleOrb } from "@/voiceorbs/orbs/glass-orbs";
 import { MercuryOrb } from "@/voiceorbs/orbs/mercury-orb";
 import { PlasmaOrb } from "@/voiceorbs/orbs/plasma-orb";
 import { TwistSphere } from "@/voiceorbs/orbs/twist-sphere";
@@ -94,6 +94,8 @@ function mark(id: OrbId, size: number, state: OrbState, levelRef: RefObject<numb
       return <ShopAppMark size={size} />;
     case "claude":
       return <ClaudeMark size={size} />;
+    case "duet":
+      return <ClaudeDuetMark size={size} />;
     case "gemini":
       return <GeminiMark size={size} />;
     case "pos":
@@ -147,7 +149,7 @@ function VoiceOrb({
       node = <MarbleOrb {...props} />;
       break;
     case "strands":
-      node = <FluidOrb {...props} />;
+      node = <BallOrb {...props} />;
       break;
     default:
       node = <PlasmaOrb {...props} />;

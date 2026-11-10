@@ -43,6 +43,7 @@ export const sidekickHomes: Record<string, Workspace> = {
   grok: place("home-active", false),
   slack: place("orders", false, { tab: "Unfulfilled" }),
   claude: place("products", false, { tab: "Draft" }),
+  duet: place("products", false, { tab: "Draft" }),
   gemini: place("analytics", false),
   muse: place("home-active", false),
   store: place("online-store", false),
