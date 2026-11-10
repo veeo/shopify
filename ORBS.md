@@ -42,5 +42,5 @@ Visible orbs keep their idle motion, all at the same pace. Offscreen orbs and hi
 - **Twisted sphere** keeps the original twist. Chief of staff uses this style. Talking speeds it.
 - **Aura Field** is the tool ring. Separate strands drift and change a little at rest, then spring open while listening or talking. The ring sits at the same size as the filled orbs.
 - **Marble** is the Campaigns orb. A milky glass marble with a soft blue-to-purple ribbon inside. It stays inside the same circle as the others.
-- **Bubbles** is a clear glass sphere of soft glowing bubbles over a warm pink core. The bubbles drift at rest, and listening and talking speed them and push them apart.
+- **Bubbles** is a clear glass sphere with soft purple and pink lava-lamp bubbles rising inside. The bubbles drift at rest; listening and talking speed the rise.
 - **Grok Bot, Slackbot, and Muse** keep their artwork. The mark squashes and stretches with the level. Grok and Slackbot answer with their eyes. Neither grows a mouth.
