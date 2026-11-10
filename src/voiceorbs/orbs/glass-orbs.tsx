@@ -75,7 +75,7 @@ void main() {
 }
 `;
 
-const FLUID = `
+const BALLS = `
 precision highp float;
 uniform vec2 uRes;
 uniform float uTime;
@@ -83,40 +83,118 @@ uniform float uLevel;
 uniform vec3 uFrom;
 uniform vec3 uTo;
 
+float bayer4(vec2 p) {
+  vec2 q = floor(mod(p, 4.0));
+  float x = q.x;
+  float y = q.y;
+  float v = mod(x, 2.0) * 8.0 + mod(y, 2.0) * 4.0 + mod(floor(x / 2.0), 2.0) * 2.0 + mod(floor(y / 2.0), 2.0);
+  return v / 16.0;
+}
+
+vec3 ballHue(float i) {
+  float k = mod(i, 6.0);
+  vec3 pink = vec3(0.96, 0.38, 0.62);
+  vec3 violet = vec3(0.55, 0.28, 0.98);
+  vec3 blue = vec3(0.28, 0.42, 0.98);
+  vec3 rose = vec3(0.98, 0.45, 0.72);
+  if (k < 1.0) return mix(pink, uTo, 0.25);
+  if (k < 2.0) return mix(violet, uFrom, 0.2);
+  if (k < 3.0) return mix(blue, uFrom, 0.35);
+  if (k < 4.0) return mix(rose, uTo, 0.4);
+  if (k < 5.0) return mix(violet, pink, 0.45);
+  return mix(blue, rose, 0.4);
+}
+
+vec3 ballHome(float i) {
+  if (i < 1.0) return vec3(0.02, 0.04, 0.12);
+  if (i < 2.0) return vec3(0.0, -0.3, 0.02);
+  if (i < 3.0) return vec3(-0.3, 0.04, 0.04);
+  if (i < 4.0) return vec3(0.28, 0.02, 0.0);
+  if (i < 5.0) return vec3(0.14, 0.26, 0.08);
+  return vec3(-0.14, -0.12, -0.04);
+}
+
+float ballRad(float i) {
+  if (i < 1.0) return 0.24;
+  if (i < 2.0) return 0.22;
+  if (i < 3.0) return 0.17;
+  if (i < 4.0) return 0.16;
+  if (i < 5.0) return 0.12;
+  return 0.14;
+}
+
+vec4 field(vec3 p, float t) {
+  vec4 acc = vec4(0.0);
+  float drift = 0.055 + uLevel * 0.07;
+  for (int i = 0; i < 6; i++) {
+    float fi = float(i);
+    float sp = 0.38 + fi * 0.045;
+    vec3 c = ballHome(fi) + vec3(
+      sin(t * sp + fi * 1.7) * drift,
+      cos(t * sp * 0.76 + fi * 2.1) * drift,
+      sin(t * sp * 0.5 + fi) * 0.04
+    );
+    float rad = ballRad(fi);
+    vec3 rel = p - c;
+    float dist = length(rel);
+    float d = dist - rad;
+    float cover = smoothstep(0.07, -0.01, d);
+    float core = smoothstep(0.02, -0.03, d);
+    vec3 bn = normalize(rel + vec3(0.0001));
+    float shade = clamp(dot(bn, normalize(vec3(-0.22, 0.78, 0.58))), 0.0, 1.0);
+    float ink = step(0.42 + shade * 0.52, bayer4(gl_FragCoord.xy + fi * 2.0));
+    vec3 hue = ballHue(fi);
+    vec3 body = hue * (0.78 + 0.4 * shade);
+    body = mix(body, body * 0.42, ink);
+    body += vec3(1.0) * pow(shade, 8.0) * 0.22;
+    vec3 col = mix(hue * 0.9, body, core);
+    float room = 1.0 - acc.a;
+    acc.rgb += col * cover * room;
+    acc.a += cover * room;
+  }
+  return acc;
+}
+
+vec3 over(vec3 base, vec4 layer) {
+  return base * (1.0 - layer.a) + layer.rgb;
+}
+
 void main() {
   vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / min(uRes.x, uRes.y);
-  float r = length(uv);
-  float edge = 1.0 - smoothstep(0.975, 1.0, r);
-  if (edge <= 0.001) {
+  float r2 = dot(uv, uv);
+  if (r2 > 1.0) {
     gl_FragColor = vec4(0.0);
     return;
   }
-  float z = sqrt(max(0.0, 1.0 - r * r));
   float t = uTime;
-  vec3 ink = vec3(0.03, 0.04, 0.08);
-  vec3 cols[4];
-  cols[0] = vec3(0.12, 0.52, 1.0);
-  cols[1] = vec3(0.55, 0.2, 1.0);
-  cols[2] = vec3(1.0, 0.25, 0.48);
-  cols[3] = vec3(1.0, 0.5, 0.14);
-  for (int i = 0; i < 4; i++) {
-    float fi = float(i);
-    float sp = 0.42 + fi * 0.27;
-    vec2 c = vec2(
-      cos(t * sp + fi * 1.9) * (0.32 + 0.08 * sin(t * 0.53 + fi * 1.3)),
-      sin(t * sp * 0.71 + fi * 2.4) * (0.3 + 0.1 * cos(t * 0.37 + fi))
-    );
-    float d = length(uv - c);
-    float blob = exp(-d * d * (3.4 - uLevel * 0.6));
-    vec3 hue = mix(cols[i], mix(uFrom, uTo, fi / 3.0), 0.28);
-    ink += hue * blob;
+  vec3 ro = vec3(0.0, 0.0, 2.4);
+  vec3 rd = normalize(vec3(uv * 0.86, -1.7));
+  float b = dot(ro, rd);
+  float disc = b * b - (dot(ro, ro) - 1.0);
+  if (disc < 0.0) {
+    gl_FragColor = vec4(0.0);
+    return;
   }
-  float fres = pow(1.0 - z, 1.8);
-  vec3 col = 1.0 - exp(-ink * (0.85 + 0.35 * z));
-  col = mix(col, vec3(1.0), fres * 0.08);
-  vec2 shine = uv - vec2(-0.3, 0.32);
-  float spec = pow(clamp(1.0 - length(shine / vec2(0.22, 0.14)), 0.0, 1.0), 5.0);
-  col += vec3(1.0) * spec * 0.28;
+  float tHit = -b - sqrt(disc);
+  vec3 hit = ro + rd * tHit;
+  vec3 n = normalize(hit);
+  vec3 inside = refract(rd, n, 0.64);
+  if (dot(inside, inside) < 0.001) inside = reflect(rd, n);
+  vec3 bent = hit * 0.62;
+  vec4 front = field(bent + inside * 0.16, t);
+  vec4 mid = field(bent + inside * 0.58 + n * 0.07, t);
+  vec4 back = field(bent + inside * 1.05 - n * 0.05, t);
+  vec3 balls = over(over(back.rgb, mid), front);
+  float cover = clamp(front.a + mid.a * (1.0 - front.a) + back.a * (1.0 - front.a) * (1.0 - mid.a), 0.0, 1.0);
+  vec3 glass = mix(vec3(0.96, 0.9, 0.98), mix(uFrom, uTo, 0.45), 0.22);
+  vec3 col = glass * (1.0 - cover) + balls;
+  float fres = pow(1.0 - clamp(dot(-rd, n), 0.0, 1.0), 2.1);
+  col = mix(col, mix(vec3(1.0), mix(uFrom, uTo, 0.55), 0.35), fres * 0.72);
+  float spec = pow(clamp(dot(n, normalize(vec3(-0.28, 0.62, 0.73))), 0.0, 1.0), 18.0);
+  float cap = pow(clamp(dot(n, normalize(vec3(-0.05, 0.92, 0.28))), 0.0, 1.0), 1.7);
+  col += vec3(1.0) * spec * 0.7;
+  col = mix(col, vec3(1.0), cap * 0.42);
+  float edge = 1.0 - smoothstep(0.985, 1.0, sqrt(r2));
   col *= edge;
   gl_FragColor = vec4(col * edge, edge);
 }
@@ -182,7 +260,7 @@ function GlassOrb({
       return shader;
     };
     const vert = compile(gl.VERTEX_SHADER, VERT);
-    const frag = compile(gl.FRAGMENT_SHADER, liveRef.current.kind === 'marble' ? MARBLE : FLUID);
+    const frag = compile(gl.FRAGMENT_SHADER, liveRef.current.kind === 'marble' ? MARBLE : BALLS);
     const program = gl.createProgram();
     if (!vert || !frag || !program) {
       setLost(true);
@@ -234,8 +312,12 @@ function GlassOrb({
       const live = liveRef.current;
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      const level = live.reduced ? 0 : (live.levelRef?.current ?? 0);
-      const rate = live.reduced || !active ? 0 : RATE[live.state] * live.speed * (0.72 + level * 0.9);
+      const raw = live.levelRef?.current;
+      const hasLive = typeof raw === 'number' && raw >= 0;
+      const voiced = live.state === 'listening' || live.state === 'speaking';
+      const level = live.reduced ? 0 : hasLive ? raw : voiced ? 0.35 : 0;
+      const pace = live.kind === 'fluid' ? 0.62 * (1 + level * 0.85) : 0.72 + level * 0.9;
+      const rate = live.reduced || !active ? 0 : RATE[live.state] * Math.max(live.speed, 0) * pace;
       time += dt * rate;
       const error = live.state === 'error' ? 1 : 0;
       const from = toUnit(error ? ERROR_COLOR_FROM : live.colorFrom);
@@ -322,13 +404,13 @@ export function MarbleOrb(props: OrbProps) {
   return <GlassOrb kind="marble" label="Marble" {...props} />;
 }
 
-export function FluidOrb(props: OrbProps) {
+export function BallOrb(props: OrbProps) {
   return (
     <GlassOrb
       {...props}
       kind="fluid"
-      label={props.label ?? 'Fluid'}
-      colorFrom={props.colorFrom ?? '#38bdf8'}
+      label={props.label ?? 'Glass'}
+      colorFrom={props.colorFrom ?? '#7c5cff'}
       colorTo={props.colorTo ?? '#fb7185'}
     />
   );

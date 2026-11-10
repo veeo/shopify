@@ -40,7 +40,7 @@ Visible orbs keep their idle motion, all at the same pace. Offscreen orbs and hi
 - **Plasma** is the Product ideas orb. The colors stay separated, a glass highlight sits on the sphere, and the flow is a step faster than before. Talking still speeds it further.
 - **Mercury** is the Trends orb. The ripples and contour deepen with the level, and the idle flow is a step faster.
 - **Twisted sphere** keeps the original twist. Chief of staff uses this style. Talking speeds it.
-- **Aura Field** is the tool ring. Open lines sit inside the circle and brighten when talking. The ring does not fill in or grow.
+- **Aura Field** is the tool ring. It is the VoiceOrbs aura: overlapping bands that drift at rest and spring open while listening or talking.
 - **Marble** is the Campaigns orb. A glass sphere with colored veins and a moving highlight. It stays inside the same circle as the others.
-- **Fluid** is the soft glass orb. Four colors drift independently inside the sphere, closer to the Siri orb than to spectral lines.
+- **Glass** is a sphere of floating color balls. The balls are refracted through the glass and stippled. Listening and talking speed them and push them apart.
 - **Grok Bot, Slackbot, and Muse** keep their artwork. The mark squashes and stretches with the level. Grok and Slackbot answer with their eyes. Neither grows a mouth.

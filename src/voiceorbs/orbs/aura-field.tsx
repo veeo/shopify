@@ -32,14 +32,16 @@ interface AuraParams extends Record<string, number> {
   desat: number;
 }
 
+const AURA_REST: AuraParams = { speed: 10, scale: 0.28, thick: 0.072, warp: 0.09, brightLo: 1.05, brightHi: 1.05, shimmer: 0, sweepRate: 0.6, desat: 0 };
+
 const AURA_TABLE: Record<OrbState, AuraParams> = {
-  idle: { speed: 12, scale: 0.26, thick: 0.045, warp: 0.03, brightLo: 0.75, brightHi: 0.9, shimmer: 0.2, sweepRate: 0.28, desat: 0 },
-  hover: { speed: 12, scale: 0.26, thick: 0.045, warp: 0.03, brightLo: 0.75, brightHi: 0.9, shimmer: 0.2, sweepRate: 0.28, desat: 0 },
-  selected: { speed: 12, scale: 0.26, thick: 0.045, warp: 0.03, brightLo: 0.75, brightHi: 0.9, shimmer: 0.2, sweepRate: 0.28, desat: 0 },
+  idle: AURA_REST,
+  hover: AURA_REST,
+  selected: AURA_REST,
   connecting: { speed: 14, scale: 0.22, thick: 0.045, warp: 0.04, brightLo: 0.9, brightHi: 0.9, shimmer: 1, sweepRate: 1.3, desat: 0 },
-  listening: { speed: 40, scale: 0.26, thick: 0.05, warp: 0.05, brightLo: 1.2, brightHi: 1.7, shimmer: 0, sweepRate: 0.7, desat: 0 },
-  thinking: { speed: 18, scale: 0.26, thick: 0.045, warp: 0.04, brightLo: 0.55, brightHi: 1.5, shimmer: 0.35, sweepRate: 0.9, desat: 0 },
-  speaking: { speed: 44, scale: 0.26, thick: 0.05, warp: 0.05, brightLo: 1.25, brightHi: 1.7, shimmer: 0, sweepRate: 0.85, desat: 0 },
+  listening: { speed: 20, scale: 0.3, thick: 0.058, warp: 0.1, brightLo: 1.5, brightHi: 2, shimmer: 0, sweepRate: 0.8, desat: 0 },
+  thinking: { speed: 30, scale: 0.27, thick: 0.05, warp: 0.14, brightLo: 0.5, brightHi: 2.5, shimmer: 0.6, sweepRate: 2.8, desat: 0 },
+  speaking: { speed: 70, scale: 0.2, thick: 0.06, warp: 0.12, brightLo: 1.6, brightHi: 1.6, shimmer: 0, sweepRate: 1, desat: 0 },
   error: { speed: 25, scale: 0.24, thick: 0.058, warp: 0.18, brightLo: 1.4, brightHi: 1.4, shimmer: 0, sweepRate: 0.6, desat: 0 },
   disabled: { speed: 0, scale: 0.2, thick: 0.04, warp: 0.05, brightLo: 0.5, brightHi: 0.5, shimmer: 0, sweepRate: 0, desat: 0.85 },
 };
@@ -141,9 +143,9 @@ void main() {
   // The canvas is larger than the avatar circle. uBleed maps the ring onto that
   // circle, and the extra margin is where the glow falls off.
   vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / uRes;
-  vec2 p = uv * uBleed * 0.64;
+  vec2 p = uv * uBleed;
   float r = length(p);
-  float edge = 1.0 - smoothstep(0.9, 1.02, length(uv));
+  float edge = 1.0 - smoothstep(0.8, 1.0, r);
   if (edge <= 0.001) {
     gl_FragColor = vec4(0.0);
     return;
@@ -160,7 +162,7 @@ void main() {
       + 0.32 * amp2 * sin(5.0 * a - ph * 1.7 + fi * 2.0)
       + 0.22 * sin(2.0 * a + ph * 0.8 + fi);
     n *= 0.5;
-    float rr = min(uRadius * (1.0 + n * uWarp * 2.2) + (fi - 1.0) * uThick * 0.9, 0.64);
+    float rr = uRadius * (1.0 + n * uWarp * 2.2) + (fi - 1.0) * uThick * 0.9;
     float d = abs(r - rr);
     float w = uThick * (0.8 + 0.6 * abs(n));
     float band = exp(-(d * d) / (w * w));
@@ -200,7 +202,7 @@ interface GlHandle {
 }
 
 /** Canvas is this many times the avatar slot, so glow can leave the circle. */
-const AURA_BLEED = 1.85;
+const AURA_BLEED = 1.28;
 
 const UNIFORMS = [
   'uRes',
@@ -292,11 +294,11 @@ export const AuraField = ({
 
     const pulse = still ? 0.5 : pingPong(m.pulse);
     const bright = p.brightLo + (p.brightHi - p.brightLo) * pulse;
-    const open = level * (weights.speaking + weights.listening * 0.9);
-    const scale = m.spring.x + 0.34 * open;
+    const speak = weights.speaking * level;
+    const scale = m.spring.x + 0.2 * speak;
     const radius = RADIUS_BASE + RADIUS_GAIN * scale;
-    const thick = p.thick + 0.04 * open;
-    const warp = p.warp + 0.16 * open;
+    const thick = p.thick + 0.035 * speak;
+    const warp = p.warp + 0.14 * speak + 0.04 * weights.listening * level;
     const shade = 0.5 + 0.42 * bright;
 
     const handle = glRef.current;

@@ -58,10 +58,13 @@ function Shell({
 }) {
   const meta = pageMeta(page);
   const sections = sectionChoices(page);
+  const parentPage = meta.parent && meta.parent.page !== "home" ? meta.parent.page : null;
+  const parentTitle = parentPage ? pageMeta(parentPage).title : "";
   return (
     <>
       <TopBar
         title={meta.title}
+        parent={parentPage ? { label: parentTitle, onClick: () => nav.go(parentPage) } : undefined}
         back={back?.label}
         onBack={back ? () => nav.go(back.page) : undefined}
         actions={actions}

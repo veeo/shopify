@@ -22,6 +22,7 @@ export type OrbId =
   | "grok"
   | "muse"
   | "claude"
+  | "duet"
   | "gemini"
   | "store"
   | "shop"
@@ -37,7 +38,7 @@ export const voiceOrbLabel: Record<VoiceOrbId, string> = {
   twist: "Twisted Colorful Sphere",
   aura: "Aura Field",
   marble: "Marble",
-  strands: "Fluid",
+  strands: "Glass",
 };
 
 /** Gallery defaults. Twist's pair keeps the original cosine palette until a sidekick picks another. */
@@ -47,7 +48,7 @@ export const voiceOrbTint: Record<VoiceOrbId, { from: string; to: string }> = {
   twist: { from: "#22d3ee", to: "#f472b6" },
   aura: { from: "#34d399", to: "#60a5fa" },
   marble: { from: "#1d4ed8", to: "#fb7185" },
-  strands: { from: "#38bdf8", to: "#fb7185" },
+  strands: { from: "#7c5cff", to: "#fb7185" },
 };
 
 /** One color for the editor. The second stop is derived so the orb keeps depth. */
@@ -74,7 +75,7 @@ export function orbColorPair(hex: string): { from: string; to: string } {
 }
 
 /** Branded marks stay out of the generic orb picker. */
-export const exemptAvatarAgents = new Set(["slack", "grok", "muse", "claude", "gemini", "store", "shop", "pos", "agentic"]);
+export const exemptAvatarAgents = new Set(["slack", "grok", "muse", "claude", "duet", "gemini", "store", "shop", "pos", "agentic"]);
 
 /** Sidekicks that stay out of the nav, the switcher, mentions, and the add list. */
 export const hiddenSidekicks = new Set(["muse", "claude", "gemini", "pos", "agentic"]);
@@ -122,6 +123,7 @@ export function canonicalOrb(orb: string): OrbId {
     orb === "slack" ||
     orb === "muse" ||
     orb === "claude" ||
+    orb === "duet" ||
     orb === "gemini" ||
     orb === "store" ||
     orb === "shop" ||
@@ -359,6 +361,16 @@ function teamConversations(now: number): Record<string, Conversation[]> {
         "It’s watching mentions of the headphone restock and the desk-lamp ship date. People keep repeating Monday’s ad, which still says the lamp ships this week.",
       ),
     ],
+    duet: [
+      convo(
+        "duet",
+        "welcome",
+        "Write the welcome email",
+        3 * 3_600_000,
+        "Write the welcome email with me.",
+        "Opening line: thanks for the order, and the Studio ANC is on its way. The next sentence should say 14 are left. You write that one.",
+      ),
+    ],
     slack: [
       convo(
         "slack",
@@ -556,6 +568,8 @@ const persona = {
     "You are Muse, a creative partner for this electronics store. The live direction is the headphone restock: one desk photo and the line “Back in stock. Ships tomorrow.” Leave the lamp out of it.",
   claude:
     "You are Claude, connected for writing. The welcome email and a rewrite of the desk-lamp delivery line are the two drafts worth doing today. Include the #ops note that 14 headphones are left.",
+  duet:
+    "You are Claude Duet, writing with the merchant one sentence at a time. The welcome email is the piece open today. #support drafted it, and it still needs the line that 14 Studio ANC Headphones are left. You write a sentence, then hand the next one back. Don't finish the whole email alone.",
   gemini:
     "You are Gemini, connected from Google. Search interest in “travel charger” and “desk setup” is up 22% week over week. The Shopping ad still crops the headphone photo.",
   store:
@@ -597,6 +611,7 @@ const purposeFor: Record<string, string> = {
   grok: "See the agents running on X and pass them a task.",
   muse: "Offer directions, names, and campaign angles.",
   claude: "Draft the emails, product copy, and replies the store owes.",
+  duet: "Write the store's drafts with you, one sentence at a time.",
   gemini: "Watch Google search and Shopping ads for this catalog.",
   store: "Look after merchandising, delivery promises, and theme content.",
   shop: "Watch the Shop channel and the listings shoppers see there.",
@@ -610,7 +625,7 @@ const purposeFor: Record<string, string> = {
 
 function connectionsFor(id: string): Connection[] {
   const on = new Set(
-    id === "slack" ? ["slack"] : id === "grok" ? ["x"] : id === "claude" ? ["claude"] : id === "gemini" ? ["google"] : id === "shop" ? ["shop"] : id === "sidekick" ? ["shop", "admin"] : ["admin"],
+    id === "slack" ? ["slack"] : id === "grok" ? ["x"] : id === "claude" || id === "duet" ? ["claude"] : id === "gemini" ? ["google"] : id === "shop" ? ["shop"] : id === "sidekick" ? ["shop", "admin"] : ["admin"],
   );
   return connectionChoices.map((item) => ({ ...item, on: on.has(item.id) }));
 }
@@ -691,6 +706,15 @@ export const catalog: Agent[] = [
     topic: "From the team",
     placeholder: "Ask Slackbot…",
     orb: "slack",
+  }),
+  agent({
+    id: "duet",
+    name: "Claude Duet",
+    group: "teams",
+    preview: "The welcome email is open. Write it with me.",
+    topic: "Writing together",
+    placeholder: "Write with Claude Duet…",
+    orb: "duet",
   }),
   agent({
     id: "claude",
@@ -1128,6 +1152,10 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
   slack: {
     text: "Here’s the team, pulled in from Slack.\n\n#ops is on the three open orders. #1078 and #1077 are paid and still unfulfilled, #1075 hasn’t been paid, and the headphone bin is down to 14.\n\n#support has the welcome email drafted. It still needs the note that 14 headphones are left.\n\nI can summarize a channel or bring one of those conversations in.",
     asks: ["Summarize what the team is on", "Pull in the welcome email"],
+  },
+  duet: {
+    text: "The welcome email is the piece to write together. #support drafted it, and it still needs the line that 14 headphones are left. I’ll take a sentence, then you take the next.",
+    asks: ["Write the welcome email with me", "Start with the headphone line"],
   },
   claude: {
     text: "Two drafts are worth doing today. The welcome email, and a rewrite of the desk-lamp line so it says it ships this week. I’d include the note that 14 headphones are left.",
@@ -1770,6 +1798,20 @@ function scriptedReply(agentId: string, text: string, storeName: string): { text
     if (/summar|agent|running|restock|doing/.test(q)) {
       return {
         text: "Two agents are running. The launch agent still owes the USB-C hub reply, about 40 people on the headphone thread. The restock agent is watching mentions of the restock and the desk-lamp ship date. Tell me which one to pass a task to.",
+        effects,
+      };
+    }
+  }
+  if (agentId === "duet") {
+    if (/headphone|14|line/.test(q)) {
+      return {
+        text: "Here’s the line: 14 Studio ANC Headphones are left, and they ship tomorrow. Your sentence next.",
+        effects,
+      };
+    }
+    if (/welcome|email|write|draft/.test(q)) {
+      return {
+        text: "Opening line: thanks for the order, and the Studio ANC is on its way. The next sentence should say 14 are left. You write that one.",
         effects,
       };
     }
