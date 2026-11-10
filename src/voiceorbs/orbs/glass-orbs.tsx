@@ -8,8 +8,6 @@ import { useWebGLSupport } from '@/voiceorbs/lib/use-webgl-support';
 import { observeActivity, useOnScreen } from '@/voiceorbs/lib/use-in-view';
 import { SphereFallback } from '@/voiceorbs/orbs/orb-boundary';
 
-type Kind = 'marble' | 'fluid';
-
 const RATE: Record<OrbState, number> = {
   idle: 1,
   hover: 1,
@@ -80,144 +78,12 @@ void main() {
 }
 `;
 
-/** Lava-lamp bubbles in a clear glass shell. Soft purple and pink, no black. */
-const BALLS = `
-precision highp float;
-uniform vec2 uRes;
-uniform float uTime;
-uniform float uLevel;
-uniform vec3 uFrom;
-uniform vec3 uTo;
-
-vec3 ballHue(float i) {
-  float k = mod(i, 8.0);
-  vec3 pink = mix(vec3(0.98, 0.36, 0.58), uTo, 0.28);
-  vec3 magenta = mix(vec3(0.94, 0.24, 0.7), uTo, 0.2);
-  vec3 violet = mix(vec3(0.58, 0.24, 0.98), uFrom, 0.28);
-  vec3 purple = mix(vec3(0.72, 0.22, 0.95), uFrom, 0.18);
-  vec3 rose = vec3(1.0, 0.46, 0.68);
-  vec3 lilac = vec3(0.78, 0.42, 1.0);
-  if (k < 1.0) return pink;
-  if (k < 2.0) return violet;
-  if (k < 3.0) return magenta;
-  if (k < 4.0) return purple;
-  if (k < 5.0) return rose;
-  if (k < 6.0) return lilac;
-  if (k < 7.0) return mix(pink, violet, 0.45);
-  return mix(magenta, purple, 0.4);
-}
-
-vec3 ballHome(float i) {
-  if (i < 1.0) return vec3(0.0, -0.02, 0.14);
-  if (i < 2.0) return vec3(0.0, -0.32, 0.02);
-  if (i < 3.0) return vec3(-0.3, 0.06, 0.06);
-  if (i < 4.0) return vec3(0.3, 0.04, 0.0);
-  if (i < 5.0) return vec3(0.16, 0.28, 0.08);
-  if (i < 6.0) return vec3(-0.18, -0.18, -0.04);
-  if (i < 7.0) return vec3(0.22, -0.18, 0.1);
-  return vec3(-0.08, 0.26, -0.02);
-}
-
-float ballRad(float i) {
-  if (i < 1.0) return 0.26;
-  if (i < 2.0) return 0.2;
-  if (i < 3.0) return 0.16;
-  if (i < 4.0) return 0.15;
-  if (i < 5.0) return 0.12;
-  if (i < 6.0) return 0.13;
-  if (i < 7.0) return 0.1;
-  return 0.11;
-}
-
-vec4 field(vec3 p, float t) {
-  vec4 acc = vec4(0.0);
-  for (int i = 0; i < 8; i++) {
-    float fi = float(i);
-    // Lava-lamp rise with a little sideways sway.
-    float rise = 0.3 + fi * 0.045 + uLevel * 0.12;
-    float sway = 0.16 + fi * 0.03 + uLevel * 0.05;
-    vec3 c = ballHome(fi) + vec3(
-      sin(t * sway + fi * 1.8) * 0.12,
-      sin(t * rise + fi * 1.15) * 0.3,
-      cos(t * rise * 0.48 + fi * 1.4) * 0.08
-    );
-    float rad = ballRad(fi) * (1.0 + 0.035 * sin(t * 0.55 + fi * 1.2));
-    vec3 rel = p - c;
-    float dist = length(rel);
-    float d = dist - rad;
-    // Crisp enough to read as bubbles, soft enough to feel liquid.
-    float cover = smoothstep(0.055, -0.012, d);
-    float core = smoothstep(0.02, -0.04, d);
-    vec3 bn = normalize(rel + vec3(0.0001));
-    float shade = clamp(dot(bn, normalize(vec3(-0.22, 0.78, 0.55))), 0.0, 1.0);
-    vec3 hue = ballHue(fi);
-    // Matte lava fill — no dark dither, just soft shading + highlight.
-    vec3 body = hue * (0.82 + 0.42 * shade);
-    body += vec3(1.0) * pow(shade, 9.0) * 0.28;
-    body = mix(body, mix(hue, vec3(1.0), 0.4), core * 0.28);
-    float room = 1.0 - acc.a;
-    float amount = cover * room;
-    acc.rgb += body * amount;
-    acc.a += amount;
-  }
-  return acc;
-}
-
-vec3 over(vec3 base, vec4 layer) {
-  return base * (1.0 - layer.a) + layer.rgb;
-}
-
-void main() {
-  vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / min(uRes.x, uRes.y);
-  float r2 = dot(uv, uv);
-  if (r2 > 1.0) {
-    gl_FragColor = vec4(0.0);
-    return;
-  }
-  float t = uTime;
-  vec3 ro = vec3(0.0, 0.0, 2.4);
-  vec3 rd = normalize(vec3(uv * 0.86, -1.7));
-  float b = dot(ro, rd);
-  float disc = b * b - (dot(ro, ro) - 1.0);
-  if (disc < 0.0) {
-    gl_FragColor = vec4(0.0);
-    return;
-  }
-  float tHit = -b - sqrt(disc);
-  vec3 hit = ro + rd * tHit;
-  vec3 n = normalize(hit);
-  vec3 inside = refract(rd, n, 0.64);
-  if (dot(inside, inside) < 0.001) inside = reflect(rd, n);
-  vec3 bent = hit * 0.6;
-  vec4 front = field(bent + inside * 0.14, t);
-  vec4 mid = field(bent + inside * 0.52 + n * 0.05, t);
-  vec4 back = field(bent + inside * 0.95 - n * 0.04, t);
-  vec3 balls = over(over(back.rgb, mid), front);
-  float cover = clamp(front.a + mid.a * (1.0 - front.a) + back.a * (1.0 - front.a) * (1.0 - mid.a), 0.0, 1.0);
-
-  vec3 glass = mix(vec3(0.99, 0.97, 1.0), mix(uFrom, uTo, 0.4), 0.06);
-  vec3 col = glass * (1.0 - cover) + balls;
-
-  float fres = pow(1.0 - clamp(dot(-rd, n), 0.0, 1.0), 2.15);
-  col = mix(col, vec3(1.0), fres * 0.42 * (1.0 - cover * 0.45));
-  float spec = pow(clamp(dot(n, normalize(vec3(-0.28, 0.62, 0.73))), 0.0, 1.0), 20.0);
-  float cap = pow(clamp(dot(n, normalize(vec3(-0.05, 0.92, 0.28))), 0.0, 1.0), 1.7);
-  col += vec3(1.0) * spec * 0.62;
-  col = mix(col, vec3(1.0), cap * 0.32);
-  float edge = 1.0 - smoothstep(0.985, 1.0, sqrt(r2));
-  col = mix(col, vec3(1.0), smoothstep(0.84, 0.98, sqrt(r2)) * 0.22);
-  col *= edge;
-  gl_FragColor = vec4(col * edge, edge);
-}
-`;
-
 const toUnit = (hex: string): [number, number, number] => {
   const [r, g, b] = hexToRgb(hex);
   return [r / 255, g / 255, b / 255];
 };
 
 function GlassOrb({
-  kind,
   state = 'idle',
   size = 144,
   speed = 1,
@@ -227,7 +93,7 @@ function GlassOrb({
   label = 'Glass orb',
   className,
   ref,
-}: OrbProps & { kind: Kind }) {
+}: OrbProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const reduced = useReducedMotion();
@@ -236,11 +102,11 @@ function GlassOrb({
   const onScreen = screen.on;
   const [painted, setPainted] = useState(false);
   const [lost, setLost] = useState(false);
-  const liveRef = useRef({ state, speed, colorFrom, colorTo, reduced, kind, levelRef });
+  const liveRef = useRef({ state, speed, colorFrom, colorTo, reduced, levelRef });
 
   useEffect(() => {
-    liveRef.current = { state, speed, colorFrom, colorTo, reduced, kind, levelRef };
-  }, [state, speed, colorFrom, colorTo, reduced, kind, levelRef]);
+    liveRef.current = { state, speed, colorFrom, colorTo, reduced, levelRef };
+  }, [state, speed, colorFrom, colorTo, reduced, levelRef]);
 
   useEffect(() => {
     if (webgl !== true || !onScreen) return;
@@ -271,7 +137,7 @@ function GlassOrb({
       return shader;
     };
     const vert = compile(gl.VERTEX_SHADER, VERT);
-    const frag = compile(gl.FRAGMENT_SHADER, liveRef.current.kind === 'marble' ? MARBLE : BALLS);
+    const frag = compile(gl.FRAGMENT_SHADER, MARBLE);
     const program = gl.createProgram();
     if (!vert || !frag || !program) {
       setLost(true);
@@ -327,8 +193,7 @@ function GlassOrb({
       const hasLive = typeof raw === 'number' && raw >= 0;
       const voiced = live.state === 'listening' || live.state === 'speaking';
       const level = live.reduced ? 0 : hasLive ? raw : voiced ? 0.35 : 0;
-      // Lava-lamp pace: slow rise at rest, a little livelier when talking.
-      const pace = live.kind === 'fluid' ? 0.62 * (1 + level * 0.85) : 0.85 + level * 0.7;
+      const pace = 0.85 + level * 0.7;
       const rate = live.reduced || !active ? 0 : RATE[live.state] * Math.max(live.speed, 0) * pace;
       time += dt * rate;
       const error = live.state === 'error' ? 1 : 0;
@@ -370,7 +235,7 @@ function GlassOrb({
       gl.deleteShader(frag);
       setPainted(false);
     };
-  }, [webgl, onScreen, size, kind]);
+  }, [webgl, onScreen, size]);
 
   const setHost = (node: HTMLDivElement | null) => {
     hostRef.current = node;
@@ -395,11 +260,7 @@ function GlassOrb({
       }}
     >
       {webgl === false || lost ? (
-        kind === 'fluid' ? (
-          <BubblesFallback from={colorFrom} to={colorTo} />
-        ) : (
-          <SphereFallback from={colorFrom} to={colorTo} />
-        )
+        <SphereFallback from={colorFrom} to={colorTo} />
       ) : onScreen ? (
         <canvas
           ref={canvasRef}
@@ -416,48 +277,13 @@ function GlassOrb({
   );
 }
 
-function BubblesFallback({ from, to }: { from: string; to: string }) {
-  return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        borderRadius: '50%',
-        background: [
-          `radial-gradient(circle at 30% 24%, rgba(255,255,255,0.95) 0%, transparent 22%)`,
-          `radial-gradient(circle at 50% 48%, ${to} 0 18%, transparent 19%)`,
-          `radial-gradient(circle at 28% 62%, ${from} 0 12%, transparent 13%)`,
-          `radial-gradient(circle at 70% 38%, ${from} 0 10%, transparent 11%)`,
-          `radial-gradient(circle at 62% 70%, ${to} 0 9%, transparent 10%)`,
-          `radial-gradient(circle at 38% 30%, ${to} 0 7%, transparent 8%)`,
-          `radial-gradient(circle at 50% 50%, #fffbfe 0%, #f7efff 58%, #efe8ff 100%)`,
-        ].join(', '),
-        boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.45)',
-      }}
-    />
-  );
-}
-
 export function MarbleOrb(props: OrbProps) {
   return (
     <GlassOrb
       {...props}
-      kind="marble"
       label={props.label ?? 'Marble'}
       colorFrom={props.colorFrom ?? '#1d4ed8'}
       colorTo={props.colorTo ?? '#a855f7'}
-    />
-  );
-}
-
-export function BallOrb(props: OrbProps) {
-  return (
-    <GlassOrb
-      {...props}
-      kind="fluid"
-      label={props.label ?? 'Bubbles'}
-      colorFrom={props.colorFrom ?? '#7c5cff'}
-      colorTo={props.colorTo ?? '#fb7185'}
     />
   );
 }

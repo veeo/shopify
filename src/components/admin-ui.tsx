@@ -114,8 +114,11 @@ export function TopBar({
                 <button
                   type="button"
                   onClick={parent.onClick}
-                  className="press mb-0.5 block max-w-full truncate rounded-md text-left text-[13px] font-medium leading-5 text-[#616161] hover:text-[#171817]"
-                  style={parentName ? { viewTransitionName: parentName, viewTransitionClass: "title-word" } : undefined}
+                  className="press mb-0 block max-w-full truncate rounded-md text-left text-[13px] font-medium leading-5 text-[#616161] hover:text-[#171817]"
+                  style={{
+                    transform: "translateY(4px)",
+                    ...(parentName ? { viewTransitionName: parentName, viewTransitionClass: "title-word" } : {}),
+                  }}
                 >
                   {parent.label}
                 </button>
