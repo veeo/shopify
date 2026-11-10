@@ -103,8 +103,9 @@ export function resolveShellLayout({ width, spanning = false, coarsePointer = fa
       preferNavCollapsed: true,
       allowAdminWide: false,
       adminWidth: SHELL.adminNarrow,
+      // Touch tablets prefer a bottom sheet; mouse-driven windows slide from the end.
       chatChrome: "compact",
-      adminSheetEdge: width < 900 ? "bottom" : "end",
+      adminSheetEdge: coarsePointer || width < 900 ? "bottom" : "end",
     };
   }
 
