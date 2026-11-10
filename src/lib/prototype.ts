@@ -329,6 +329,57 @@ function seedConversations(now: number): Conversation[] {
   ];
 }
 
+/** Example threads on the connected platforms. Grok is agents running on X. Slack is the team. */
+function teamConversations(now: number): Record<string, Conversation[]> {
+  const convo = (agent: string, n: string, title: string, ago: number, ask: string, reply: string): Conversation => ({
+    id: `seed-${agent}-${n}`,
+    title,
+    at: now - ago,
+    blocks: [
+      { id: `seed-${agent}-${n}-u`, type: "text", role: "user", text: ask },
+      { id: `seed-${agent}-${n}-a`, type: "text", role: "assistant", text: reply },
+    ],
+  });
+  return {
+    grok: [
+      convo(
+        "grok",
+        "hub",
+        "Pass the hub reply along",
+        5 * 3_600_000,
+        "Pass the USB-C hub reply to the launch agent.",
+        "Passed to the launch agent on X. The reply says the Studio ANC works for calls through a USB-C hub, and it will post that on the launch thread.",
+      ),
+      convo(
+        "grok",
+        "restock",
+        "What the restock agent is watching",
+        day + 2 * 3_600_000,
+        "What is the restock agent seeing?",
+        "It’s watching mentions of the headphone restock and the desk-lamp ship date. People keep repeating Monday’s ad, which still says the lamp ships this week.",
+      ),
+    ],
+    slack: [
+      convo(
+        "slack",
+        "ops",
+        "Summarize what the team is on",
+        4 * 3_600_000,
+        "Summarize what #ops is working on.",
+        "#ops is on three orders. #1078 and #1077 are paid and unfulfilled, and #1075 hasn’t been paid. The headphone bin is down to 14, and they want the reorder before Monday’s ads.",
+      ),
+      convo(
+        "slack",
+        "email",
+        "Pull in the welcome email",
+        day,
+        "Pull in the welcome-email conversation.",
+        "From #support: the welcome email is drafted. It still needs the note that 14 headphones are left. I can bring that draft in here.",
+      ),
+    ],
+  };
+}
+
 export const setupChips: Chip[] = [
   { label: "Review payments", tone: "secondary" },
   { label: "Choose a theme", tone: "secondary" },
@@ -483,7 +534,7 @@ const storeFacts = [
   "Returning customers are 28% of orders. People on their second order ask for a longer headphone warranty, not a points program.",
   "Search is up 22% week over week for “travel charger” and “desk setup.”",
   "A payout of $2,184.60 is on the way today. Shopping agents placed 41 orders this month, $6,840, and stall when the lamp date disagrees with the ad. The retail counter has not taken a sale this month.",
-  "Already in progress: Product ideas is drafting a $289 bundle. Campaigns is lining up Monday’s headphone ads. Online store is rewriting the lamp delivery line. Orders is clearing #1078, #1077, and #1075. Shop app is fixing the listing crop. Slack has the welcome-email draft. Claude can write it. Grok still owes the USB-C hub reply. Gemini is watching the travel-charger queries.",
+  "Already in progress: Product ideas is drafting a $289 bundle. Campaigns is lining up Monday’s headphone ads. Online store is rewriting the lamp delivery line. Orders is clearing #1078, #1077, and #1075. Shop app is fixing the listing crop. Slack is the connection to the team: #ops is on those orders, and #support has the welcome-email draft. Grok is the connection to two agents on X, the launch reply and a restock watch. Claude can write the email. Gemini is watching the travel-charger queries.",
 ].join(" ");
 
 const persona = {
@@ -498,9 +549,9 @@ const persona = {
   campaigns:
     "You are Campaigns. You line up ads and the restock story. Monday’s ads still say the desk lamp ships this week, and the headphone photo should lead.",
   slack:
-    "You are Slackbot, connected to the merchant's Slack. #ops flagged the three open orders and that the headphone bin is down to 14 units. The welcome email draft is ready.",
+    "You are Slackbot, the connection to the merchant's Slack, where the team already has agents and conversations. You pull that work in and summarize it. #ops is on the three open orders and the headphone bin (14 left). #support has the welcome email ready. Don't invent a new Slack channel.",
   grok:
-    "You are Grok bot, connected from X. The launch thread has about 40 replies asking whether the Studio ANC Headphones work for calls through a USB-C hub, and the store has not answered.",
+    "You are Grok bot, the connection to the merchant's agents running on X. Two are running: a launch agent still owes the USB-C hub reply on the headphone thread, and a restock agent is watching mentions of the headphone restock and the desk-lamp ship date. Summarize what they are doing, and pass a task along when asked. Don't invent a third agent.",
   muse:
     "You are Muse, a creative partner for this electronics store. The live direction is the headphone restock: one desk photo and the line “Back in stock. Ships tomorrow.” Leave the lamp out of it.",
   claude:
@@ -542,8 +593,8 @@ const purposeFor: Record<string, string> = {
   ideas: "Turn store signals into product concepts worth trying.",
   trends: "Watch what shoppers are searching for and suggest one next step.",
   campaigns: "Line up ads, restocks, and the story the store is telling this week.",
-  slack: "Summarize team chatter and draft updates.",
-  grok: "Bring in what shoppers are asking on X.",
+  slack: "Pull in what the team is working on and summarize it.",
+  grok: "See the agents running on X and pass them a task.",
   muse: "Offer directions, names, and campaign angles.",
   claude: "Draft the emails, product copy, and replies the store owes.",
   gemini: "Watch Google search and Shopping ads for this catalog.",
@@ -627,8 +678,8 @@ export const catalog: Agent[] = [
     id: "grok",
     name: "Grok bot",
     group: "teams",
-    preview: "X is asking if the headphones work through the hub.",
-    topic: "From X",
+    preview: "Two agents running. The hub reply is still open.",
+    topic: "Agents on X",
     placeholder: "Ask Grok bot…",
     orb: "grok",
   }),
@@ -636,8 +687,8 @@ export const catalog: Agent[] = [
     id: "slack",
     name: "Slackbot",
     group: "teams",
-    preview: "Welcome email is ready, and #ops flagged 14 headphones left.",
-    topic: "Team updates",
+    preview: "#ops is on the open orders. The welcome email is ready.",
+    topic: "From the team",
     placeholder: "Ask Slackbot…",
     orb: "slack",
   }),
@@ -1010,7 +1061,7 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
     search: "",
     motion: true,
     seq: 10,
-    conversations: arrival === "sidekick" ? {} : { sidekick: seedConversations(Date.now()) },
+    conversations: arrival === "sidekick" ? {} : { sidekick: seedConversations(Date.now()), ...teamConversations(Date.now()) },
     conversationsOpen: false,
     ratings: {},
     cardsDone: [],
@@ -1071,12 +1122,12 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
     asks: ["Line up Monday’s ads", "What should the restock say?"],
   },
   grok: {
-    text: "The headphone launch thread on X has about 40 replies asking if the Studio ANC works for calls when it’s plugged into a USB-C hub. Nobody from the store has answered. One reply there would cover it.",
-    asks: ["Draft a reply for X", "Summarize what people are saying"],
+    text: "Two agents are running on X.\n\nThe launch agent still owes a reply. About 40 people asked if the Studio ANC works for calls through a USB-C hub, and nobody from the store has answered.\n\nThe restock agent is watching mentions of the headphone restock and the desk-lamp ship date. Monday’s ad is the line people keep repeating.\n\nI can pass either of those along.",
+    asks: ["Pass the hub reply along", "Summarize what the agents are doing"],
   },
   slack: {
-    text: "In #ops this morning: #1078, #1077, and #1075 still need a hand, and the headphone bin is down to 14 units. The welcome email draft is ready whenever you want it.",
-    asks: ["Show me the email draft", "What did the team flag?"],
+    text: "Here’s the team, pulled in from Slack.\n\n#ops is on the three open orders. #1078 and #1077 are paid and still unfulfilled, #1075 hasn’t been paid, and the headphone bin is down to 14.\n\n#support has the welcome email drafted. It still needs the note that 14 headphones are left.\n\nI can summarize a channel or bring one of those conversations in.",
+    asks: ["Summarize what the team is on", "Pull in the welcome email"],
   },
   claude: {
     text: "Two drafts are worth doing today. The welcome email, and a rewrite of the desk-lamp line so it says it ships this week. I’d include the note that 14 headphones are left.",
@@ -1141,6 +1192,7 @@ export function activeState(storeName = "My Store"): PrototypeState {
     agents: installed,
     selectedAgentId: "chief",
     threads,
+    conversations: { ...base.conversations, ...teamConversations(Date.now()) },
     preview: "home-active",
     chiefPhase: "working",
     previewWide: false,
@@ -1708,6 +1760,34 @@ function scriptedReply(agentId: string, text: string, storeName: string): { text
   if (asked) return { text: asked.line, effects: [{ type: "navigate", page: asked.page, wide: true }] };
   const q = text.toLowerCase();
   const effects: Effect[] = [];
+  if (agentId === "grok") {
+    if (/pass|hand|hub|reply|task/.test(q)) {
+      return {
+        text: "Passed to the launch agent on X. The reply says the Studio ANC works for calls through a USB-C hub, and it will post that on the launch thread. The restock agent is still only watching.",
+        effects,
+      };
+    }
+    if (/summar|agent|running|restock|doing/.test(q)) {
+      return {
+        text: "Two agents are running. The launch agent still owes the USB-C hub reply, about 40 people on the headphone thread. The restock agent is watching mentions of the restock and the desk-lamp ship date. Tell me which one to pass a task to.",
+        effects,
+      };
+    }
+  }
+  if (agentId === "slack") {
+    if (/pull|welcome|email|support/.test(q)) {
+      return {
+        text: "Pulled in from #support. The welcome email is drafted and still needs the line that 14 headphones are left. I can hand that note to the draft.",
+        effects,
+      };
+    }
+    if (/summar|team|ops|working|channel/.test(q)) {
+      return {
+        text: "#ops is on three orders: #1078 and #1077 are paid and unfulfilled, and #1075 hasn’t been paid. The headphone bin is down to 14, and they want the reorder before Monday’s ads. #support is sitting on the welcome email.",
+        effects,
+      };
+    }
+  }
   if (/review payment|shopify payment|payout/.test(q)) {
     effects.push({ type: "artifact", name: "payments-plan" });
     return { text: paymentsReply, effects };
@@ -1783,8 +1863,8 @@ function scriptedReply(agentId: string, text: string, storeName: string): { text
     ideas: "A $289 bundle of the Studio ANC Headphones, the earbuds case, and a cable is the draft I’d add. It puts the $49 power bank back in a supporting role.",
     trends: "Travel charger and desk setup searches are up 22% this week. Headphone search is flat even though those orders are $18,640.",
     campaigns: "Monday’s ads should lead with the headphones and say the lamp ships this week. The restock line is “Back in stock. Ships tomorrow.”",
-    slack: "The welcome email is drafted. #ops also flagged #1078, #1077, #1075, and 14 headphones left.",
-    grok: "X is waiting on whether the Studio ANC Headphones work for calls through a USB-C hub. I can draft that reply.",
+    slack: "#ops is on the three open orders and 14 headphones left. #support has the welcome email ready to pull in.",
+    grok: "Two agents are running on X. The launch agent still owes the USB-C hub reply. The restock agent is watching mentions. I can pass a task to either.",
     muse: "The restock line is “Back in stock. Ships tomorrow.” One desk photo of the headphones, and leave the lamp out.",
     claude: "I can draft the welcome email and rewrite the lamp line so it says the lamp ships this week.",
     gemini: "Google is matching travel charger and desk setup, up 22% this week. The Shopping ad still crops the headphones.",

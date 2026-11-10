@@ -51,11 +51,23 @@ export function AgentNav({
 }) {
   const agents = visibleAgents(state);
   const [menu, setMenu] = useState<"account" | "store" | null>(null);
+  const [hiddenOpen, setHiddenOpen] = useState(false);
   const query = state.search.trim().toLowerCase();
   const hiddenItems = catalog
     .filter((item) => hiddenSidekicks.has(item.id))
     .map((item) => state.agents.find((agent) => agent.id === item.id) ?? item)
     .filter((item) => !query || item.name.toLowerCase().includes(query));
+  const hiddenSelection = hiddenSidekicks.has(state.selectedAgentId) && state.mode === "thread" ? state.selectedAgentId : "";
+  const [openedFor, setOpenedFor] = useState("");
+  if (hiddenSelection !== openedFor) {
+    setOpenedFor(hiddenSelection);
+    if (hiddenSelection) setHiddenOpen(true);
+  }
+  const [openedQuery, setOpenedQuery] = useState("");
+  if (query !== openedQuery) {
+    setOpenedQuery(query);
+    if (query && hiddenItems.length > 0) setHiddenOpen(true);
+  }
   const collapsed = !navOpen;
   const visibleGroups = groups
     .map((group) => ({
@@ -64,6 +76,11 @@ export function AgentNav({
     }))
     .filter((group) => group.items.length > 0);
   const navRef = useRef<HTMLElement>(null);
+  const hiddenList = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!hiddenOpen) return;
+    hiddenList.current?.scrollIntoView({ block: "nearest" });
+  }, [hiddenOpen]);
   const placed = useRef(new Map<string, { left: number; top: number }>());
   const skipSlide = useRef(true);
   const [sliding, setSliding] = useState(false);
@@ -255,20 +272,53 @@ export function AgentNav({
           collapsed ? "pt-6 [scrollbar-gutter:stable_both-edges]" : "gap-4"
         } ${sliding ? "overflow-visible" : "overflow-x-hidden overflow-y-auto"}`}
       >
-        {visibleGroups.map((group, index) => (
-          <div key={group.id} className={collapsed ? "" : "flex min-w-0 flex-col gap-2"}>
-            {collapsed && index > 0 ? <div className="mx-auto mb-6 mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
-            {!collapsed && group.label ? (
-              <div className="flex h-8 items-center gap-1.5 px-2.5">
-                <span className="shrink-0 whitespace-nowrap text-[13px] leading-4 tracking-[-0.13px] text-[#7d7f7c]">{group.label}</span>
-                <span className="h-px min-w-2 flex-1 bg-white/10" />
-              </div>
-            ) : null}
-            <div className={collapsed ? "flex flex-col items-center gap-4" : "flex flex-col gap-2"}>
-              {group.items.map(agentRow)}
+        {visibleGroups.map((group, index) => {
+          const hidden = group.id === "hidden";
+          const open = !hidden || hiddenOpen;
+          return (
+            <div key={group.id} className={collapsed ? "" : "flex min-w-0 flex-col gap-2"}>
+              {collapsed && index > 0 && !hidden ? <div className="mx-auto mb-6 mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
+              {hidden ? (
+                <button
+                  type="button"
+                  aria-expanded={hiddenOpen}
+                  aria-controls="hidden-sidekicks"
+                  aria-label={collapsed ? (hiddenOpen ? "Hide sidekicks" : "Show hidden sidekicks") : undefined}
+                  onClick={() => setHiddenOpen((value) => !value)}
+                  className={
+                    collapsed
+                      ? "press mx-auto mb-6 mt-6 grid h-6 w-8 place-items-center"
+                      : "press flex h-8 w-full items-center gap-1.5 rounded-lg px-2.5 text-left hover:bg-white/[0.06]"
+                  }
+                >
+                  {collapsed ? (
+                    <span className={`h-px w-8 ${hiddenOpen ? "bg-white/40" : "bg-white/15"}`} />
+                  ) : (
+                    <>
+                      <span className="shrink-0 whitespace-nowrap text-[13px] leading-4 tracking-[-0.13px] text-[#7d7f7c]">{group.label}</span>
+                      <span className={`h-px min-w-2 flex-1 ${hiddenOpen ? "bg-white/30" : "bg-white/10"}`} />
+                      <PIcon name={hiddenOpen ? "ChevronUp" : "ChevronDown"} size={16} />
+                    </>
+                  )}
+                </button>
+              ) : !collapsed && group.label ? (
+                <div className="flex h-8 items-center gap-1.5 px-2.5">
+                  <span className="shrink-0 whitespace-nowrap text-[13px] leading-4 tracking-[-0.13px] text-[#7d7f7c]">{group.label}</span>
+                  <span className="h-px min-w-2 flex-1 bg-white/10" />
+                </div>
+              ) : null}
+              {open ? (
+                <div
+                  id={hidden ? "hidden-sidekicks" : undefined}
+                  ref={hidden ? hiddenList : undefined}
+                  className={collapsed ? "flex flex-col items-center gap-4" : "flex flex-col gap-2"}
+                >
+                  {group.items.map(agentRow)}
+                </div>
+              ) : null}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className={`mb-3 flex items-center ${collapsed ? "mt-6 flex-col" : "pl-2"}`}>
