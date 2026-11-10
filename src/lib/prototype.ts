@@ -1759,13 +1759,9 @@ export function runChip(state: PrototypeState, label: string) {
     state.preview = "pos";
     return;
   }
-  if (label === "Tell me more about creating a sidekick") {
-    push(state, agentId, {
-      id: id(state),
-      type: "text",
-      role: "assistant",
-      text: "A sidekick is an agent with a job: a persona, a place in the nav, and tools that can change the admin. Add a recommended one, connect Slack, Grok, Claude, or Gemini, or name your own. Each keeps a separate conversation.",
-    });
+  if (label === "Tell me more about sidekick" || label === "Tell me more about creating a sidekick") {
+    // About copy is shown inline on the Add a sidekick page; keep mode as add.
+    state.mode = "add";
     return;
   }
   if (label === "Add a chief of staff") {

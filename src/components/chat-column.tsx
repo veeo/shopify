@@ -246,7 +246,7 @@ export function ChatColumn({
             className={`${state.motion && !stage ? "page-in" : ""} scroll-thin min-h-0 flex-1 overflow-y-auto pb-4`}
           >
             {state.mode === "add" ? (
-              <AddGrid onAdd={onAddCatalog} onChip={onChip} />
+              <AddGrid onAdd={onAddCatalog} onCreate={onCreate} />
             ) : state.mode === "create" ? (
               <CreateForm onCreate={onCreate} onBack={() => onChip("Browse sidekicks")} />
             ) : purpose ? (
@@ -1859,7 +1859,15 @@ function BlockView({
   return null;
 }
 
-function CreateForm({ onCreate, onBack }: { onCreate: (name: string, purpose: string) => void; onBack: () => void }) {
+function CreateForm({
+  onCreate,
+  onBack,
+  backLabel = "Back",
+}: {
+  onCreate: (name: string, purpose: string) => void;
+  onBack: () => void;
+  backLabel?: string;
+}) {
   const form = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
   function fieldValue(name: string) {
@@ -1893,7 +1901,7 @@ function CreateForm({ onCreate, onBack }: { onCreate: (name: string, purpose: st
               Add sidekick
             </s-button>
             <s-button variant="secondary" onClick={onBack}>
-              Back
+              {backLabel}
             </s-button>
           </s-stack>
         </s-stack>
@@ -1930,52 +1938,84 @@ const addCopy: Record<string, string> = {
   analytics: "Sales, sessions, and conversion for the period that’s open.",
 };
 
-function AddGrid({ onAdd, onChip }: { onAdd: (id: string) => void; onChip: (label: string) => void }) {
+const sidekickAbout =
+  "A sidekick is an agent with a job: a persona, a place in the nav, and tools that can change the admin. Add a recommended one, connect Slack, Grok, Claude, or Gemini, or name your own. Each keeps a separate conversation.";
+
+function AddGrid({
+  onAdd,
+  onCreate,
+}: {
+  onAdd: (id: string) => void;
+  onCreate: (name: string, purpose: string) => void;
+}) {
+  // Stay on Add a sidekick: hide the catalog for about/create, then offer it again at the end.
+  const [pane, setPane] = useState<"catalog" | "about" | "create">("catalog");
+
   return (
     <div className="max-w-[640px]">
       <p className="max-w-[560px] text-[15px] leading-[1.4] text-white">
         Sidekicks are AI agents that get things done for you. Start with a recommended one, connect a team bot, or add a channel or tool.
       </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <ChipButton label="Tell me more about creating a sidekick" tone="secondary" onClick={() => onChip("Tell me more about creating a sidekick")} />
-        <ChipButton label="Create my own sidekick" tone="primary" onClick={() => onChip("Create my own sidekick")} />
-      </div>
-      <div className="mt-8">
-      {addSections.map((section) => {
-        const rows = section.ids.flatMap((id) => (isListedSidekick(id) ? catalog.filter((item) => item.id === id) : []));
-        if (rows.length === 0) return null;
-        return (
-          <section key={section.label} className="mb-6">
-            <p className="mb-2 flex items-center gap-0.5 text-[15px] text-[#8e8f8b]">
-              {section.label} <PIcon name="ChevronDown" size={20} />
-            </p>
-            <div className="overflow-hidden rounded-2xl bg-[#1a1b1a] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
-              {rows.map((row, index) => {
-                const connect = row.group === "teams";
-                return (
-                  <div
-                    key={row.id}
-                    className={`rise flex items-center gap-3 px-3 py-2.5 ${index > 0 ? "border-t border-white/[0.06]" : ""}`}
-                    style={{ animationDelay: `${index * 40}ms`, animationFillMode: "backwards" }}
-                  >
-                    <span className="grid size-9 shrink-0 place-items-center">
-                      <Orb id={row.orb} size={ORB_SIZE.nav} agentId={row.id} colorFrom={row.orbFrom} colorTo={row.orbTo} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14px] leading-5">{row.name}</p>
-                      <p className="text-[13px] leading-[1.4] text-[#9a9a9a]">{addCopy[row.id]}</p>
-                    </div>
-                    <span className="shrink-0">
-                      <s-button onClick={() => onAdd(row.id)}>{connect ? "Connect" : "Add"}</s-button>
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
-      </div>
+
+      {pane === "catalog" ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <ChipButton label="Tell me more about sidekick" tone="secondary" onClick={() => setPane("about")} />
+          <ChipButton label="Create my own sidekick" tone="primary" onClick={() => setPane("create")} />
+        </div>
+      ) : null}
+
+      {pane === "about" ? (
+        <div className="mt-6 max-w-[560px]">
+          <p className="text-[15px] leading-[1.45] text-white">{sidekickAbout}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <ChipButton label="Create my own sidekick" tone="primary" onClick={() => setPane("create")} />
+            <ChipButton label="Browse sidekicks" tone="secondary" onClick={() => setPane("catalog")} />
+          </div>
+        </div>
+      ) : null}
+
+      {pane === "create" ? (
+        <div className="mt-6">
+          <CreateForm onCreate={onCreate} onBack={() => setPane("catalog")} backLabel="Browse sidekicks" />
+        </div>
+      ) : null}
+
+      {pane === "catalog" ? (
+        <div className="mt-8">
+          {addSections.map((section) => {
+            const rows = section.ids.flatMap((id) => (isListedSidekick(id) ? catalog.filter((item) => item.id === id) : []));
+            if (rows.length === 0) return null;
+            return (
+              <section key={section.label} className="mb-6">
+                <p className="mb-2 text-[15px] text-[#8e8f8b]">{section.label}</p>
+                <div className="overflow-hidden rounded-2xl bg-[#1a1b1a] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+                  {rows.map((row, index) => {
+                    const connect = row.group === "teams";
+                    return (
+                      <div
+                        key={row.id}
+                        className={`rise flex items-center gap-3 px-3 py-2.5 ${index > 0 ? "border-t border-white/[0.06]" : ""}`}
+                        style={{ animationDelay: `${index * 40}ms`, animationFillMode: "backwards" }}
+                      >
+                        <span className="grid size-9 shrink-0 place-items-center">
+                          <Orb id={row.orb} size={ORB_SIZE.nav} agentId={row.id} colorFrom={row.orbFrom} colorTo={row.orbTo} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[14px] leading-5">{row.name}</p>
+                          <p className="text-[13px] leading-[1.4] text-[#9a9a9a]">{addCopy[row.id]}</p>
+                        </div>
+                        <span className="shrink-0">
+                          <s-button onClick={() => onAdd(row.id)}>{connect ? "Connect" : "Add"}</s-button>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
