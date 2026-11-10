@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
 import { Badge, Body, Btn, Card as AdminCard, circleButton, HeaderExtras, HeaderSlotProvider, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { WorkspaceViewProvider, useWorkspaceView, type WorkspaceViewApi } from "@/components/workspace-view";
-import { isSettingsPage, sectionChoices } from "@/lib/admin-nav";
+import { isSettingsPage, sectionChoices, sharesSection } from "@/lib/admin-nav";
 import { bindScrollReader } from "@/lib/workspace";
 import type { BusinessType, PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
 
@@ -99,14 +100,29 @@ export function PreviewColumn({
   useEffect(() => {
     closeMenu.current = setMenuOpen;
   });
+  const [quietFor, setQuietFor] = useState<PreviewId | null>(null);
   const nav: Nav = {
     onPreview,
     onRail,
     onChip,
     go: (page) => {
       menuRef.current = false;
-      setMenu(false);
-      onPreview(page);
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const morph = state.motion && !reduce && sharesSection(state.preview, page) && typeof document.startViewTransition === "function";
+      if (!morph) {
+        setMenu(false);
+        onPreview(page);
+        return;
+      }
+      document.documentElement.classList.add("vt-titles");
+      const transition = document.startViewTransition(() => {
+        flushSync(() => {
+          setQuietFor(page);
+          setMenu(false);
+          onPreview(page);
+        });
+      });
+      transition.finished.finally(() => document.documentElement.classList.remove("vt-titles"));
     },
     rail: (id) => {
       menuRef.current = false;
@@ -127,6 +143,7 @@ export function PreviewColumn({
   const seenPreview = useRef(state.preview);
   if (kind && menu) setMenu(false);
   const underlayPage: PreviewId = kind === "payments" ? "payments" : state.preview;
+  if (quietFor && quietFor !== state.preview) setQuietFor(null);
   const settingsLevel = underlayPage === "settings" || isSettingsPage(underlayPage);
   const headerRef = useRef<HTMLElement>(null);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
@@ -316,7 +333,7 @@ export function PreviewColumn({
           ) : null}
           <div
             key={underlayPage}
-            className={`${state.motion ? "page-in" : ""} ${menu && state.menuStyle === "push" ? "opacity-40 transition-opacity duration-300" : "opacity-100 transition-opacity duration-300"}`}
+            className={`${state.motion && quietFor !== underlayPage ? "page-in" : ""} ${menu && state.menuStyle === "push" ? "opacity-40 transition-opacity duration-300" : "opacity-100 transition-opacity duration-300"}`}
             onPointerDownCapture={(event) => {
               if (!menu || state.menuStyle !== "push") return;
               swallow.current = true;

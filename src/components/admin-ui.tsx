@@ -1,6 +1,6 @@
 "use client";
 
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { nextSort, sortLabel, useWorkspaceView } from "@/components/workspace-view";
@@ -22,7 +22,15 @@ export function HeaderExtras({ children }: { children: ReactNode }) {
 export const circleButton =
   "press grid size-8 shrink-0 place-items-center rounded-full bg-white text-[#303030] shadow-[0_0_0_1px_#e3e3e3,0_1px_1px_rgba(0,0,0,0.06),0_2px_4px_-1px_rgba(0,0,0,0.14)] hover:bg-[#fafafa] active:bg-[#f1f1f1]";
 
-/* Top bar: page icon + 13px title on the left, actions on the right; sub-pages show "‹ Parent". */
+/* Top bar: a large title with a section menu. A deeper page lifts its parent into a smaller line above. */
+
+function titleMotionName(label: string) {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return slug ? `vt-${slug}` : undefined;
+}
 
 export type BarAction = { label: string; tone?: "primary" | "white" | "gray"; icon?: PolarisIconName; onClick?: () => void; disabled?: boolean };
 
@@ -33,6 +41,7 @@ export function TopBar({
   actions = [],
   more = [],
   aside,
+  parent,
   sections,
   current,
   onSection,
@@ -48,6 +57,8 @@ export function TopBar({
   actions?: BarAction[];
   more?: { label: string; onClick?: () => void }[];
   aside?: ReactNode;
+  /** The section this page sits inside, shown as the smaller word above the title. */
+  parent?: { label: string; onClick?: () => void };
   sections?: { label: string; page: PreviewId }[];
   current?: PreviewId;
   onSection?: (page: PreviewId) => void;
@@ -77,69 +88,102 @@ export function TopBar({
       {more.length > 0 ? <MoreMenu items={more} /> : null}
     </>
   ) : null;
+  const titleName = typeof title === "string" ? titleMotionName(title) : undefined;
+  const parentMotion = parent ? titleMotionName(parent.label) : undefined;
+  const parentName = parentMotion && parentMotion !== titleName ? parentMotion : undefined;
+  const heading = (caret: boolean) => (
+    <h2
+      className="flex min-w-0 items-center gap-1 text-[22px] font-semibold leading-8 tracking-[-0.44px] text-[#171817]"
+      style={titleName ? { viewTransitionName: titleName, viewTransitionClass: "title-word" } : undefined}
+    >
+      <span className="min-w-0 truncate">{title}</span>
+      {caret ? (
+        <span className={`shrink-0 text-[#616161] transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
+          <PIcon name="ChevronDown" size={16} />
+        </span>
+      ) : null}
+    </h2>
+  );
   return (
     <header className="px-6 pb-6 pt-5">
-      <div className="flex min-h-8 items-center gap-1">
-        {back ? (
-          <button
-            type="button"
-            onClick={onBack}
-            className="press -ml-1 flex min-w-0 items-center gap-0.5 rounded-lg py-1 pl-0.5 pr-1.5 text-[13px] font-semibold text-[#303030] hover:bg-[#f1f1f1]"
-          >
-            <PIcon name="ChevronLeft" size={20} />
-            <span className="truncate">{back}</span>
-          </button>
-        ) : menuItems && menuItems.length > 0 ? (
-          <span ref={menu} className="relative min-w-0">
+      <div className="flex min-w-0 flex-col">
+        {back ? null : (
+          <div className={`grid ${parent ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+            <div className="overflow-hidden">
+              {parent ? (
+                <button
+                  type="button"
+                  onClick={parent.onClick}
+                  className="press mb-0.5 block max-w-full truncate rounded-md text-left text-[13px] font-medium leading-5 text-[#616161] hover:text-[#171817]"
+                  style={parentName ? { viewTransitionName: parentName, viewTransitionClass: "title-word" } : undefined}
+                >
+                  {parent.label}
+                </button>
+              ) : (
+                <span className="block h-0" />
+              )}
+            </div>
+          </div>
+        )}
+        <div className="flex min-h-8 min-w-0 items-center gap-1">
+          {back ? (
             <button
               type="button"
-              aria-haspopup="menu"
-              aria-expanded={open}
-              onClick={() => setOpen((value) => !value)}
-              className="press flex min-w-0 items-center gap-1 rounded-lg pr-1 text-left hover:bg-[#f6f6f6]"
+              onClick={onBack}
+              className="press -ml-1 flex min-w-0 items-center gap-0.5 rounded-lg py-1 pl-0.5 pr-1.5 text-[13px] font-semibold text-[#303030] hover:bg-[#f1f1f1]"
             >
-              <h2 className="truncate text-[22px] font-medium leading-8 tracking-[-0.44px] text-[#171817]">{title}</h2>
-              <span className={`shrink-0 text-[#616161] transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
-                <PIcon name="ChevronDown" size={16} />
-              </span>
+              <PIcon name="ChevronLeft" size={20} />
+              <span className="truncate">{back}</span>
             </button>
-            {open ? (
-              <span
-                role="menu"
-                className="pop-in absolute left-0 top-full z-30 mt-1 flex max-h-64 w-56 flex-col overflow-y-auto rounded-xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.14)]"
+          ) : menuItems && menuItems.length > 0 ? (
+            <span ref={menu} className="relative min-w-0">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={open}
+                onClick={() => setOpen((value) => !value)}
+                className="press flex min-w-0 items-center gap-1 rounded-lg pr-1 text-left hover:bg-[#f6f6f6]"
               >
-                {menuItems.map((item) => {
-                  const on = item.id === menuValue;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      role="menuitem"
-                      aria-current={on ? "page" : undefined}
-                      onClick={() => {
-                        setOpen(false);
-                        pick(item.id);
-                      }}
-                      className={`press rounded-lg px-2.5 py-1.5 text-left text-[13px] ${on ? "bg-[#f1f1f1] font-medium text-[#171817]" : "text-[#303030] hover:bg-[#f6f6f6]"}`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </span>
-            ) : null}
-          </span>
-        ) : (
-          <h2 className="min-w-0 truncate text-[22px] font-medium leading-8 tracking-[-0.44px] text-[#171817]">{title}</h2>
-        )}
-        {pager ? <PagerButton label="Previous product" disabled={pager.prevDisabled} onClick={pager.onPrev} icon="ChevronLeft" /> : null}
-        {pager ? <PagerButton label="Next product" disabled={pager.nextDisabled} onClick={pager.onNext} icon="ChevronRight" /> : null}
-        {aside || companions ? (
-          <span className="ml-auto flex shrink-0 items-center gap-1.5">
-            {aside}
-            {companions}
-          </span>
-        ) : null}
+                {heading(true)}
+              </button>
+              {open ? (
+                <span
+                  role="menu"
+                  className="pop-in absolute left-0 top-full z-30 mt-1 flex max-h-64 w-56 flex-col overflow-y-auto rounded-xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.14)]"
+                >
+                  {menuItems.map((item) => {
+                    const on = item.id === menuValue;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="menuitem"
+                        aria-current={on ? "page" : undefined}
+                        onClick={() => {
+                          flushSync(() => setOpen(false));
+                          pick(item.id);
+                        }}
+                        className={`press rounded-lg px-2.5 py-1.5 text-left text-[13px] ${on ? "bg-[#f1f1f1] font-medium text-[#171817]" : "text-[#303030] hover:bg-[#f6f6f6]"}`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </span>
+              ) : null}
+            </span>
+          ) : (
+            heading(false)
+          )}
+          {pager ? <PagerButton label="Previous product" disabled={pager.prevDisabled} onClick={pager.onPrev} icon="ChevronLeft" /> : null}
+          {pager ? <PagerButton label="Next product" disabled={pager.nextDisabled} onClick={pager.onNext} icon="ChevronRight" /> : null}
+          {aside || companions ? (
+            <span className="ml-auto flex shrink-0 items-center gap-1.5" style={companions ? { viewTransitionName: "section-actions" } : undefined}>
+              {aside}
+              {companions}
+            </span>
+          ) : null}
+        </div>
       </div>
     </header>
   );
@@ -223,7 +267,11 @@ export function useDismiss(open: boolean, ref: React.RefObject<HTMLElement | nul
 }
 
 export function Body({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`flex flex-col gap-4 px-6 pb-10 ${className}`}>{children}</div>;
+  return (
+    <div className={`flex flex-col gap-4 px-6 pb-10 ${className}`} style={{ viewTransitionName: "admin-body" }}>
+      {children}
+    </div>
+  );
 }
 
 /* Buttons. Primary, gray, and critical come from Polaris (s-button); the admin's white bordered header buttons don't exist there. */
