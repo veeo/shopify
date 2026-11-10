@@ -25,6 +25,7 @@ import {
   type BarAction,
 } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
+import { useWorkspaceView } from "@/components/workspace-view";
 import { navFor, pageMeta, sectionChoices, settingsNav, type PreviewId } from "@/lib/admin-nav";
 import type { PrototypeState } from "@/lib/prototype";
 
@@ -103,6 +104,16 @@ const orderRows = [
 
 function Orders({ state, nav }: Props) {
   const active = state.scenario === "active";
+  const view = useWorkspaceView();
+  const query = (view?.query ?? "").trim().toLowerCase();
+  const tab = view?.tab || "All";
+  const shown = orderRows
+    .filter((row) => (tab === "Unfulfilled" ? !row.fulfilled : tab === "Unpaid" ? !row.paid : true))
+    .filter((row) => !query || `${row.id} ${row.customer}`.toLowerCase().includes(query));
+  if (view?.sort === "name") shown.sort((a, b) => a.customer.localeCompare(b.customer));
+  else if (view?.sort === "price") shown.sort((a, b) => Number(b.total.replace(/[^0-9.]/g, "")) - Number(a.total.replace(/[^0-9.]/g, "")));
+  else if (view?.sort === "oldest") shown.reverse();
+  const selected = shown.find((row) => row.id === view?.recordId) ?? orderRows.find((row) => row.id === view?.recordId);
   return (
     <Shell
       page="orders"
@@ -118,9 +129,21 @@ function Orders({ state, nav }: Props) {
             <Kpi label="Orders fulfilled" value="9" points={[2, 3, 3, 5, 4, 6, 7, 9]} />
             <Kpi label="Returns" value="$0.00" />
           </div>
+          {selected ? (
+            <Card className="flex items-center justify-between gap-3">
+              <span className="flex min-w-0 flex-col">
+                <span className="text-[13px] font-semibold">Order {selected.id}</span>
+                <span className="truncate text-[12px] text-[#616161]">
+                  {selected.customer} · {selected.total} · {selected.items}
+                </span>
+              </span>
+              <Badge tone={selected.fulfilled ? "neutral" : "caution"}>{selected.fulfilled ? "Fulfilled" : "Unfulfilled"}</Badge>
+            </Card>
+          ) : null}
           <Table
             select
             toolbar={<TableSearch placeholder="Search and filter" tabs={["All", "Unfulfilled", "Unpaid"]} />}
+            onRow={(index) => view?.setRecord(shown[index]?.id ?? "")}
             columns={[
               { label: "Order", width: 64 },
               { label: "Date", width: 132 },
@@ -130,7 +153,7 @@ function Orders({ state, nav }: Props) {
               { label: "Fulfillment status", width: 120 },
               { label: "Items", width: 64 },
             ]}
-            rows={orderRows.map((row) => [
+            rows={shown.map((row) => [
               <span key="id" className="font-semibold">
                 {row.id}
               </span>,
@@ -174,6 +197,10 @@ const customerRows = [
 function Customers({ state, nav }: Props) {
   const active = state.scenario === "active";
   const [open, setOpen] = useState(false);
+  const view = useWorkspaceView();
+  const query = (view?.query ?? "").trim().toLowerCase();
+  const rows = customerRows.filter((row) => !query || row.join(" ").toLowerCase().includes(query));
+  const selected = rows.find((row) => row[0] === view?.recordId);
   return (
     <Shell page="customers" nav={nav} actions={[{ label: "Import" }, { label: "Add customer", tone: "primary" }]} more={[{ label: "Export" }]}>
       <Card flush>
@@ -189,9 +216,18 @@ function Customers({ state, nav }: Props) {
         ) : null}
       </Card>
       <SearchField placeholder="Search customers" trailing="LayoutColumns3" />
+      {selected ? (
+        <Card className="flex flex-col gap-1">
+          <span className="text-[13px] font-semibold">{selected[0]}</span>
+          <span className="text-[12px] text-[#616161]">
+            {selected[2]} · {selected[3]} · {selected[4]}
+          </span>
+        </Card>
+      ) : null}
       {active ? (
         <Table
           select
+          onRow={(index) => view?.setRecord(rows[index]?.[0] ?? "")}
           columns={[
             { label: "Customer name", width: 128 },
             { label: "Email subscription", width: 120 },
@@ -199,7 +235,7 @@ function Customers({ state, nav }: Props) {
             { label: "Orders", width: 64 },
             { label: "Amount spent", width: 96, align: "end" },
           ]}
-          rows={customerRows.map(([name, sub, place, orders, spent]) => [
+          rows={rows.map(([name, sub, place, orders, spent]) => [
             <span key="n" className="font-semibold">
               {name}
             </span>,
