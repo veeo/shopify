@@ -32,24 +32,25 @@ interface AuraParams extends Record<string, number> {
   desat: number;
 }
 
-const AURA_REST: AuraParams = { speed: 10, scale: 0.28, thick: 0.072, warp: 0.09, brightLo: 1.05, brightHi: 1.05, shimmer: 0, sweepRate: 0.6, desat: 0 };
+const AURA_REST: AuraParams = { speed: 18, scale: 0.4, thick: 0.078, warp: 0.18, brightLo: 1.35, brightHi: 1.35, shimmer: 0, sweepRate: 0.9, desat: 0 };
 
 const AURA_TABLE: Record<OrbState, AuraParams> = {
   idle: AURA_REST,
   hover: AURA_REST,
   selected: AURA_REST,
-  connecting: { speed: 14, scale: 0.22, thick: 0.045, warp: 0.04, brightLo: 0.9, brightHi: 0.9, shimmer: 1, sweepRate: 1.3, desat: 0 },
-  listening: { speed: 20, scale: 0.3, thick: 0.058, warp: 0.1, brightLo: 1.5, brightHi: 2, shimmer: 0, sweepRate: 0.8, desat: 0 },
-  thinking: { speed: 30, scale: 0.27, thick: 0.05, warp: 0.14, brightLo: 0.5, brightHi: 2.5, shimmer: 0.6, sweepRate: 2.8, desat: 0 },
-  speaking: { speed: 70, scale: 0.2, thick: 0.06, warp: 0.12, brightLo: 1.6, brightHi: 1.6, shimmer: 0, sweepRate: 1, desat: 0 },
-  error: { speed: 25, scale: 0.24, thick: 0.058, warp: 0.18, brightLo: 1.4, brightHi: 1.4, shimmer: 0, sweepRate: 0.6, desat: 0 },
-  disabled: { speed: 0, scale: 0.2, thick: 0.04, warp: 0.05, brightLo: 0.5, brightHi: 0.5, shimmer: 0, sweepRate: 0, desat: 0.85 },
+  connecting: { speed: 16, scale: 0.3, thick: 0.04, warp: 0.08, brightLo: 0.95, brightHi: 0.95, shimmer: 1, sweepRate: 1.3, desat: 0 },
+  listening: { speed: 24, scale: 0.38, thick: 0.05, warp: 0.16, brightLo: 1.55, brightHi: 2.05, shimmer: 0, sweepRate: 0.9, desat: 0 },
+  thinking: { speed: 34, scale: 0.35, thick: 0.045, warp: 0.18, brightLo: 0.55, brightHi: 2.5, shimmer: 0.6, sweepRate: 2.8, desat: 0 },
+  speaking: { speed: 78, scale: 0.3, thick: 0.052, warp: 0.16, brightLo: 1.65, brightHi: 1.65, shimmer: 0, sweepRate: 1.1, desat: 0 },
+  error: { speed: 28, scale: 0.32, thick: 0.05, warp: 0.2, brightLo: 1.4, brightHi: 1.4, shimmer: 0, sweepRate: 0.6, desat: 0 },
+  disabled: { speed: 0, scale: 0.28, thick: 0.036, warp: 0.06, brightLo: 0.5, brightHi: 0.5, shimmer: 0, sweepRate: 0, desat: 0.85 },
 };
 
-const SPEED_UNIT = 0.02;
+const SPEED_UNIT = 0.028;
 const PULSE_HALF_PERIOD = 0.35;
-const RADIUS_BASE = 0.26;
-const RADIUS_GAIN = 1.05;
+/** Sit near the slot edge so Aura reads the same size as the filled orbs. */
+const RADIUS_BASE = 0.48;
+const RADIUS_GAIN = 1.15;
 const BOUNCY_SPRING = { omega: (2 * Math.PI) / 1, zeta: 1 - 0.35 };
 const SMOOTH_SPRING = { omega: (2 * Math.PI) / 0.8, zeta: 1 };
 
@@ -153,29 +154,34 @@ void main() {
   float a = atan(p.y, p.x);
 
   vec3 acc = vec3(0.0);
-  for (int i = 0; i < 3; i++) {
+  // Five separate strands that drift apart and change shape a little at rest.
+  for (int i = 0; i < 5; i++) {
     float fi = float(i);
-    float ph = uPhase * (1.0 + 0.35 * fi) + fi * 2.1;
-    float amp1 = 0.6 + 0.8 * noise(vec2(ph * 0.35, fi * 7.3));
-    float amp2 = 0.4 + 0.8 * noise(vec2(fi * 3.9, ph * 0.28 + 4.0));
-    float n = 0.5 * amp1 * sin(3.0 * a + ph * 1.3)
-      + 0.32 * amp2 * sin(5.0 * a - ph * 1.7 + fi * 2.0)
-      + 0.22 * sin(2.0 * a + ph * 0.8 + fi);
-    n *= 0.5;
-    float rr = uRadius * (1.0 + n * uWarp * 2.2) + (fi - 1.0) * uThick * 0.9;
+    float ph = uPhase * (1.0 + 0.28 * fi) + fi * 1.55;
+    float amp1 = 0.55 + 0.9 * noise(vec2(ph * 0.42, fi * 7.3));
+    float amp2 = 0.35 + 0.9 * noise(vec2(fi * 3.9, ph * 0.33 + 4.0));
+    float amp3 = 0.25 + 0.7 * noise(vec2(ph * 0.2 + 2.0, fi * 5.1));
+    float n = 0.48 * amp1 * sin(3.0 * a + ph * 1.35)
+      + 0.3 * amp2 * sin(5.0 * a - ph * 1.75 + fi * 2.0)
+      + 0.18 * amp3 * sin(2.0 * a + ph * 0.85 + fi)
+      + 0.12 * sin(7.0 * a + ph * 0.55 + fi * 1.3);
+    n *= 0.55;
+    float rr = uRadius * (1.0 + n * uWarp * 2.4) + (fi - 2.0) * uThick * 1.15;
     float d = abs(r - rr);
-    float w = uThick * (0.8 + 0.6 * abs(n));
+    float w = uThick * (0.62 + 0.55 * abs(n));
     float band = exp(-(d * d) / (w * w));
-    float bloom = exp(-d / (w * 2.6));
-    float hue = 0.5 + 0.5 * sin(a + uPhase * 0.3 + fi * 1.4 + n * 3.0);
-    vec3 c = mix(uFrom, uTo, smoothstep(0.1, 0.9, hue));
-    float layer = i == 1 ? 1.0 : 0.55;
-    acc += c * (band * 1.0 + bloom * 0.28) * layer;
-    acc += mix(c, vec3(1.0), 0.45) * pow(band, 6.0) * 0.35 * layer;
+    float bloom = exp(-d / (w * 2.4));
+    float hue = 0.5 + 0.5 * sin(a + uPhase * 0.35 + fi * 1.15 + n * 3.0);
+    vec3 c = mix(uFrom, uTo, smoothstep(0.08, 0.92, hue));
+    float layer = i == 2 ? 1.0 : (i == 1 || i == 3 ? 0.7 : 0.48);
+    acc += c * (band * 1.05 + bloom * 0.3) * layer;
+    acc += mix(c, vec3(1.0), 0.5) * pow(band, 5.5) * 0.4 * layer;
   }
 
-  float hollow = smoothstep(uRadius * 0.25, uRadius * 0.95, r);
-  acc *= mix(0.1, 1.0, hollow);
+  // Keep the center open, but leave a soft wash so the ring still reads as large as a filled orb.
+  float hollow = smoothstep(uRadius * 0.2, uRadius * 0.92, r);
+  acc *= mix(0.22, 1.0, hollow);
+  acc += mix(uFrom, uTo, 0.5) * (1.0 - hollow) * 0.12;
 
   float sweep = pow(0.5 + 0.5 * cos(a - uSweep), 6.0);
   float sweep2 = pow(0.5 + 0.5 * cos(a - uSweep * 0.7 + 2.6), 10.0);
@@ -202,7 +208,7 @@ interface GlHandle {
 }
 
 /** Canvas is this many times the avatar slot, so glow can leave the circle. */
-const AURA_BLEED = 1.28;
+const AURA_BLEED = 1.12;
 
 const UNIFORMS = [
   'uRes',

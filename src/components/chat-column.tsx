@@ -12,12 +12,11 @@ import { pageMeta } from "@/lib/admin-nav";
 import {
   canonicalOrb,
   catalog,
+  colorCombosFor,
   exemptAvatarAgents,
   isListedSidekick,
   isNavSidekick,
   isVoiceOrb,
-  orbColorPair,
-  orbSwatches,
   paymentSteps,
   purposes,
   sellers,
@@ -1484,10 +1483,23 @@ function Popover({
   );
 }
 
-function avatarChoices(agent: Agent): { id: OrbId; label: string }[] {
-  if (exemptAvatarAgents.has(agent.id)) return [{ id: agent.orb, label: agent.name }];
-  if (agent.group === "tools") return [{ id: "aura", label: voiceOrbLabel.aura }];
-  return voiceOrbIds.filter((id) => id !== "aura").map((id) => ({ id, label: voiceOrbLabel[id] }));
+/** Recommended orb first, then every voice style. Branded marks stay available for teams and channels. */
+function orbChoices(agent: Agent): { id: OrbId; label: string }[] {
+  const seen = new Set<string>();
+  const choices: { id: OrbId; label: string }[] = [];
+  const push = (id: OrbId, label: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    choices.push({ id, label });
+  };
+  if (exemptAvatarAgents.has(agent.id)) {
+    push(agent.id as OrbId, agent.name);
+  } else {
+    const recommended = canonicalOrb(agent.orb);
+    push(recommended, isVoiceOrb(recommended) ? voiceOrbLabel[recommended] : agent.name);
+  }
+  for (const id of voiceOrbIds) push(id, voiceOrbLabel[id]);
+  return choices;
 }
 
 function EditSidekick({
@@ -1502,15 +1514,12 @@ function EditSidekick({
   const [name, setName] = useState(agent.name);
   const [purpose, setPurpose] = useState(agent.purpose);
   const [orb, setOrb] = useState<OrbId>(canonicalOrb(agent.orb));
-  const starting = isVoiceOrb(canonicalOrb(agent.orb)) ? voiceOrbTint[canonicalOrb(agent.orb) as keyof typeof voiceOrbTint] : voiceOrbTint.plasma;
+  const initialOrb = canonicalOrb(agent.orb);
+  const starting = isVoiceOrb(initialOrb) ? voiceOrbTint[initialOrb] : voiceOrbTint.plasma;
   const [colorFrom, setColorFrom] = useState(agent.orbFrom ?? starting.from);
   const [colorTo, setColorTo] = useState(agent.orbTo ?? starting.to);
   const voice = isVoiceOrb(orb);
-  const applyColor = (hex: string) => {
-    const pair = orbColorPair(hex);
-    setColorFrom(pair.from);
-    setColorTo(pair.to);
-  };
+  const combos = voice ? colorCombosFor(orb) : [];
   const field = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white outline-none placeholder:text-[#8e8f8b] focus:border-white/30";
   return createPortal(
     <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" role="presentation" onMouseDown={onClose}>
@@ -1533,11 +1542,11 @@ function EditSidekick({
           </button>
         </div>
         <fieldset>
-          <legend className="mb-2 text-[12px] text-[#8e8f8b]">Avatar</legend>
+          <legend className="mb-2 text-[12px] text-[#8e8f8b]">Orb</legend>
           <div className="flex flex-wrap gap-2">
-            {avatarChoices(agent).map((choice) => (
+            {orbChoices(agent).map((choice) => (
               <button
-                key={choice.id}
+                key={`${choice.id}-${choice.label}`}
                 type="button"
                 aria-label={choice.label}
                 aria-pressed={orb === choice.id}
@@ -1566,32 +1575,23 @@ function EditSidekick({
           <fieldset>
             <legend className="mb-2 text-[12px] text-[#8e8f8b]">Color</legend>
             <div className="flex flex-wrap items-center gap-2">
-              {orbSwatches.map((swatch) => {
-                const pair = orbColorPair(swatch.color);
-                const selected = colorFrom.toLowerCase() === pair.from && colorTo.toLowerCase() === pair.to;
+              {combos.map((combo) => {
+                const selected = colorFrom.toLowerCase() === combo.from.toLowerCase() && colorTo.toLowerCase() === combo.to.toLowerCase();
                 return (
                   <button
-                    key={swatch.name}
+                    key={combo.name}
                     type="button"
-                    aria-label={swatch.name}
+                    aria-label={combo.name}
                     aria-pressed={selected}
-                    onClick={() => applyColor(swatch.color)}
-                    className={`press rounded-full ${selected ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-90 hover:opacity-100"}`}
-                  >
-                    <Orb id={orb} size={28} colorFrom={pair.from} colorTo={pair.to} />
-                  </button>
+                    onClick={() => {
+                      setColorFrom(combo.from);
+                      setColorTo(combo.to);
+                    }}
+                    className={`press size-7 rounded-full ${selected ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a1a1a]" : "opacity-90 hover:opacity-100"}`}
+                    style={{ background: `linear-gradient(135deg, ${combo.from}, ${combo.to})` }}
+                  />
                 );
               })}
-              <label className="ml-1 flex items-center gap-2 text-[12px] text-[#8e8f8b]">
-                Fine tune
-                <input
-                  type="color"
-                  aria-label="Orb color"
-                  value={colorFrom}
-                  onChange={(event) => applyColor(event.target.value)}
-                  className="h-7 w-9 cursor-pointer rounded-md border border-white/15 bg-transparent p-0.5"
-                />
-              </label>
             </div>
           </fieldset>
         ) : null}

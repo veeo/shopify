@@ -66,9 +66,9 @@ type PlasmaTune = {
 };
 
 const TUNE: Record<OrbState, PlasmaTune> = {
-  idle: { flow: 0.48, distortion: 0.5, swirl: 0.34, grain: 0.04, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
-  hover: { flow: 0.48, distortion: 0.5, swirl: 0.34, grain: 0.04, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
-  selected: { flow: 0.48, distortion: 0.5, swirl: 0.34, grain: 0.04, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
+  idle: { flow: 0.68, distortion: 0.58, swirl: 0.46, grain: 0.05, outer: 0.1, inner: 0.18, beat: 0.08, beatRate: 0.34, error: 0 },
+  hover: { flow: 0.68, distortion: 0.58, swirl: 0.46, grain: 0.05, outer: 0.1, inner: 0.18, beat: 0.08, beatRate: 0.34, error: 0 },
+  selected: { flow: 0.68, distortion: 0.58, swirl: 0.46, grain: 0.05, outer: 0.1, inner: 0.18, beat: 0.08, beatRate: 0.34, error: 0 },
   connecting: { flow: 0.4, distortion: 0.4, swirl: 0.4, grain: 0.08, outer: 0.1, inner: 0.1, beat: 0.6, beatRate: 0.28, error: 0 },
   listening: { flow: 0.85, distortion: 0.5, swirl: 0.32, grain: 0.1, outer: 0.16, inner: 0.95, beat: 0, beatRate: 0.3, error: 0 },
   thinking: { flow: 0.7, distortion: 0.35, swirl: 0.78, grain: 0.1, outer: 0.08, inner: 0.35, beat: 0.4, beatRate: 0.45, error: 0 },

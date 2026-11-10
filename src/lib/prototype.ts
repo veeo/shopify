@@ -38,7 +38,7 @@ export const voiceOrbLabel: Record<VoiceOrbId, string> = {
   twist: "Twisted Colorful Sphere",
   aura: "Aura Field",
   marble: "Marble",
-  strands: "Glass",
+  strands: "Bubbles",
 };
 
 /** Gallery defaults. Twist's pair keeps the original cosine palette until a sidekick picks another. */
@@ -47,34 +47,31 @@ export const voiceOrbTint: Record<VoiceOrbId, { from: string; to: string }> = {
   mercury: { from: "#cbd5e1", to: "#a5b4fc" },
   twist: { from: "#22d3ee", to: "#f472b6" },
   aura: { from: "#34d399", to: "#60a5fa" },
-  marble: { from: "#1d4ed8", to: "#fb7185" },
+  marble: { from: "#1d4ed8", to: "#a855f7" },
   strands: { from: "#7c5cff", to: "#fb7185" },
 };
 
-/** One color for the editor. The second stop is derived so the orb keeps depth. */
-export const orbSwatches = [
-  { name: "Violet", color: "#7c3aed" },
-  { name: "Cyan", color: "#06b6d4" },
-  { name: "Emerald", color: "#10b981" },
-  { name: "Amber", color: "#f59e0b" },
-  { name: "Rose", color: "#f43f5e" },
-  { name: "Slate", color: "#94a3b8" },
+/** Curated color combinations for the edit picker. The orb's own default is shown first. */
+export const orbColorCombos = [
+  { name: "Violet cyan", from: "#7c3aed", to: "#06b6d4" },
+  { name: "Aurora", from: "#34d399", to: "#60a5fa" },
+  { name: "Cyan pink", from: "#22d3ee", to: "#f472b6" },
+  { name: "Cobalt violet", from: "#1d4ed8", to: "#a855f7" },
+  { name: "Bubble", from: "#7c5cff", to: "#fb7185" },
+  { name: "Sunset", from: "#f97316", to: "#ec4899" },
+  { name: "Slate", from: "#94a3b8", to: "#a5b4fc" },
+  { name: "Rose gold", from: "#fb7185", to: "#fbbf24" },
 ] as const;
 
-/** The color the person picked, plus a lighter stop so the orb still has depth. */
-export function orbColorPair(hex: string): { from: string; to: string } {
-  const clean = hex.replace("#", "");
-  const full = clean.length === 3 ? [...clean].map((part) => part + part).join("") : clean.padStart(6, "0").slice(0, 6);
-  const value = Number.parseInt(full, 16);
-  if (Number.isNaN(value)) return { from: "#7c3aed", to: "#c4b5fd" };
-  const channels = [(value >> 16) & 255, (value >> 8) & 255, value & 255];
-  const lift = [0.42, 0.28, 0.5];
-  const to = channels.map((channel, index) => Math.round(channel + (255 - channel) * lift[index]));
-  const hexOf = (rgb: number[]) => `#${rgb.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
-  return { from: hexOf(channels), to: hexOf(to) };
+export function colorCombosFor(orb: VoiceOrbId): { name: string; from: string; to: string }[] {
+  const recommended = { name: "Recommended", ...voiceOrbTint[orb] };
+  const rest = orbColorCombos.filter(
+    (combo) => combo.from.toLowerCase() !== recommended.from.toLowerCase() || combo.to.toLowerCase() !== recommended.to.toLowerCase(),
+  );
+  return [recommended, ...rest];
 }
 
-/** Branded marks stay out of the generic orb picker. */
+/** Branded marks are the recommended default for their sidekick, and stay available in the orb picker. */
 export const exemptAvatarAgents = new Set(["slack", "grok", "muse", "claude", "duet", "gemini", "store", "shop", "pos", "agentic"]);
 
 /** The earlier Claude mark. Claude Duet is the one that stays. */
