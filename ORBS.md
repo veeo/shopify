@@ -40,7 +40,6 @@ Visible orbs keep their idle motion, all at the same pace. Offscreen orbs and hi
 - **Plasma** is the Product ideas orb. The colors stay separated, a glass highlight sits on the sphere, and the idle flow is a step more lively. Talking still speeds it further.
 - **Mercury** is the Trends orb. The ripples and contour deepen with the level, and the idle flow is a step faster.
 - **Twisted sphere** keeps the original twist. Chief of staff uses this style. Talking speeds it.
-- **Aura Field** is the tool ring. Separate strands drift and change a little at rest, then spring open while listening or talking. The ring sits at the same size as the filled orbs.
 - **Marble** is the Campaigns orb. A milky glass marble with a soft blue-to-purple ribbon inside. It stays inside the same circle as the others.
-- **Orbit** is the React Bits glowing ring: violet-to-cyan swirl with an orbiting highlight. Listening and talking wake it and speed the trail. Adapted from [reactbits.dev/backgrounds/orb](https://reactbits.dev/backgrounds/orb).
+- **Orbit** is the tool ring (React Bits): a centered violet-to-cyan swirl with an orbiting highlight. Idle stays round and calm; listening and talking wake the glow and speed the trail. Adapted from [reactbits.dev/backgrounds/orb](https://reactbits.dev/backgrounds/orb).
 - **Grok Bot, Slackbot, and Muse** keep their artwork. The mark squashes and stretches with the level. Grok and Slackbot answer with their eyes. Neither grows a mouth.

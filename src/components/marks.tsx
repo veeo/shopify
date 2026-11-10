@@ -6,7 +6,6 @@ import { useReducedMotion } from "@/voiceorbs/lib/use-reduced-motion";
 import { ORB_LOOK, presenceFor } from "@/voiceorbs/lib/orb-model";
 import { canonicalOrb, isVoiceOrb, type OrbId, type VoiceOrbId } from "@/lib/prototype";
 import { AgenticMark, ClaudeDuetMark, ClaudeMark, GeminiMark, GrokBot, MuseBall, OnlineStoreMark, PosMark, ShopAppMark, SlackOrb } from "@/components/team-marks";
-import { AuraField } from "@/voiceorbs/orbs/aura-field";
 import { MarbleOrb } from "@/voiceorbs/orbs/glass-orbs";
 import { OrbitOrb } from "@/voiceorbs/orbs/orbit-orb";
 import { MercuryOrb } from "@/voiceorbs/orbs/mercury-orb";
@@ -39,6 +38,7 @@ export function Orb({
   colorTo,
   presence = "rest",
   orbState,
+  levelRef: levelOverride,
 }: {
   id: OrbId;
   size?: number;
@@ -51,16 +51,19 @@ export function Orb({
   hot?: boolean;
   /** Show a voice state without a live microphone. Audio still wins when this sidekick is talking. */
   orbState?: OrbState;
+  /** Optional envelope override — design-system specimens use this instead of a live mic. */
+  levelRef?: RefObject<number>;
 }) {
   const resolved = canonicalOrb(id);
   const audio = useOrbAudio(agentId);
   const reduced = useReducedMotion();
   const state: OrbState = audio.state ?? orbState ?? (presence === "selected" ? "selected" : "idle");
   const look = ORB_LOOK[presenceFor(state, reduced)];
+  const levelRef = levelOverride ?? audio.levelRef;
   const body = isVoiceOrb(resolved) ? (
-    <VoiceOrb id={resolved} size={size} state={state} levelRef={audio.levelRef} colorFrom={colorFrom} colorTo={colorTo} />
+    <VoiceOrb id={resolved} size={size} state={state} levelRef={levelRef} colorFrom={colorFrom} colorTo={colorTo} />
   ) : (
-    mark(resolved, size, state, audio.levelRef, colorFrom, colorTo)
+    mark(resolved, size, state, levelRef, colorFrom, colorTo)
   );
   return (
     <span
@@ -127,7 +130,7 @@ function VoiceOrb({
   colorTo?: string;
 }) {
   const style = { "--s": `${size}px`, "--render": `${ORB_RENDER}px`, "--fit": size / ORB_RENDER } as CSSProperties;
-  const glow = id === "aura" || id === "orbit";
+  const glow = id === "orbit";
   const props = {
     size: ORB_RENDER,
     state,
@@ -143,9 +146,6 @@ function VoiceOrb({
       break;
     case "twist":
       node = <TwistSphere {...props} />;
-      break;
-    case "aura":
-      node = <AuraField {...props} />;
       break;
     case "marble":
       node = <MarbleOrb {...props} />;

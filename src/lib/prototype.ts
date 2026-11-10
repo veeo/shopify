@@ -9,7 +9,7 @@ export type BusinessType = (typeof businessTypes)[number];
 
 export type AgentGroup = "favorites" | "teams" | "channels" | "tools" | "hidden";
 
-export const voiceOrbIds = ["plasma", "mercury", "twist", "aura", "marble", "orbit"] as const;
+export const voiceOrbIds = ["plasma", "mercury", "twist", "marble", "orbit"] as const;
 export type VoiceOrbId = (typeof voiceOrbIds)[number];
 
 export type OrbId =
@@ -36,7 +36,6 @@ export const voiceOrbLabel: Record<VoiceOrbId, string> = {
   plasma: "Plasma",
   mercury: "Mercury",
   twist: "Twisted Colorful Sphere",
-  aura: "Aura Field",
   marble: "Marble",
   orbit: "Orbit",
 };
@@ -46,7 +45,6 @@ export const voiceOrbTint: Record<VoiceOrbId, { from: string; to: string }> = {
   plasma: { from: "#7c3aed", to: "#06b6d4" },
   mercury: { from: "#cbd5e1", to: "#a5b4fc" },
   twist: { from: "#22d3ee", to: "#f472b6" },
-  aura: { from: "#34d399", to: "#60a5fa" },
   marble: { from: "#1d4ed8", to: "#a855f7" },
   orbit: { from: "#9c43fe", to: "#4cc2e9" },
 };
@@ -115,15 +113,16 @@ const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
   chief: "twist",
   ideas: "plasma",
   trends: "mercury",
-  customers: "aura",
-  orders: "aura",
-  finance: "aura",
-  analytics: "aura",
+  customers: "orbit",
+  orders: "orbit",
+  finance: "orbit",
+  analytics: "orbit",
   custom: "plasma",
   particles: "twist",
   dither: "plasma",
   grain: "twist",
-  gooey: "aura",
+  gooey: "orbit",
+  aura: "orbit",
   nebula: "marble",
   crystal: "marble",
   iridescence: "plasma",
@@ -863,7 +862,7 @@ export const catalog: Agent[] = [
     preview: "A $2,184.60 payout is on the way.",
     topic: "Payouts",
     placeholder: "Ask Finance…",
-    orb: "aura",
+    orb: "orbit",
   }),
   agent({
     id: "analytics",
@@ -872,7 +871,7 @@ export const catalog: Agent[] = [
     preview: "Last 30 days: $48,393 from 386 orders.",
     topic: "Last 30 days",
     placeholder: "Ask Analytics…",
-    orb: "aura",
+    orb: "orbit",
   }),
 ];
 

@@ -843,37 +843,7 @@ function Sidekick() {
   return (
     <Group id="sidekick" title="Sidekick" note="Pieces this prototype draws itself: orbs, choice cards, chat, the composer, status, and suggestion chips.">
       <div className="flex flex-col gap-4 rounded-2xl bg-[#0c0d0c] p-5 text-white">
-        <div className="flex flex-col gap-3">
-          <p className="text-[13px] font-medium text-[#c6c6c6]">Orbs</p>
-          <div className="overflow-x-auto">
-            <table className="border-separate border-spacing-x-3 border-spacing-y-2">
-              <thead>
-                <tr>
-                  <th className="w-28" />
-                  {orbStates.map((state) => (
-                    <th key={state.id} className="text-[11px] font-medium text-[#8e8f8b]">
-                      {state.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {voiceOrbIds.map((id) => (
-                  <tr key={id}>
-                    <th className="pr-2 text-left text-[12px] font-medium text-[#c6c6c6]">{voiceOrbLabel[id]}</th>
-                    {orbStates.map((state) => (
-                      <td key={state.id} className="text-center">
-                        <span className="inline-grid size-12 place-items-center">
-                          <StyleOrb id={id} state={state.id} />
-                        </span>
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <OrbGallery />
         <div className="flex flex-col gap-2">
           <p className="text-[13px] font-medium text-[#c6c6c6]">Chat</p>
           <div className="flex justify-end">
@@ -926,9 +896,75 @@ function Sidekick() {
   );
 }
 
+/** Demo levels so listening/speaking in the gallery match a live mic without opening one. */
+const DEMO_LEVEL: Partial<Record<OrbState, number>> = {
+  listening: 0.55,
+  speaking: 0.72,
+  thinking: 0.28,
+};
+
+/**
+ * One style at a time across the four voice states. Browsers cap WebGL contexts, so a full
+ * style×state matrix goes black — this keeps four live orbs, the same path as nav/composer.
+ */
+function OrbGallery() {
+  const [style, setStyle] = useState<VoiceOrbId>("orbit");
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-[13px] font-medium text-[#c6c6c6]">Orbs</p>
+      <p className="max-w-[640px] text-[12px] leading-[1.45] text-[#8e8f8b]">
+        Same WebGL styles as the nav and composer, drawn at 144px into the slot. Pick a style, then compare idle with the
+        live voice states. Idle stays calm and circular. Listening and speaking push a demo level into the surface —
+        thinking wakes without audio. Hover and selected match rest.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {voiceOrbIds.map((id) => {
+          const on = id === style;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setStyle(id)}
+              className={`rounded-lg px-2.5 py-1.5 text-[12px] transition-colors ${
+                on ? "bg-white/[0.12] text-white" : "text-[#8e8f8b] hover:bg-white/[0.06] hover:text-[#c6c6c6]"
+              }`}
+              aria-pressed={on}
+            >
+              {voiceOrbLabel[id]}
+            </button>
+          );
+        })}
+      </div>
+      <div className="grid max-w-[560px] grid-cols-4 gap-4 overflow-visible pt-1">
+        {orbStates.map((state) => (
+          <div key={state.id} className="flex flex-col items-center gap-2 overflow-visible">
+            <span className="inline-grid size-16 place-items-center overflow-visible">
+              <StyleOrb id={style} state={state.id} />
+            </span>
+            <span className="text-[11px] font-medium text-[#8e8f8b]">{state.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function StyleOrb({ id, state }: { id: VoiceOrbId; state: OrbState }) {
   const tint = id === "twist" ? undefined : voiceOrbTint[id];
-  return <Orb id={id} size={40} orbState={state} colorFrom={tint?.from} colorTo={tint?.to} />;
+  const levelRef = useRef(DEMO_LEVEL[state] ?? -1);
+  useEffect(() => {
+    levelRef.current = DEMO_LEVEL[state] ?? -1;
+  }, [state]);
+  return (
+    <Orb
+      id={id}
+      size={56}
+      orbState={state}
+      levelRef={levelRef}
+      colorFrom={tint?.from}
+      colorTo={tint?.to}
+    />
+  );
 }
 
 function ChoicePreview() {

@@ -100,7 +100,9 @@ vec4 draw(vec2 uv) {
   float innerFade = smoothstep(r0 * (1.0 - 0.2 * reach), r0 * (1.0 - 0.05 * reach), len);
   v0 *= mix(innerFade, 1.0, bgLuminance * 0.7 * min(uBleed, 1.0));
   float body = smoothstep(0.8 - 0.2 * reach, 0.8, len);
-  float cl = cos(ang + uSwirl) * 0.5 + 0.5;
+  // Idle keeps the swirl near 50/50 so one hue doesn't pull the ring off-level.
+  float clRaw = cos(ang + uSwirl) * 0.5 + 0.5;
+  float cl = mix(0.5, clRaw, clamp(uAwake * 2.4 + 0.28, 0.0, 1.0));
 
   vec2 pos = vec2(cos(uOrbit), sin(uOrbit)) * r0;
   float d = distance(uv, pos);
@@ -183,20 +185,20 @@ const mixHex = (a: string, b: string, t: number) => {
   return `#${[r, g, bl].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 };
 
-/** Voice states → ring energy. */
+/** Voice states → ring energy. Idle stays round and even; talk wakes the bead. */
 const TUNE: Record<
   OrbState,
-  { speed: number; awake: number; glow: number; wobble: number; trail: number }
+  { speed: number; awake: number; glow: number; wobble: number; trail: number; highlight: number }
 > = {
-  idle: { speed: 0.7, awake: 0.12, glow: 1.05, wobble: 1, trail: 1 },
-  hover: { speed: 0.75, awake: 0.18, glow: 1.1, wobble: 1, trail: 1 },
-  selected: { speed: 0.75, awake: 0.2, glow: 1.1, wobble: 1, trail: 1 },
-  connecting: { speed: 0.9, awake: 0.35, glow: 1.15, wobble: 1.1, trail: 1.1 },
-  listening: { speed: 1.15, awake: 0.7, glow: 1.25, wobble: 1.15, trail: 1.2 },
-  thinking: { speed: 1.05, awake: 0.55, glow: 1.2, wobble: 1.2, trail: 1.15 },
-  speaking: { speed: 1.45, awake: 0.95, glow: 1.35, wobble: 1.25, trail: 1.35 },
-  error: { speed: 1.2, awake: 0.6, glow: 1.2, wobble: 1.3, trail: 0.8 },
-  disabled: { speed: 0, awake: 0, glow: 0.8, wobble: 0.4, trail: 0.4 },
+  idle: { speed: 0.22, awake: 0.03, glow: 0.95, wobble: 0.04, trail: 0.12, highlight: 0.1 },
+  hover: { speed: 0.32, awake: 0.08, glow: 0.98, wobble: 0.1, trail: 0.35, highlight: 0.3 },
+  selected: { speed: 0.35, awake: 0.1, glow: 1.0, wobble: 0.12, trail: 0.4, highlight: 0.35 },
+  connecting: { speed: 0.85, awake: 0.35, glow: 1.12, wobble: 0.55, trail: 0.95, highlight: 0.85 },
+  listening: { speed: 1.1, awake: 0.7, glow: 1.22, wobble: 0.85, trail: 1.15, highlight: 1.05 },
+  thinking: { speed: 0.95, awake: 0.5, glow: 1.15, wobble: 0.7, trail: 1.0, highlight: 0.9 },
+  speaking: { speed: 1.4, awake: 0.95, glow: 1.32, wobble: 1.05, trail: 1.3, highlight: 1.2 },
+  error: { speed: 1.15, awake: 0.55, glow: 1.18, wobble: 1.1, trail: 0.7, highlight: 0.95 },
+  disabled: { speed: 0, awake: 0, glow: 0.8, wobble: 0.08, trail: 0.2, highlight: 0.15 },
 };
 
 type Program = { program: WebGLProgram; uniforms: Record<string, WebGLUniformLocation | null> };
@@ -300,7 +302,8 @@ export function OrbitOrb({
     const motion = {
       time: 0,
       swirl: 0,
-      orbit: Math.random() * Math.PI * 2,
+      // Park the highlight at top-center so idle reads level, not randomly lopsided.
+      orbit: Math.PI * 0.5,
       echo: 1,
       rotation: 0,
       hover: 0,
@@ -310,6 +313,7 @@ export function OrbitOrb({
       pulse: 0,
       pulseSpeed: 0,
       kick: 0,
+      highlight: TUNE.idle.highlight,
     };
 
     let px = 0;
@@ -357,18 +361,19 @@ export function OrbitOrb({
       gl.uniform3fv(u.uColor1, c1);
       gl.uniform3fv(u.uColor2, c2);
       gl.uniform3fv(u.uColor3, c3);
-      // Zoom so the ring fills the avatar slot like the other voice orbs.
-      gl.uniform1f(u.uScale, 0.88 / (1 + motion.pulse * 0.85));
+      // Zoom so the ring fills the avatar slot like the filled voice orbs.
+      gl.uniform1f(u.uScale, 0.82 / (1 + motion.pulse * 0.85));
       gl.uniform1f(u.uWobble, tune.wobble);
       gl.uniform1f(u.uGlow, tune.glow);
-      gl.uniform1f(u.uBleed, 1);
-      gl.uniform1f(u.uHighlight, 1);
+      gl.uniform1f(u.uBleed, 0.85);
+      gl.uniform1f(u.uHighlight, motion.highlight);
       gl.uniform2f(u.uEcho, motion.echo * 0.55, motion.echo < 1 ? (1 - motion.echo) * (1 - motion.echo) : 0);
       gl.uniform1f(u.uSwirl, motion.swirl);
       gl.uniform1f(u.uOrbit, motion.orbit);
       gl.uniform1f(u.uReveal, 1);
       gl.uniform1f(u.uOpacity, live.state === 'disabled' ? 0.45 : 1);
       gl.uniform1f(u.uTrail, tune.trail);
+      // Keep the ring face-on — never tilt the plane.
       gl.uniform2f(u.uTilt, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -382,13 +387,15 @@ export function OrbitOrb({
       const rate = live.reduced || !active ? 0 : Math.max(live.speed, 0) * tune.speed;
       const step = dt * rate;
       motion.time += step;
-      motion.swirl += step * 2 * (1 + motion.kick);
+      // Idle swirl stays slow so the color split doesn't freeze mid-asymmetry.
+      motion.swirl += step * (live.state === 'idle' || live.state === 'hover' || live.state === 'selected' ? 0.65 : 2) * (1 + motion.kick);
       motion.orbit -= step;
       motion.orbit = Math.atan2(Math.sin(motion.orbit), Math.cos(motion.orbit));
       motion.echo = Math.min(1, motion.echo + dt / 1.2);
       motion.kick *= Math.exp(-dt * 2.5);
       motion.pulseSpeed += (-170 * motion.pulse - 11 * motion.pulseSpeed) * dt;
       motion.pulse += motion.pulseSpeed * dt;
+      motion.highlight += (tune.highlight - motion.highlight) * (1 - Math.exp(-dt / 0.18));
       // Soft awake reach without cursor — keeps the ring breathing.
       const targetHover = live.reduced ? 0 : tune.awake;
       motion.hover += (targetHover - motion.hover) * (1 - Math.exp(-dt / 0.16));

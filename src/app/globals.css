@@ -728,7 +728,7 @@ html.vt-titles::view-transition-old(*):only-child {
     background: transparent;
   }
 
-  /* Aura / Orbit draw glow past the avatar circle — don't clip it. */
+  /* Orbit draws glow past the avatar circle — don't clip it. */
   .orb.voice-slot-glow {
     overflow: visible;
   }
