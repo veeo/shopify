@@ -728,6 +728,11 @@ html.vt-titles::view-transition-old(*):only-child {
     background: transparent;
   }
 
+  /* Aura / Orbit draw glow past the avatar circle — don't clip it. */
+  .orb.voice-slot-glow {
+    overflow: visible;
+  }
+
   .voice-orb-fit {
     position: absolute;
     top: 0;

@@ -9,7 +9,7 @@ export type BusinessType = (typeof businessTypes)[number];
 
 export type AgentGroup = "favorites" | "teams" | "channels" | "tools" | "hidden";
 
-export const voiceOrbIds = ["plasma", "mercury", "twist", "aura", "marble"] as const;
+export const voiceOrbIds = ["plasma", "mercury", "twist", "aura", "marble", "orbit"] as const;
 export type VoiceOrbId = (typeof voiceOrbIds)[number];
 
 export type OrbId =
@@ -38,6 +38,7 @@ export const voiceOrbLabel: Record<VoiceOrbId, string> = {
   twist: "Twisted Colorful Sphere",
   aura: "Aura Field",
   marble: "Marble",
+  orbit: "Orbit",
 };
 
 /** Gallery defaults. Twist's pair keeps the original cosine palette until a sidekick picks another. */
@@ -47,6 +48,7 @@ export const voiceOrbTint: Record<VoiceOrbId, { from: string; to: string }> = {
   twist: { from: "#22d3ee", to: "#f472b6" },
   aura: { from: "#34d399", to: "#60a5fa" },
   marble: { from: "#1d4ed8", to: "#a855f7" },
+  orbit: { from: "#9c43fe", to: "#4cc2e9" },
 };
 
 /** Curated color combinations for the edit picker. The orb's own default is shown first. */
@@ -55,6 +57,7 @@ export const orbColorCombos = [
   { name: "Aurora", from: "#34d399", to: "#60a5fa" },
   { name: "Cyan pink", from: "#22d3ee", to: "#f472b6" },
   { name: "Cobalt violet", from: "#1d4ed8", to: "#a855f7" },
+  { name: "Orbit", from: "#9c43fe", to: "#4cc2e9" },
   { name: "Sunset", from: "#f97316", to: "#ec4899" },
   { name: "Slate", from: "#94a3b8", to: "#a5b4fc" },
   { name: "Rose gold", from: "#fb7185", to: "#fbbf24" },

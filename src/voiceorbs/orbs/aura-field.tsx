@@ -146,7 +146,8 @@ void main() {
   vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / uRes;
   vec2 p = uv * uBleed;
   float r = length(p);
-  float edge = 1.0 - smoothstep(0.8, 1.0, r);
+  // Soft falloff past the avatar circle so the glow can leave the slot.
+  float edge = 1.0 - smoothstep(1.0, uBleed * 0.98, r);
   if (edge <= 0.001) {
     gl_FragColor = vec4(0.0);
     return;
@@ -207,8 +208,8 @@ interface GlHandle {
   loc: Record<string, WebGLUniformLocation | null>;
 }
 
-/** Canvas is this many times the avatar slot, so glow can leave the circle. */
-const AURA_BLEED = 1.12;
+/** Canvas is this many times the avatar slot, so outer glow can leave the circle. */
+const AURA_BLEED = 1.4;
 
 const UNIFORMS = [
   'uRes',

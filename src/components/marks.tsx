@@ -8,6 +8,7 @@ import { canonicalOrb, isVoiceOrb, type OrbId, type VoiceOrbId } from "@/lib/pro
 import { AgenticMark, ClaudeDuetMark, ClaudeMark, GeminiMark, GrokBot, MuseBall, OnlineStoreMark, PosMark, ShopAppMark, SlackOrb } from "@/components/team-marks";
 import { AuraField } from "@/voiceorbs/orbs/aura-field";
 import { MarbleOrb } from "@/voiceorbs/orbs/glass-orbs";
+import { OrbitOrb } from "@/voiceorbs/orbs/orbit-orb";
 import { MercuryOrb } from "@/voiceorbs/orbs/mercury-orb";
 import { PlasmaOrb } from "@/voiceorbs/orbs/plasma-orb";
 import { TwistSphere } from "@/voiceorbs/orbs/twist-sphere";
@@ -126,6 +127,7 @@ function VoiceOrb({
   colorTo?: string;
 }) {
   const style = { "--s": `${size}px`, "--render": `${ORB_RENDER}px`, "--fit": size / ORB_RENDER } as CSSProperties;
+  const glow = id === "aura" || id === "orbit";
   const props = {
     size: ORB_RENDER,
     state,
@@ -148,11 +150,14 @@ function VoiceOrb({
     case "marble":
       node = <MarbleOrb {...props} />;
       break;
+    case "orbit":
+      node = <OrbitOrb {...props} />;
+      break;
     default:
       node = <PlasmaOrb {...props} />;
   }
   return (
-    <span className="orb voice-slot" style={style} aria-hidden>
+    <span className={`orb voice-slot${glow ? " voice-slot-glow" : ""}`} style={style} aria-hidden>
       <span className="voice-orb-fit">{node}</span>
     </span>
   );
