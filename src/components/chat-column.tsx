@@ -14,6 +14,7 @@ import {
   catalog,
   exemptAvatarAgents,
   isListedSidekick,
+  isNavSidekick,
   isVoiceOrb,
   orbColorPair,
   orbSwatches,
@@ -640,7 +641,7 @@ const pageSuggestions: Record<string, string[]> = {
 
 export function suggestionsFor(state: PrototypeState) {
   if (state.mode === "create") return [];
-  if (state.mode === "add") return ["Tell me more about creating a sidekick", "Which sidekick should I add first?", "Create my own sidekick", "What can sidekicks do?"];
+  if (state.mode === "add") return ["Which sidekick should I add first?", "What can sidekicks do?"];
   if (sidekickStage(state)) return [];
   if (state.lookbook && !state.theme) return [];
   if (state.theme) return ["I have something to sell", "Write a headline for the homepage", "Change the colors", "What should we do next?"];
@@ -712,7 +713,6 @@ export function Composer({
   const fileInput = useRef<HTMLInputElement>(null);
   const recognition = useRef<SpeechRecognitionLike | null>(null);
   const recording = useRef<Recording | null>(null);
-  const meter = useRef<HTMLSpanElement>(null);
   const base = useRef("");
   const heard = useRef("");
   const showSuggestions = focused && !draft.trim() && !busy && !plusOpen && !switchOpen;
@@ -735,18 +735,6 @@ export function Composer({
     voiceOpen ? null : listening ? "listening" : transcribing || busy || state.workingAgentId === liveAgentId ? "thinking" : null,
     () => (listening ? (recording.current?.level() ?? 0) : 0),
   );
-
-  useEffect(() => {
-    if (!listening) return;
-    let frame = 0;
-    const draw = () => {
-      const level = recording.current?.level() ?? 0;
-      meter.current?.style.setProperty("--level", level.toFixed(3));
-      frame = requestAnimationFrame(draw);
-    };
-    frame = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(frame);
-  }, [listening]);
 
   function submit(text = draft) {
     const value = text.trim();
@@ -933,18 +921,7 @@ export function Composer({
           ) : (
             <Orb id={agent.orb} agentId={agent.id} size={ORB_SIZE.composer} presence="selected" colorFrom={agent.orbFrom} colorTo={agent.orbTo} />
           )}
-          {listening ? (
-            <span ref={meter} className="ml-1.5 flex h-5 items-center gap-[3px] text-[12px] text-[#8e8f8b]" style={{ "--level": 0 } as React.CSSProperties}>
-              {[0.5, 0.85, 1, 0.7, 0.45].map((weight, index) => (
-                <span
-                  key={index}
-                  className="w-[3px] rounded-full bg-[#ff6d5e] transition-[height] duration-75"
-                  style={{ height: `calc(4px + var(--level) * ${Math.round(weight * 16)}px)` }}
-                />
-              ))}
-              <span className="ml-1.5">Listening</span>
-            </span>
-          ) : transcribing ? (
+          {transcribing ? (
             <span className="ml-1.5 flex items-center gap-1.5 text-[12px] text-[#8e8f8b]">
               <Spinner />
               <span className="shimmer-text">Transcribing</span>
@@ -1135,7 +1112,7 @@ function SidekickSwitcher({
   onPick: (id: string) => void;
   onAdd?: () => void;
 }) {
-  const agents = state.agents.filter((item) => item.installed && isListedSidekick(item.id));
+  const agents = state.agents.filter((item) => item.installed && isNavSidekick(item.id));
   return (
     <Popover id="sidekick-switcher" onDismiss={onDismiss} className="bottom-[calc(100%+8px)] left-0 w-64 origin-bottom-left p-1.5">
       <p className="px-2 pb-1 pt-1.5 text-[12px] text-[#8e8f8b]">Switch sidekick</p>
@@ -1192,7 +1169,7 @@ function PlusMenu({
 }) {
   const [sub, setSub] = useState<"mention" | "skills" | "apps" | null>(null);
   const [generate, setGenerate] = useState(true);
-  const agents = state.agents.filter((item) => item.installed && isListedSidekick(item.id));
+  const agents = state.agents.filter((item) => item.installed && isNavSidekick(item.id));
   const row = `flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left ${light ? "text-[12px] text-[#303030] hover:bg-[#f1f1f1]" : "text-[13px] text-white hover:bg-white/[0.07]"}`;
   const divider = `my-1 h-px ${light ? "bg-[#ebebeb]" : "bg-white/10"}`;
 
@@ -1816,8 +1793,8 @@ function CreateForm({ onCreate, onBack }: { onCreate: (name: string, purpose: st
 
 const addSections: { label: string; ids: string[] }[] = [
   { label: "Recommended", ids: ["chief", "ideas", "trends", "campaigns"] },
-  { label: "Team", ids: ["grok", "slack", "duet"] },
-  { label: "Channels", ids: ["store", "shop"] },
+  { label: "Team", ids: ["grok", "slack", "muse", "gemini", "duet"] },
+  { label: "Channels", ids: ["store", "shop", "pos", "agentic"] },
   { label: "Tools", ids: ["customers", "orders", "finance", "analytics"] },
 ];
 
@@ -1831,6 +1808,7 @@ const addCopy: Record<string, string> = {
   claude: "Connect Claude to draft emails, product copy, and replies.",
   duet: "Write with Claude, one sentence at a time.",
   gemini: "Connect Google’s Gemini for search and Shopping ads.",
+  muse: "Connect Muse for directions, names, and the line a campaign should use.",
   store: "The online store: theme, product pages, and delivery promises.",
   shop: "The Shop channel and the listings shoppers see there.",
   pos: "Point of Sale for the counter, pickup, and in-person sales.",
@@ -1844,9 +1822,14 @@ const addCopy: Record<string, string> = {
 function AddGrid({ onAdd, onChip }: { onAdd: (id: string) => void; onChip: (label: string) => void }) {
   return (
     <div className="max-w-[640px]">
-      <p className="mb-5 max-w-[560px] text-[15px] leading-[1.4] text-white">
+      <p className="max-w-[560px] text-[15px] leading-[1.4] text-white">
         Sidekicks are AI agents that get things done for you. Start with a recommended one, connect a team bot, or add a channel or tool.
       </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <ChipButton label="Tell me more about creating a sidekick" tone="secondary" onClick={() => onChip("Tell me more about creating a sidekick")} />
+        <ChipButton label="Create my own sidekick" tone="primary" onClick={() => onChip("Create my own sidekick")} />
+      </div>
+      <div className="mt-8">
       {addSections.map((section) => {
         const rows = section.ids.flatMap((id) => (isListedSidekick(id) ? catalog.filter((item) => item.id === id) : []));
         if (rows.length === 0) return null;
@@ -1881,9 +1864,6 @@ function AddGrid({ onAdd, onChip }: { onAdd: (id: string) => void; onChip: (labe
           </section>
         );
       })}
-      <div className="flex flex-wrap gap-2">
-        <ChipButton label="Tell me more about creating a sidekick" tone="secondary" onClick={() => onChip("Tell me more about creating a sidekick")} />
-        <ChipButton label="Create my own sidekick" tone="primary" onClick={() => onChip("Create my own sidekick")} />
       </div>
     </div>
   );

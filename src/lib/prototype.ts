@@ -77,11 +77,40 @@ export function orbColorPair(hex: string): { from: string; to: string } {
 /** Branded marks stay out of the generic orb picker. */
 export const exemptAvatarAgents = new Set(["slack", "grok", "muse", "claude", "duet", "gemini", "store", "shop", "pos", "agentic"]);
 
-/** Sidekicks that stay out of the nav, the switcher, mentions, and the add list. */
-export const hiddenSidekicks = new Set(["muse", "claude", "gemini", "pos", "agentic"]);
+/** The earlier Claude mark. Claude Duet is the one that stays. */
+const retiredSidekicks = new Set(["claude"]);
 
+/** Tucked under Hidden on an active store, out of the main groups, the switcher, and mentions. */
+export const hiddenSidekicks = new Set(["duet"]);
+
+/** Installed in the main nav when the store is active. */
+const defaultSidekicks = new Set([
+  "chief",
+  "ideas",
+  "trends",
+  "campaigns",
+  "grok",
+  "slack",
+  "store",
+  "shop",
+  "pos",
+  "orders",
+  "finance",
+  "analytics",
+]);
+
+/** A sidekick the merchant can add. Retired ones stay in the catalog only. */
 export function isListedSidekick(id: string) {
-  return !hiddenSidekicks.has(id);
+  return !retiredSidekicks.has(id);
+}
+
+/** In the main nav, the switcher, and mentions. Hidden ones stay in the Hidden tray. */
+export function isNavSidekick(id: string) {
+  return isListedSidekick(id) && !hiddenSidekicks.has(id);
+}
+
+function isDefaultSidekick(id: string) {
+  return defaultSidekicks.has(id);
 }
 
 const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
@@ -1205,7 +1234,7 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
 
 export function activeState(storeName = "My Store"): PrototypeState {
   const base = setupState(storeName, "tasks");
-  const installed = catalog.filter((item) => isListedSidekick(item.id)).map((item) => ({
+  const installed = catalog.filter((item) => isDefaultSidekick(item.id)).map((item) => ({
     ...item,
     installed: true,
     preview: item.id === "chief" ? "Last 30 days: $48,393" : item.preview,
@@ -1231,7 +1260,7 @@ export function activeState(storeName = "My Store"): PrototypeState {
 
 export function visibleAgents(state: PrototypeState) {
   const query = state.search.trim().toLowerCase();
-  return state.agents.filter((item) => item.installed && isListedSidekick(item.id) && (!query || item.name.toLowerCase().includes(query)));
+  return state.agents.filter((item) => item.installed && isNavSidekick(item.id) && (!query || item.name.toLowerCase().includes(query)));
 }
 
 function ensureInstalled(state: PrototypeState, sourceId: string) {
@@ -1713,7 +1742,7 @@ export function runChip(state: PrototypeState, label: string) {
     state.scenario = "active";
     state.preview = "home-active";
     state.previewWide = true;
-    const missing = catalog.filter((item) => isListedSidekick(item.id) && !state.agents.some((agent) => agent.id === item.id && agent.installed));
+    const missing = catalog.filter((item) => isDefaultSidekick(item.id) && !state.agents.some((agent) => agent.id === item.id && agent.installed));
     for (const item of missing) {
       state.agents.push({ ...item, installed: true });
       if (!state.threads[item.id]) state.threads[item.id] = activeThread(item.id);
