@@ -250,12 +250,11 @@ function capsulePath(w: number, h: number) {
   );
 }
 
-const GROK_R = 67;
+const GROK_R = 71.5;
 
 function mascotDrive(state: OrbState | undefined, level: number, time: number) {
   if (state === "listening" || state === "speaking") return level >= 0 ? clamp(level) : speechEnvelope(time);
   if (state === "thinking" || state === "connecting") return 0.2 + 0.12 * Math.sin(time * 2.4);
-  if (state === "hover") return 0.22;
   return 0;
 }
 
@@ -300,10 +299,7 @@ function grokFrame(t: number, state: OrbState | undefined, level: number, reduce
       opacity: clamp(pose.depth / 0.12),
     };
   });
-  const breath = life.breath;
-  const sx = breath * (1 + (reduced ? 0 : live * 0.07));
-  const sy = breath * (1 - (reduced ? 0 : live * 0.05));
-  const rig = `translate(${round(CENTER + life.driftX * GROK_R)} ${round(CENTER + life.driftY * GROK_R)}) scale(${round(sx)} ${round(sy)}) translate(${-CENTER} ${-CENTER})`;
+  const rig = `translate(${round(life.driftX * GROK_R)} ${round(life.driftY * GROK_R)})`;
   return { eyes, rig };
 }
 
@@ -367,18 +363,14 @@ function slackEyeTransform(cx: number, lid: number, widen = 1) {
 export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
   const id = useId().replace(/:/g, "");
   const host = useRef<HTMLSpanElement>(null);
-  const motion = useRef<SVGGElement>(null);
   const leftEye = useRef<SVGGElement>(null);
   const rightEye = useRef<SVGGElement>(null);
 
   useMascotLoop(host, (time) => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const drive = reduced ? 0 : mascotDrive(state, levelRef?.current ?? -1, time);
-    const sx = 1 + Math.sin(time / 3.6) * 0.012 + drive * 0.07;
-    const sy = 1 + Math.sin(time / 3.6) * 0.012 - drive * 0.05;
     const lid = reduced ? 1 : blinkLid(time, SLACK_BLINKS, 0.16, 0.36);
     const widen = 1 + drive * 0.08;
-    motion.current?.setAttribute("transform", `translate(14 14) scale(${sx.toFixed(3)} ${sy.toFixed(3)}) translate(-14 -14)`);
     leftEye.current?.setAttribute("transform", slackEyeTransform(8, lid, widen));
     rightEye.current?.setAttribute("transform", slackEyeTransform(20, lid, widen));
   });
@@ -403,7 +395,7 @@ export function SlackOrb({ size, state, levelRef }: { size: number; state?: OrbS
         </defs>
         <g filter={`url(#${id}-shade)`}>
           <g clipPath={`url(#${id}-clip)`}>
-            <g ref={motion}>
+            <g>
               <rect width="28" height="28" rx="14" fill="#FAFAF8" />
               <circle cy="28" r="13" fill="#E2076A" />
               <circle cx="28" cy="28" r="13" fill="#FCC005" />
@@ -545,17 +537,20 @@ export function AgenticMark({ size }: { size: number }) {
   const id = useId().replace(/:/g, "");
   return (
     <MarkFrame size={size}>
-      <defs>{markShade(`${id}-shade`, "0.3")}</defs>
+      <defs>{markShade(`${id}-shade`, "0.28")}</defs>
       <g filter={`url(#${id}-shade)`}>
-        <rect width="28" height="28" rx="14" fill="#312E81" />
-        <path d="M10.2 17.6 L17.4 11.4 M10.2 17.6 L17.6 18.4" stroke="white" strokeWidth="1.3" strokeLinecap="round" />
-        <circle cx="10.2" cy="17.6" r="1.7" fill="white" />
-        <circle cx="17.4" cy="11.4" r="1.7" fill="white" />
-        <circle cx="17.6" cy="18.4" r="1.7" fill="white" />
+        <rect width="28" height="28" rx="14" fill="#FF3B14" />
+        <g transform="translate(6 6)">
+          <path fill="white" d={agenticGlyph} />
+        </g>
       </g>
     </MarkFrame>
   );
 }
+
+/** Spark over a bag. Drawn in a 16px box so it stays readable inside the circle and in the admin nav. */
+const agenticGlyph =
+  "M8 .7c.14.95.36 1.4.86 1.86.5.46 1.12.64 2.04.78-0.92.14-1.54.32-2.04.78-.5.46-.72.91-.86 1.86-.14-.95-.36-1.4-.86-1.86-.5-.46-1.12-.64-2.04-.78.92-.14 1.54-.32 2.04-.78.5-.46.72-.91.86-1.86ZM6.15 7.55V6.9a1.85 1.85 0 0 1 3.7 0v.65h-.95V6.9a.9.9 0 0 0-1.8 0v.65h-.95ZM4.25 7.7h7.5c.5 0 .9.4.9.9v4.85c0 .6-.5 1.1-1.1 1.1H4.45c-.6 0-1.1-.5-1.1-1.1V8.6c0-.5.4-.9.9-.9Z";
 
 export function MuseBall({ size, state, levelRef }: { size: number; state?: OrbState; levelRef?: LevelRef }) {
   const host = useRef<HTMLSpanElement>(null);

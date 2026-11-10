@@ -17,7 +17,7 @@ const css = (rgb: Rgb, alpha = 1) => `rgba(${rgb[0] | 0}, ${rgb[1] | 0}, ${rgb[2
 
 function sphereShade(ctx: CanvasRenderingContext2D, size: number, from: Rgb, to: Rgb, light = 0.55) {
   const c = size / 2;
-  const r = c * 0.92;
+  const r = c * 0.99;
   const body = ctx.createRadialGradient(c - r * 0.32, c - r * 0.38, r * 0.08, c, c, r);
   body.addColorStop(0, css(mix(from, [255, 255, 255], light)));
   body.addColorStop(0.42, css(mix(from, to, 0.45)));
@@ -41,7 +41,7 @@ function sphereShade(ctx: CanvasRenderingContext2D, size: number, from: Rgb, to:
 
 function drawCrystal(ctx: CanvasRenderingContext2D, size: number, frame: OrbFrame, from: Rgb, to: Rgb, pointer: Pointer) {
   const c = size / 2;
-  const r = c * 0.9;
+  const r = c * 0.99;
   const level = frame.reduced ? 0 : frame.level;
   ctx.clearRect(0, 0, size, size);
   ctx.save();
@@ -51,7 +51,7 @@ function drawCrystal(ctx: CanvasRenderingContext2D, size: number, frame: OrbFram
   sphereShade(ctx, size, mix(from, [20, 24, 40], 0.55), mix(to, [180, 220, 255], 0.25), 0.35);
   const dust = 10;
   for (let i = 0; i < dust; i += 1) {
-    const speed = 0.35 + level * 1.6 + (i % 3) * 0.15;
+    const speed = 0.7 + level * 1.1 + (i % 3) * 0.08;
     const ang = frame.time * speed + i * 0.9;
     const orbit = r * (0.25 + (i % 5) * 0.12) * (1 + level * 0.15);
     const x = c + Math.cos(ang) * orbit + pointer.x * r * 0.18;
@@ -66,7 +66,7 @@ function drawCrystal(ctx: CanvasRenderingContext2D, size: number, frame: OrbFram
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   for (let i = 0; i < cracks; i += 1) {
-    const base = frame.time * (0.4 + level) + i * 1.7;
+    const base = frame.time * (0.8 + level * 0.6) + i * 1.7;
     ctx.beginPath();
     const steps = 5;
     for (let s = 0; s <= steps; s += 1) {
@@ -86,7 +86,7 @@ function drawCrystal(ctx: CanvasRenderingContext2D, size: number, frame: OrbFram
 
 function drawStrands(ctx: CanvasRenderingContext2D, size: number, frame: OrbFrame, from: Rgb, to: Rgb) {
   const c = size / 2;
-  const r = c * 0.9;
+  const r = c * 0.99;
   const level = frame.reduced ? 0.04 : frame.level;
   ctx.clearRect(0, 0, size, size);
   ctx.save();
@@ -124,14 +124,14 @@ function drawStrands(ctx: CanvasRenderingContext2D, size: number, frame: OrbFram
 
 function drawIridescence(ctx: CanvasRenderingContext2D, size: number, frame: OrbFrame, from: Rgb, to: Rgb) {
   const c = size / 2;
-  const r = c * 0.9;
+  const r = c * 0.99;
   const level = frame.reduced ? 0 : frame.level;
   ctx.clearRect(0, 0, size, size);
   ctx.save();
   ctx.beginPath();
   ctx.arc(c, c, r, 0, Math.PI * 2);
   ctx.clip();
-  const turn = frame.time * (0.25 + level * 1.4);
+  const turn = frame.time * (0.7 + level * 0.8);
   for (let i = 0; i < 3; i += 1) {
     const g = ctx.createConicGradient(turn + i * 0.8, c, c);
     g.addColorStop(0, css(from, 0.85));

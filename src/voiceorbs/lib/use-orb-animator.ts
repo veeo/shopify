@@ -100,8 +100,7 @@ export const useOrbAnimator = (
       frame.reduced = reduced;
       frame.state = opts.state;
       opts.onFrame?.(frame);
-      const resting = opts.state === 'idle' || opts.state === 'disabled';
-      const held = (reduced || resting) && isSettled(mix.weights, opts.state) && frame.time > 0.8 && !hasLive;
+      const held = reduced && isSettled(mix.weights, opts.state) && frame.time > 0.8 && !hasLive;
       if (active && !held) raf = requestAnimationFrame(tick);
       else last = null;
     };

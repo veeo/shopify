@@ -1,4 +1,5 @@
 import { channelNav, findNav, mainNav, navFor, pageMeta, previewPages, settingsNav, type PreviewId } from "@/lib/admin-nav";
+import type { ChoiceCard, ChoiceMode } from "@/lib/choices";
 import { applyWorkspace, captureWorkspace, emptyView, homeFor, readLiveScroll, sameDesk, type SavedWork, type ViewState, type Workspace } from "@/lib/workspace";
 
 export { previewPages, type PreviewId };
@@ -70,6 +71,13 @@ export const orbColorPresets: { name: string; from: string; to: string }[] = [
 /** Branded marks stay out of the generic orb picker. */
 export const exemptAvatarAgents = new Set(["slack", "grok", "muse", "claude", "gemini", "store", "shop", "pos", "agentic"]);
 
+/** Sidekicks that stay out of the nav, the switcher, mentions, and the add list. */
+export const hiddenSidekicks = new Set(["muse", "claude", "gemini", "pos", "agentic"]);
+
+export function isListedSidekick(id: string) {
+  return !hiddenSidekicks.has(id);
+}
+
 const legacyVoiceOrb: Partial<Record<string, VoiceOrbId>> = {
   sidekick: "twist",
   chief: "twist",
@@ -92,6 +100,7 @@ const reuseTint: Record<string, { from: string; to: string }> = {
   orders: { from: "#22d3ee", to: "#2563eb" },
   finance: { from: "#fbbf24", to: "#b45309" },
   analytics: { from: "#34d399", to: "#059669" },
+  campaigns: { from: "#fb7185", to: "#fbbf24" },
   custom: { from: "#4f46e5", to: "#ec4899" },
 };
 
@@ -155,7 +164,19 @@ export type Block =
   | { id: string; type: "sellers" }
   | { id: string; type: "chips"; chips: Chip[] }
   | { id: string; type: "purpose" }
-  | { id: string; type: "create" };
+  | { id: string; type: "create" }
+  | {
+      id: string;
+      type: "choices";
+      title: string;
+      cards: ChoiceCard[];
+      selected: string[];
+      mode: ChoiceMode;
+      settled?: boolean;
+      replaced?: boolean;
+      setKey?: string;
+    }
+  | { id: string; type: "status"; label: string };
 
 export type ProductTone =
   | "coral"
@@ -241,6 +262,8 @@ export type PrototypeState = {
   theme: string | null;
   /** The Sidekick title intro has already played this session. Returning to Sidekick must not replay it. */
   introPlayed: boolean;
+  /** The agent whose orb should show the working state while a form fills. */
+  workingAgentId: string | null;
 };
 
 export type Conversation = { id: string; title: string; at: number; blocks: Block[] };
@@ -484,7 +507,7 @@ const persona = {
   pos:
     "You are Point of Sale. This electronics store sells online. The counter has not taken a sale this month. If #1078 is picked up in person, it rings up on the reader.",
   agentic:
-    "You are Agentic storefronts. Shopping agents placed 41 orders and $6,840 this month. They stall on the desk lamp because the page says 5–7 days and the ad says this week.",
+    "You are Agentic. Shopping agents placed 41 orders and $6,840 this month. They stall on the desk lamp because the page says 5–7 days and the ad says this week.",
   customers:
     "You are the Customers agent. 28% of orders are from people who have bought before. Second-order buyers ask for a longer warranty on the headphones, not a points program.",
   orders:
@@ -582,7 +605,7 @@ export const catalog: Agent[] = [
     preview: "Travel charger and desk setup searches are up 22%.",
     topic: "This week",
     placeholder: "Ask Trends…",
-    orb: "strands",
+    orb: "mercury",
   }),
   agent({
     id: "campaigns",
@@ -591,7 +614,7 @@ export const catalog: Agent[] = [
     preview: "Monday’s ads still say the lamp ships this week.",
     topic: "This week’s ads",
     placeholder: "Ask Campaigns…",
-    orb: "crystal",
+    orb: "nebula",
   }),
   agent({
     id: "grok",
@@ -667,11 +690,11 @@ export const catalog: Agent[] = [
   }),
   agent({
     id: "agentic",
-    name: "Agentic storefronts",
+    name: "Agentic",
     group: "channels",
     preview: "Agent orders stall when the lamp date doesn’t match the ad.",
     topic: "Agent traffic",
-    placeholder: "Ask Agentic storefronts…",
+    placeholder: "Ask Agentic…",
     orb: "agentic",
   }),
   agent({
@@ -988,6 +1011,7 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
     lookbook: false,
     theme: null,
     introPlayed: false,
+    workingAgentId: null,
   };
 }
 
@@ -1061,7 +1085,7 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
   },
   store: {
     text: "The Desk Lamp page still says it ships in 5–7 days. The ads running this week say it ships this week. That gap is on the product page and in the cart. I can rewrite the delivery line.",
-    asks: ["Rewrite the delivery line", "What else on the storefront needs work?"],
+    asks: ["What should we change on the storefront?", "Show me theme ideas"],
   },
   shop: {
     text: "Shop brought in sessions and converted at 1.6% over the last 30 days. The online store converted at 2.7%. The Shop listing crops the headphone photo, so the grid shows the earcup and not the product. That’s the first fix.",
@@ -1077,11 +1101,11 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
   },
   customers: {
     text: "28% of this month’s orders are from people who’ve bought before. The ones on their second order keep asking for two years of warranty on the headphones, not a points program. That’s the smaller test.",
-    asks: ["Sketch the warranty offer", "Who is coming back?"],
+    asks: ["Who should I group?", "Who is coming back?"],
   },
   orders: {
     text: "Three orders need a hand. #1078 Danielle Hudson, $369.99, paid, headphones and accessories, not fulfilled. #1077 Maya Chen, $89, paid, desk lamp, not fulfilled. #1075 Priya Patel, $58, not paid and not fulfilled. Everything older than yesterday has shipped.",
-    asks: ["Open the orders", "Which one should I clear first?"],
+    asks: ["Which order needs me?", "Which one should I clear first?"],
   },
   finance: {
     text: "Today’s payout is $2,184.60 and it’s already on the way. The headphone orders are most of that. The last 30 days of sales behind it are $48,393.",
@@ -1095,7 +1119,7 @@ const activeGreetings: Record<string, { text: string; asks: [string, string] }> 
 
 export function activeState(storeName = "My Store"): PrototypeState {
   const base = setupState(storeName, "tasks");
-  const installed = catalog.filter((item) => item.id !== "muse").map((item) => ({
+  const installed = catalog.filter((item) => isListedSidekick(item.id)).map((item) => ({
     ...item,
     installed: true,
     preview: item.id === "chief" ? "Last 30 days: $48,393" : item.preview,
@@ -1120,10 +1144,11 @@ export function activeState(storeName = "My Store"): PrototypeState {
 
 export function visibleAgents(state: PrototypeState) {
   const query = state.search.trim().toLowerCase();
-  return state.agents.filter((item) => item.installed && (!query || item.name.toLowerCase().includes(query)));
+  return state.agents.filter((item) => item.installed && isListedSidekick(item.id) && (!query || item.name.toLowerCase().includes(query)));
 }
 
 function ensureInstalled(state: PrototypeState, sourceId: string) {
+  if (!isListedSidekick(sourceId)) return null;
   const existing = state.agents.find((item) => item.id === sourceId);
   if (existing?.installed) return existing;
   const source = catalog.find((item) => item.id === sourceId);
@@ -1437,6 +1462,17 @@ function presentForSidekick(turn: { text: string; effects: Effect[] }, text: str
 
 export function runChip(state: PrototypeState, label: string) {
   const agentId = state.selectedAgentId;
+  if (label === "Save as draft" || label === "Publish") {
+    confirmProduct(state, label === "Publish");
+    return;
+  }
+  if (label === "Open the product") {
+    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
+    state.preview = "product";
+    state.previewWide = true;
+    push(state, agentId, { id: id(state), type: "text", role: "assistant", text: "Here’s the draft. You can still edit any field." });
+    return;
+  }
   if (state.arrival === "sidekick" && agentId === "sidekick") {
     const intent = arrivalIntent(label, state.storeName);
     if (intent) {
@@ -1590,7 +1626,7 @@ export function runChip(state: PrototypeState, label: string) {
     state.scenario = "active";
     state.preview = "home-active";
     state.previewWide = true;
-    const missing = catalog.filter((item) => !state.agents.some((agent) => agent.id === item.id && agent.installed));
+    const missing = catalog.filter((item) => isListedSidekick(item.id) && !state.agents.some((agent) => agent.id === item.id && agent.installed));
     for (const item of missing) {
       state.agents.push({ ...item, installed: true });
       if (!state.threads[item.id]) state.threads[item.id] = activeThread(item.id);
@@ -1796,7 +1832,15 @@ export type Action =
   | { type: "delete-conversation"; id: string }
   | { type: "title"; agentId: string; title: string }
   | { type: "rate"; id: string; value: "up" | "down" }
-  | { type: "logout" };
+  | { type: "logout" }
+  | { type: "offer-choices"; agentId: string; intro: string; title: string; cards: ChoiceCard[]; mode: ChoiceMode; setKey?: string }
+  | { type: "select-choice"; agentId: string; blockId: string; cardId: string; lock?: boolean }
+  | { type: "arm-multi"; agentId: string }
+  | { type: "begin-draft"; agentId: string; productId: string }
+  | { type: "status"; agentId: string; label: string }
+  | { type: "follow-up"; agentId: string; text: string; chips?: Chip[] }
+  | { type: "confirm-product"; publish: boolean }
+  | { type: "cancel-draft"; agentId: string };
 
 export function reducer(state: PrototypeState, action: Action): PrototypeState {
   const next = reduceInner(state, action);
@@ -1833,7 +1877,17 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
       next.menuStyle = action.style;
       return next;
     case "select": {
-      if (!next.agents.some((item) => item.id === action.id && item.installed)) return state;
+      const installed = next.agents.some((item) => item.id === action.id && item.installed);
+      if (!installed) {
+        if (!hiddenSidekicks.has(action.id)) return state;
+        const source = catalog.find((item) => item.id === action.id);
+        if (!source) return state;
+        const revealed = { ...source, installed: true, unread: 0 };
+        next.agents = next.agents.some((item) => item.id === action.id)
+          ? next.agents.map((item) => (item.id === action.id ? revealed : item))
+          : [...next.agents, revealed];
+        if (!next.threads[action.id]?.length) next.threads[action.id] = activeThread(action.id);
+      }
       next.selectedAgentId = action.id;
       next.mode = "thread";
       next.searchOpen = false;
@@ -2015,7 +2069,7 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
     }
     case "add-catalog": {
       const source = catalog.find((item) => item.id === action.id);
-      if (!source) return state;
+      if (!source || !isListedSidekick(action.id)) return state;
       ensureInstalled(next, action.id);
       if (action.id === "chief") {
         next.chiefPhase = "purpose";
@@ -2137,9 +2191,129 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
       openPage(next, page, false);
       return next;
     }
+    case "offer-choices": {
+      const thread = next.threads[action.agentId] ?? [];
+      const replaced = thread.map((block) => (block.type === "choices" && !block.replaced ? { ...block, replaced: true, settled: true } : block));
+      next.threads[action.agentId] = replaced;
+      push(next, action.agentId, { id: id(next), type: "text", role: "assistant", text: action.intro, typed: true });
+      push(next, action.agentId, {
+        id: id(next),
+        type: "choices",
+        title: action.title,
+        cards: action.cards,
+        selected: [],
+        mode: action.mode,
+        setKey: action.setKey,
+      });
+      return next;
+    }
+    case "select-choice": {
+      next.threads[action.agentId] = (next.threads[action.agentId] ?? []).map((block) => {
+        if (block.type !== "choices" || block.id !== action.blockId) return block;
+        const selected = action.lock
+          ? block.selected.includes(action.cardId) ? block.selected : [...block.selected, action.cardId]
+          : block.mode === "multi"
+            ? block.selected.includes(action.cardId)
+              ? block.selected.filter((item) => item !== action.cardId)
+              : [...block.selected, action.cardId]
+            : [action.cardId];
+        return { ...block, selected, settled: block.mode === "single" || Boolean(action.lock) };
+      });
+      return next;
+    }
+    case "arm-multi": {
+      next.threads[action.agentId] = (next.threads[action.agentId] ?? []).map((block) =>
+        block.type === "choices" && !block.replaced ? { ...block, mode: "multi" } : block,
+      );
+      push(next, action.agentId, {
+        id: id(next),
+        type: "text",
+        role: "assistant",
+        text: "Pick two and I’ll bundle them into one draft.",
+        typed: true,
+      });
+      return next;
+    }
+    case "begin-draft": {
+      const product: Product = {
+        id: action.productId,
+        title: "",
+        price: "",
+        status: "Draft",
+        tone: "sand",
+        description: "",
+        inventory: "0 in stock",
+      };
+      next.products = [product, ...next.products];
+      next.selectedProductId = product.id;
+      next.preview = "product";
+      next.previewWide = true;
+      next.view = { ...emptyView(), recordId: product.id };
+      next.workingAgentId = action.agentId;
+      return next;
+    }
+    case "status": {
+      const thread = (next.threads[action.agentId] ?? []).filter((block) => block.type !== "status");
+      next.threads[action.agentId] = [...thread, { id: `${action.agentId}-status`, type: "status", label: action.label }];
+      next.workingAgentId = action.agentId;
+      return next;
+    }
+    case "follow-up": {
+      next.threads[action.agentId] = (next.threads[action.agentId] ?? []).filter((block) => block.type !== "status");
+      next.workingAgentId = null;
+      push(next, action.agentId, { id: id(next), type: "text", role: "assistant", text: action.text, typed: true });
+      if (action.chips?.length) push(next, action.agentId, { id: id(next), type: "chips", chips: action.chips });
+      return next;
+    }
+    case "confirm-product":
+      confirmProduct(next, action.publish);
+      return next;
+    case "cancel-draft": {
+      next.workingAgentId = null;
+      next.threads[action.agentId] = (next.threads[action.agentId] ?? [])
+        .filter((block) => block.type !== "status")
+        .map((block) => (block.type === "choices" && !block.replaced ? { ...block, settled: true } : block));
+      if (next.preview === "product") {
+        next.preview = "products";
+        next.previewWide = false;
+        next.view = emptyView();
+      }
+      push(next, action.agentId, {
+        id: id(next),
+        type: "text",
+        role: "assistant",
+        text: "Okay. I left that draft in Products. Nothing was published.",
+        typed: true,
+      });
+      return next;
+    }
     default:
       return state;
   }
+}
+
+function confirmProduct(state: PrototypeState, publish: boolean) {
+  const agentId = state.selectedAgentId;
+  const product = state.products.find((item) => item.id === state.selectedProductId);
+  const title = product?.title.trim() || "Untitled product";
+  state.products = state.products.map((item) =>
+    item.id === state.selectedProductId ? { ...item, status: publish ? "Active" : "Draft" } : item,
+  );
+  state.preview = "products";
+  state.previewWide = true;
+  state.view = { ...emptyView() };
+  state.workingAgentId = null;
+  state.threads[agentId] = (state.threads[agentId] ?? []).filter((block) => block.type !== "status");
+  const kept = publish ? "published" : "saved as a draft";
+  push(state, agentId, { id: id(state), type: "text", role: "user", text: publish ? "Publish" : "Save as draft" });
+  push(state, agentId, {
+    id: id(state),
+    type: "text",
+    role: "assistant",
+    text: `${title} is ${kept}. It’s in the products list.`,
+    typed: true,
+  });
+  push(state, agentId, { id: id(state), type: "chips", chips: [{ label: "Open the product", tone: "primary" }] });
 }
 
 const freshActions = new Set<Action["type"]>(["scenario", "reset", "arrival", "boot-active", "logout", "sign-in"]);

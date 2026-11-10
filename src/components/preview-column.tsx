@@ -488,7 +488,7 @@ function Screen(props: {
     case "products":
       return <Products state={state} onProduct={props.onProduct} onAdd={props.onAddProduct} nav={nav} />;
     case "product":
-      return <ProductEdit state={state} onBack={() => nav.onPreview("products")} onProduct={props.onProduct} onUpdate={props.onUpdateProduct} />;
+      return <ProductEdit state={state} onBack={() => nav.onPreview("products")} onProduct={props.onProduct} onUpdate={props.onUpdateProduct} onConfirm={nav.onChip} />;
     case "online-store":
       if (state.lookbook) return <ThemeBoard state={state} onUse={props.onUseTheme} />;
       return <AdminPage page={page} state={state} nav={nav} />;
@@ -1481,14 +1481,29 @@ function ProductEdit({
   onBack,
   onProduct,
   onUpdate,
+  onConfirm,
 }: {
   state: PrototypeState;
   onBack: () => void;
   onProduct: (id: string) => void;
   onUpdate: (id: string, patch: Partial<Product>) => void;
+  onConfirm: (label: string) => void;
 }) {
   const view = useWorkspaceView();
   const product = state.products.find((item) => item.id === state.selectedProductId) ?? state.products[0];
+  const filling = state.workingAgentId;
+  const titleMark = product?.title ?? "";
+  const descriptionMark = product?.description ?? "";
+  const priceMark = product?.price ?? "";
+  const imageMark = product?.image ?? "";
+  const variantMark = view?.draft.variant ?? "";
+  useEffect(() => {
+    if (!filling) return;
+    const field = variantMark ? "variant" : imageMark ? "media" : priceMark ? "price" : descriptionMark ? "description" : titleMark ? "title" : "";
+    if (!field) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.querySelector(`[data-field="${field}"]`)?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+  }, [filling, titleMark, descriptionMark, priceMark, imageMark, variantMark]);
   if (!product) return null;
   const taxed = (view?.draft.taxed ?? "yes") !== "no";
   const tracked = (view?.draft.tracked ?? "yes") !== "no";
@@ -1501,9 +1516,20 @@ function ProductEdit({
         <Btn tone="white" onClick={onBack}>
           Cancel
         </Btn>
-        <Btn tone="primary" onClick={onBack}>
-          Save
-        </Btn>
+        {view?.draft.variant ? (
+          <>
+            <Btn tone="gray" onClick={() => onConfirm("Save as draft")}>
+              Save as draft
+            </Btn>
+            <Btn tone="primary" onClick={() => onConfirm("Publish")}>
+              Publish
+            </Btn>
+          </>
+        ) : (
+          <Btn tone="primary" onClick={onBack}>
+            Save
+          </Btn>
+        )}
       </HeaderExtras>
       <TopBar
         title={title}
@@ -1513,11 +1539,11 @@ function ProductEdit({
       />
       <Body>
         <AdminCard className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1">
+          <label data-field="title" className="flex flex-col gap-1">
             <Label>Title</Label>
             <input value={product.title} placeholder="Short sleeve t-shirt" onChange={(event) => onUpdate(product.id, { title: event.target.value })} className={`${inputClass} h-8`} />
           </label>
-          <div className="flex flex-col gap-1">
+          <div data-field="description" className="flex flex-col gap-1">
             <Label>Description</Label>
             <div className="overflow-hidden rounded-lg border border-[#8a8a8a]/40 focus-within:border-[#303030]">
               <div className="flex items-center gap-0.5 overflow-x-auto border-b border-[#ebebeb] bg-[#f7f7f7] px-1.5 py-1 text-[#4a4a4a] [scrollbar-width:none]">
@@ -1539,7 +1565,7 @@ function ProductEdit({
               />
             </div>
           </div>
-          <div className="flex flex-col gap-1">
+          <div data-field="media" className="flex flex-col gap-1">
             <Label>Media</Label>
             <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-[#8a8a8a] px-4 py-5">
               {product.image ? <img src={product.image} alt="" className="mb-1 size-14 rounded-md object-cover" /> : null}
@@ -1557,6 +1583,7 @@ function ProductEdit({
           </div>
         </AdminCard>
         <Section title="Price">
+          <div data-field="price" />
           <AdminCard flush>
             <div className="p-3">
               <label className="flex h-8 w-40 items-center gap-1 rounded-lg border border-[#8a8a8a]/40 px-2.5 text-[12px] focus-within:border-[#303030]">
@@ -1606,6 +1633,12 @@ function ProductEdit({
                   className={`${inputClass} h-7 w-20 text-right`}
                 />
               </div>
+              {view?.draft.variant ? (
+                <div data-field="variant" className="flex items-center justify-between border-t border-[#ebebeb] px-2.5 py-2">
+                  <span>Variant</span>
+                  <span className="font-medium text-[#303030]">{view.draft.variant}</span>
+                </div>
+              ) : null}
             </div>
           ) : null}
           <div className="flex flex-wrap gap-1.5 border-t border-[#ebebeb] px-3 py-2">

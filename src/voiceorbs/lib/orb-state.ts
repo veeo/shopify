@@ -71,9 +71,8 @@ const wave = (x: number): number => 0.5 - 0.5 * Math.cos(x);
 export const stateEnergy = (state: OrbState, t: number): number => {
   switch (state) {
     case 'hover':
-      return 0.28 + 0.08 * wave(t * 3.2);
     case 'selected':
-      return 0.14 + 0.06 * wave(t * 1.4);
+      return 0;
     case 'listening':
       return speechEnvelope(t);
     case 'speaking':

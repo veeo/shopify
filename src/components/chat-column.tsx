@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { ChipButton, Orb } from "@/components/marks";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Markdown } from "@/components/markdown";
+import { ArtifactRow, ChoiceCards } from "@/components/choice-cards";
 import { useOrbAudioPublish } from "@/components/orb-audio";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { pageMeta } from "@/lib/admin-nav";
@@ -12,6 +13,7 @@ import {
   canonicalOrb,
   catalog,
   exemptAvatarAgents,
+  isListedSidekick,
   isVoiceOrb,
   orbColorPresets,
   paymentSteps,
@@ -58,6 +60,8 @@ export function ChatColumn({
   onAddAgent,
   onIntroduced,
   onIntroFinished,
+  onChoose,
+  onBundle,
 }: {
   state: PrototypeState;
   liveSegments: LiveSegment[] | null;
@@ -81,6 +85,8 @@ export function ChatColumn({
   onAddAgent: () => void;
   onIntroduced?: () => void;
   onIntroFinished?: () => void;
+  onChoose: (blockId: string, cardId: string) => void;
+  onBundle: (blockId: string) => void;
 }) {
   const agent = selectedAgent(state);
   const purpose = state.selectedAgentId === "chief" && state.chiefPhase === "purpose" && state.mode === "thread";
@@ -226,6 +232,8 @@ export function ChatColumn({
                         if (!locked) onSend(text);
                       }}
                       onCreate={onCreate}
+                      onChoose={onChoose}
+                      onBundle={onBundle}
                     />
                   ),
                 )}
@@ -723,7 +731,7 @@ export function Composer({
   const avatarAgent = state.mode === "add" || state.mode === "create" ? (state.agents.find((item) => item.id === "sidekick") ?? agent) : agent;
   useOrbAudioPublish(
     liveAgentId,
-    voiceOpen ? null : listening ? "listening" : transcribing || busy ? "thinking" : null,
+    voiceOpen ? null : listening ? "listening" : transcribing || busy || state.workingAgentId === liveAgentId ? "thinking" : null,
     () => (listening ? (recording.current?.level() ?? 0) : 0),
   );
 
@@ -1126,7 +1134,7 @@ function SidekickSwitcher({
   onPick: (id: string) => void;
   onAdd?: () => void;
 }) {
-  const agents = state.agents.filter((item) => item.installed);
+  const agents = state.agents.filter((item) => item.installed && isListedSidekick(item.id));
   return (
     <Popover id="sidekick-switcher" onDismiss={onDismiss} className="bottom-[calc(100%+8px)] left-0 w-64 origin-bottom-left p-1.5">
       <p className="px-2 pb-1 pt-1.5 text-[12px] text-[#8e8f8b]">Switch sidekick</p>
@@ -1183,7 +1191,7 @@ function PlusMenu({
 }) {
   const [sub, setSub] = useState<"mention" | "skills" | "apps" | null>(null);
   const [generate, setGenerate] = useState(true);
-  const agents = state.agents.filter((item) => item.installed);
+  const agents = state.agents.filter((item) => item.installed && isListedSidekick(item.id));
   const row = `flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left ${light ? "text-[12px] text-[#303030] hover:bg-[#f1f1f1]" : "text-[13px] text-white hover:bg-white/[0.07]"}`;
   const divider = `my-1 h-px ${light ? "bg-[#ebebeb]" : "bg-white/10"}`;
 
@@ -1681,6 +1689,8 @@ function BlockView({
   onChip,
   onAsk,
   onCreate,
+  onChoose,
+  onBundle,
 }: {
   block: Block;
   answer: boolean;
@@ -1690,6 +1700,8 @@ function BlockView({
   onChip: (label: string) => void;
   onAsk: (text: string) => void;
   onCreate: (name: string, purpose: string) => void;
+  onChoose: (blockId: string, cardId: string) => void;
+  onBundle: (blockId: string) => void;
 }) {
   if (block.type === "text" && block.role === "user") {
     return (
@@ -1701,6 +1713,29 @@ function BlockView({
     );
   }
   if (block.type === "text") return <AssistantText block={block} answer={answer} rating={rating} onRate={onRate} />;
+  if (block.type === "status") {
+    return (
+      <p role="status" aria-live="polite" className="rise flex items-center gap-2 py-1 text-[13px] text-[#c6c6c6]">
+        <span className="size-1.5 animate-pulse rounded-full bg-white motion-reduce:animate-none" />
+        {block.label}
+      </p>
+    );
+  }
+  if (block.type === "choices") {
+    return (
+      <ChoiceCards
+        title={block.title}
+        cards={block.cards}
+        selected={block.selected}
+        mode={block.mode}
+        settled={block.settled}
+        replaced={block.replaced}
+        onPick={(cardId) => onChoose(block.id, cardId)}
+        onBundle={() => onBundle(block.id)}
+        onDifferent={() => onAsk("Show me different options")}
+      />
+    );
+  }
   if (block.type === "chips") {
     const opening = block.id === "arrive-chips";
     return (
@@ -1757,14 +1792,8 @@ function BlockView({
           </p>
         </div>
         {sellers.map((item) => (
-          <div key={item.title} className="flex items-center gap-4">
-            <img src={item.image} alt="" className="size-24 rounded-2xl object-cover shadow-[inset_0_0_4px_rgba(255,255,255,0.2)]" />
-            <div>
-              <p className="text-[15px] text-[#8e8f8b]">
-                {item.title} · {item.meta}
-              </p>
-              <p className="mt-1 text-[15px] leading-[1.4]">{item.advice}</p>
-            </div>
+          <div key={item.title} className="flex flex-wrap items-center gap-3">
+            <ArtifactRow image={item.image} title={item.title} meta={item.meta} body={item.advice} />
           </div>
         ))}
       </div>
@@ -1819,8 +1848,8 @@ function CreateForm({ onCreate, onBack }: { onCreate: (name: string, purpose: st
 
 const addSections: { label: string; ids: string[] }[] = [
   { label: "Recommended", ids: ["chief", "ideas", "trends", "campaigns"] },
-  { label: "Team", ids: ["grok", "slack", "claude", "gemini"] },
-  { label: "Channels", ids: ["store", "shop", "pos", "agentic"] },
+  { label: "Team", ids: ["grok", "slack"] },
+  { label: "Channels", ids: ["store", "shop"] },
   { label: "Tools", ids: ["customers", "orders", "finance", "analytics"] },
 ];
 
@@ -1836,7 +1865,7 @@ const addCopy: Record<string, string> = {
   store: "The online store: theme, product pages, and delivery promises.",
   shop: "The Shop channel and the listings shoppers see there.",
   pos: "Point of Sale for the counter, pickup, and in-person sales.",
-  agentic: "Agentic storefronts, where shopping agents find and buy.",
+  agentic: "Agentic, where shopping agents find and buy.",
   customers: "Buyers, repeat orders, and what they ask for next.",
   orders: "Fulfillment, payment, and the orders that still need a hand.",
   finance: "Payouts, fees, and what is on the way to the bank.",
@@ -1845,37 +1874,38 @@ const addCopy: Record<string, string> = {
 
 function AddGrid({ onAdd, onChip }: { onAdd: (id: string) => void; onChip: (label: string) => void }) {
   return (
-    <div className="max-w-[720px]">
+    <div className="max-w-[640px]">
       <p className="mb-5 max-w-[560px] text-[15px] leading-[1.4] text-white">
         Sidekicks are AI agents that get things done for you. Start with a recommended one, connect a team bot, or add a channel or tool.
       </p>
       {addSections.map((section) => {
-        const cards = section.ids.flatMap((id) => catalog.filter((item) => item.id === id));
+        const rows = section.ids.flatMap((id) => (isListedSidekick(id) ? catalog.filter((item) => item.id === id) : []));
+        if (rows.length === 0) return null;
         return (
           <section key={section.label} className="mb-6">
-            <p className="mb-3 flex items-center gap-0.5 text-[15px] text-[#8e8f8b]">
+            <p className="mb-2 flex items-center gap-0.5 text-[15px] text-[#8e8f8b]">
               {section.label} <PIcon name="ChevronDown" size={20} />
             </p>
-            <div className="grid grid-cols-3 gap-3">
-              {cards.map((card, index) => {
-                const connect = card.group === "teams";
+            <div className="overflow-hidden rounded-2xl bg-[#1a1b1a] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+              {rows.map((row, index) => {
+                const connect = row.group === "teams";
                 return (
-                  <article
-                    key={card.id}
-                    className="rise flex flex-col gap-4 rounded-3xl bg-[#1a1b1a] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-colors duration-150 hover:bg-[#1f201f]"
+                  <div
+                    key={row.id}
+                    className={`rise flex items-center gap-3 px-3 py-2.5 ${index > 0 ? "border-t border-white/[0.06]" : ""}`}
                     style={{ animationDelay: `${index * 40}ms`, animationFillMode: "backwards" }}
                   >
-                    <Orb id={card.orb} size={ORB_SIZE.card} agentId={card.id} colorFrom={card.orbFrom} colorTo={card.orbTo} />
-                    <div className="min-h-[92px]">
-                      <p className="text-[15px] leading-[1.4]">{card.name}</p>
-                      <p className="text-[13px] leading-[1.4] text-[#9a9a9a]">{addCopy[card.id]}</p>
+                    <span className="grid size-9 shrink-0 place-items-center">
+                      <Orb id={row.orb} size={ORB_SIZE.nav} agentId={row.id} colorFrom={row.orbFrom} colorTo={row.orbTo} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] leading-5">{row.name}</p>
+                      <p className="text-[13px] leading-[1.4] text-[#9a9a9a]">{addCopy[row.id]}</p>
                     </div>
-                    <div className="mt-auto">
-                      <s-button inlineSize="fill" onClick={() => onAdd(card.id)}>
-                        {connect ? "Connect" : "Add"}
-                      </s-button>
-                    </div>
-                  </article>
+                    <span className="shrink-0">
+                      <s-button onClick={() => onAdd(row.id)}>{connect ? "Connect" : "Add"}</s-button>
+                    </span>
+                  </div>
                 );
               })}
             </div>

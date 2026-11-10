@@ -48,7 +48,7 @@ export const TwistSphere = ({
       }}
     >
       <OrbBoundary fallback={<SphereFallback from={colorFrom} to={colorTo} />}>
-        <TwistScene frameRef={frameRef} colorFrom={colorFrom} colorTo={colorTo} custom={custom} engaged={state !== 'idle' && state !== 'disabled'} />
+        <TwistScene frameRef={frameRef} colorFrom={colorFrom} colorTo={colorTo} custom={custom} engaged />
       </OrbBoundary>
     </div>
   );

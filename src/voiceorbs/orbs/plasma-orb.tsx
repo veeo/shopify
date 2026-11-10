@@ -64,8 +64,8 @@ type PlasmaTune = {
 
 const TUNE: Record<OrbState, PlasmaTune> = {
   idle: { flow: 0.3, distortion: 0.42, swirl: 0.26, grain: 0.06, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
-  hover: { flow: 0.55, distortion: 0.5, swirl: 0.36, grain: 0.08, outer: 0.14, inner: 0.28, beat: 0, beatRate: 0.3, error: 0 },
-  selected: { flow: 0.4, distortion: 0.46, swirl: 0.3, grain: 0.07, outer: 0.1, inner: 0.18, beat: 0, beatRate: 0.3, error: 0 },
+  hover: { flow: 0.3, distortion: 0.42, swirl: 0.26, grain: 0.06, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
+  selected: { flow: 0.3, distortion: 0.42, swirl: 0.26, grain: 0.06, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
   connecting: { flow: 0.4, distortion: 0.4, swirl: 0.4, grain: 0.08, outer: 0.1, inner: 0.1, beat: 0.6, beatRate: 0.28, error: 0 },
   listening: { flow: 0.85, distortion: 0.5, swirl: 0.32, grain: 0.1, outer: 0.16, inner: 0.95, beat: 0, beatRate: 0.3, error: 0 },
   thinking: { flow: 0.7, distortion: 0.35, swirl: 0.78, grain: 0.1, outer: 0.08, inner: 0.35, beat: 0.4, beatRate: 0.45, error: 0 },
@@ -200,7 +200,6 @@ export const PlasmaOrb = ({
         borderRadius: '50%',
         opacity: state === 'disabled' ? 0.5 : 1,
         filter: state === 'disabled' ? 'grayscale(0.85)' : 'grayscale(0)',
-        scale: 'calc(1 + var(--orb-outer, 0) * 0.025)',
         transition: 'opacity 0.6s ease-out, filter 0.6s ease-out',
       }}
     >
