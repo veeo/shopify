@@ -80,7 +80,7 @@ void main() {
 }
 `;
 
-/** Soft glowing bubbles in a clear glass shell. No black, plenty of drift. */
+/** Lava-lamp bubbles in a clear glass shell. Soft purple and pink, no black. */
 const BALLS = `
 precision highp float;
 uniform vec2 uRes;
@@ -90,64 +90,73 @@ uniform vec3 uFrom;
 uniform vec3 uTo;
 
 vec3 ballHue(float i) {
-  float k = mod(i, 6.0);
-  vec3 violet = mix(vec3(0.58, 0.32, 0.98), uFrom, 0.35);
-  vec3 purple = mix(vec3(0.72, 0.28, 0.95), uTo, 0.25);
-  vec3 magenta = mix(vec3(0.95, 0.35, 0.72), uTo, 0.4);
-  vec3 rose = vec3(0.98, 0.48, 0.7);
-  vec3 lilac = vec3(0.78, 0.52, 1.0);
-  if (k < 1.0) return violet;
-  if (k < 2.0) return purple;
+  float k = mod(i, 8.0);
+  vec3 pink = mix(vec3(0.98, 0.36, 0.58), uTo, 0.28);
+  vec3 magenta = mix(vec3(0.94, 0.24, 0.7), uTo, 0.2);
+  vec3 violet = mix(vec3(0.58, 0.24, 0.98), uFrom, 0.28);
+  vec3 purple = mix(vec3(0.72, 0.22, 0.95), uFrom, 0.18);
+  vec3 rose = vec3(1.0, 0.46, 0.68);
+  vec3 lilac = vec3(0.78, 0.42, 1.0);
+  if (k < 1.0) return pink;
+  if (k < 2.0) return violet;
   if (k < 3.0) return magenta;
-  if (k < 4.0) return rose;
-  if (k < 5.0) return lilac;
-  return mix(violet, rose, 0.45);
+  if (k < 4.0) return purple;
+  if (k < 5.0) return rose;
+  if (k < 6.0) return lilac;
+  if (k < 7.0) return mix(pink, violet, 0.45);
+  return mix(magenta, purple, 0.4);
 }
 
 vec3 ballHome(float i) {
-  if (i < 1.0) return vec3(0.0, 0.02, 0.08);
-  if (i < 2.0) return vec3(0.18, -0.22, 0.04);
-  if (i < 3.0) return vec3(-0.24, 0.08, 0.06);
-  if (i < 4.0) return vec3(0.26, 0.16, -0.02);
-  if (i < 5.0) return vec3(-0.08, 0.26, 0.02);
-  return vec3(0.08, -0.08, -0.06);
+  if (i < 1.0) return vec3(0.0, -0.02, 0.14);
+  if (i < 2.0) return vec3(0.0, -0.32, 0.02);
+  if (i < 3.0) return vec3(-0.3, 0.06, 0.06);
+  if (i < 4.0) return vec3(0.3, 0.04, 0.0);
+  if (i < 5.0) return vec3(0.16, 0.28, 0.08);
+  if (i < 6.0) return vec3(-0.18, -0.18, -0.04);
+  if (i < 7.0) return vec3(0.22, -0.18, 0.1);
+  return vec3(-0.08, 0.26, -0.02);
 }
 
 float ballRad(float i) {
-  if (i < 1.0) return 0.32;
-  if (i < 2.0) return 0.24;
-  if (i < 3.0) return 0.2;
-  if (i < 4.0) return 0.18;
-  if (i < 5.0) return 0.15;
-  return 0.16;
+  if (i < 1.0) return 0.26;
+  if (i < 2.0) return 0.2;
+  if (i < 3.0) return 0.16;
+  if (i < 4.0) return 0.15;
+  if (i < 5.0) return 0.12;
+  if (i < 6.0) return 0.13;
+  if (i < 7.0) return 0.1;
+  return 0.11;
 }
 
 vec4 field(vec3 p, float t) {
   vec4 acc = vec4(0.0);
-  float drift = 0.12 + uLevel * 0.1;
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 8; i++) {
     float fi = float(i);
-    float sp = 0.55 + fi * 0.08;
+    // Lava-lamp rise with a little sideways sway.
+    float rise = 0.3 + fi * 0.045 + uLevel * 0.12;
+    float sway = 0.16 + fi * 0.03 + uLevel * 0.05;
     vec3 c = ballHome(fi) + vec3(
-      sin(t * sp + fi * 1.7) * drift,
-      cos(t * sp * 0.82 + fi * 2.2) * drift * 0.9,
-      sin(t * sp * 0.55 + fi * 1.1) * drift * 0.45
+      sin(t * sway + fi * 1.8) * 0.12,
+      sin(t * rise + fi * 1.15) * 0.3,
+      cos(t * rise * 0.48 + fi * 1.4) * 0.08
     );
-    float rad = ballRad(fi) * (1.0 + 0.04 * sin(t * 0.7 + fi));
+    float rad = ballRad(fi) * (1.0 + 0.035 * sin(t * 0.55 + fi * 1.2));
     vec3 rel = p - c;
     float dist = length(rel);
     float d = dist - rad;
-    float cover = smoothstep(0.11, -0.03, d);
-    float core = smoothstep(0.05, -0.05, d);
-    float glow = exp(-max(d, 0.0) * 5.8) * 0.75;
+    // Crisp enough to read as bubbles, soft enough to feel liquid.
+    float cover = smoothstep(0.055, -0.012, d);
+    float core = smoothstep(0.02, -0.04, d);
     vec3 bn = normalize(rel + vec3(0.0001));
-    float shade = clamp(dot(bn, normalize(vec3(-0.2, 0.75, 0.55))), 0.0, 1.0);
+    float shade = clamp(dot(bn, normalize(vec3(-0.22, 0.78, 0.55))), 0.0, 1.0);
     vec3 hue = ballHue(fi);
-    vec3 body = hue * (0.92 + 0.3 * shade);
-    body += vec3(1.0) * pow(shade, 9.0) * 0.32;
-    body = mix(body, vec3(1.0), core * 0.22);
+    // Matte lava fill — no dark dither, just soft shading + highlight.
+    vec3 body = hue * (0.82 + 0.42 * shade);
+    body += vec3(1.0) * pow(shade, 9.0) * 0.28;
+    body = mix(body, mix(hue, vec3(1.0), 0.4), core * 0.28);
     float room = 1.0 - acc.a;
-    float amount = clamp(cover + glow * 0.8, 0.0, 1.0) * room;
+    float amount = cover * room;
     acc.rgb += body * amount;
     acc.a += amount;
   }
@@ -177,31 +186,26 @@ void main() {
   float tHit = -b - sqrt(disc);
   vec3 hit = ro + rd * tHit;
   vec3 n = normalize(hit);
-  vec3 inside = refract(rd, n, 0.66);
+  vec3 inside = refract(rd, n, 0.64);
   if (dot(inside, inside) < 0.001) inside = reflect(rd, n);
-  vec3 bent = hit * 0.58;
+  vec3 bent = hit * 0.6;
   vec4 front = field(bent + inside * 0.14, t);
   vec4 mid = field(bent + inside * 0.52 + n * 0.05, t);
   vec4 back = field(bent + inside * 0.95 - n * 0.04, t);
   vec3 balls = over(over(back.rgb, mid), front);
   float cover = clamp(front.a + mid.a * (1.0 - front.a) + back.a * (1.0 - front.a) * (1.0 - mid.a), 0.0, 1.0);
 
-  // Warm pink core behind the bubbles.
-  float coreGlow = exp(-length(bent.xy) * 2.4) * (0.55 + 0.25 * sin(t * 0.8));
-  vec3 core = mix(vec3(1.0, 0.55, 0.72), mix(uFrom, uTo, 0.5), 0.35);
-  vec3 glass = mix(vec3(0.99, 0.97, 1.0), mix(uFrom, uTo, 0.35), 0.08);
+  vec3 glass = mix(vec3(0.99, 0.97, 1.0), mix(uFrom, uTo, 0.4), 0.06);
   vec3 col = glass * (1.0 - cover) + balls;
-  col += core * coreGlow * (1.0 - cover * 0.55);
 
-  float fres = pow(1.0 - clamp(dot(-rd, n), 0.0, 1.0), 2.0);
-  col = mix(col, vec3(1.0), fres * 0.55);
-  float spec = pow(clamp(dot(n, normalize(vec3(-0.3, 0.65, 0.7))), 0.0, 1.0), 20.0);
-  float cap = pow(clamp(dot(n, normalize(vec3(-0.05, 0.92, 0.28))), 0.0, 1.0), 1.6);
-  col += vec3(1.0) * spec * 0.65;
-  col = mix(col, vec3(1.0), cap * 0.38);
+  float fres = pow(1.0 - clamp(dot(-rd, n), 0.0, 1.0), 2.15);
+  col = mix(col, vec3(1.0), fres * 0.42 * (1.0 - cover * 0.45));
+  float spec = pow(clamp(dot(n, normalize(vec3(-0.28, 0.62, 0.73))), 0.0, 1.0), 20.0);
+  float cap = pow(clamp(dot(n, normalize(vec3(-0.05, 0.92, 0.28))), 0.0, 1.0), 1.7);
+  col += vec3(1.0) * spec * 0.62;
+  col = mix(col, vec3(1.0), cap * 0.32);
   float edge = 1.0 - smoothstep(0.985, 1.0, sqrt(r2));
-  // Bright rim like the reference.
-  col = mix(col, vec3(1.0), smoothstep(0.82, 0.98, sqrt(r2)) * 0.35);
+  col = mix(col, vec3(1.0), smoothstep(0.84, 0.98, sqrt(r2)) * 0.22);
   col *= edge;
   gl_FragColor = vec4(col * edge, edge);
 }
@@ -323,8 +327,8 @@ function GlassOrb({
       const hasLive = typeof raw === 'number' && raw >= 0;
       const voiced = live.state === 'listening' || live.state === 'speaking';
       const level = live.reduced ? 0 : hasLive ? raw : voiced ? 0.35 : 0;
-      // Bubbles keep a lively idle drift. Marble keeps a slower ribbon.
-      const pace = live.kind === 'fluid' ? 0.95 * (1 + level * 0.75) : 0.85 + level * 0.7;
+      // Lava-lamp pace: slow rise at rest, a little livelier when talking.
+      const pace = live.kind === 'fluid' ? 0.62 * (1 + level * 0.85) : 0.85 + level * 0.7;
       const rate = live.reduced || !active ? 0 : RATE[live.state] * Math.max(live.speed, 0) * pace;
       time += dt * rate;
       const error = live.state === 'error' ? 1 : 0;
@@ -391,7 +395,11 @@ function GlassOrb({
       }}
     >
       {webgl === false || lost ? (
-        <SphereFallback from={colorFrom} to={colorTo} />
+        kind === 'fluid' ? (
+          <BubblesFallback from={colorFrom} to={colorTo} />
+        ) : (
+          <SphereFallback from={colorFrom} to={colorTo} />
+        )
       ) : onScreen ? (
         <canvas
           ref={canvasRef}
@@ -405,6 +413,28 @@ function GlassOrb({
         />
       ) : null}
     </div>
+  );
+}
+
+function BubblesFallback({ from, to }: { from: string; to: string }) {
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        borderRadius: '50%',
+        background: [
+          `radial-gradient(circle at 30% 24%, rgba(255,255,255,0.95) 0%, transparent 22%)`,
+          `radial-gradient(circle at 50% 48%, ${to} 0 18%, transparent 19%)`,
+          `radial-gradient(circle at 28% 62%, ${from} 0 12%, transparent 13%)`,
+          `radial-gradient(circle at 70% 38%, ${from} 0 10%, transparent 11%)`,
+          `radial-gradient(circle at 62% 70%, ${to} 0 9%, transparent 10%)`,
+          `radial-gradient(circle at 38% 30%, ${to} 0 7%, transparent 8%)`,
+          `radial-gradient(circle at 50% 50%, #fffbfe 0%, #f7efff 58%, #efe8ff 100%)`,
+        ].join(', '),
+        boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.45)',
+      }}
+    />
   );
 }
 
