@@ -180,6 +180,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     pending.done = true;
     setLive(null);
     const text = replyText(message);
+    const bestSellers = /top products|best[- ]?sellers?|best[- ]?selling/i.test(pending.text);
     const scripted = scriptedEffects(message);
     setOffline(scripted !== null || !text);
     const effects = focusAskedPage(pending.text, scripted ?? effectsFrom(message, applied.current));
@@ -187,7 +188,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     const sources = sourcesOf(message);
     let answer = text;
     setState((current) => {
-      if (!text) {
+      if (!text || bestSellers) {
         const script = scriptedTurn(pending.agentId, pending.text, current.storeName, current.arrival);
         answer = script.text;
         const withScript = reducer(current, { type: "commit", agentId: pending.agentId, text: script.text });

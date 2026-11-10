@@ -161,7 +161,7 @@ export function readLiveScroll() {
   }
 }
 
-const storageKey = "sidekick-workspaces-v1";
+const storageKey = "sidekick-workspaces-v2";
 
 export type SavedProduct = EditableProduct & { tone: string; image?: string; inventory: string };
 

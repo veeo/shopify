@@ -559,7 +559,29 @@ export const sellers = [
     advice: "The sitewide 20% off is filling carts on its own. Offer it only after a headphone is added.",
     image: "/assets/products/usb-c-power-bank.webp",
   },
+  {
+    title: "Portable Charger",
+    meta: "$5,310 · 90 orders",
+    advice: "“Travel charger” search is up 22%. Pair it with the power bank instead of discounting it alone.",
+    image: "/assets/products/portable-charger.webp",
+  },
 ] as const;
+
+/** The products that are actually selling, best first. The chat names the top three; the admin filter shows all of these. */
+export const bestSellerIds = ["headphones", "bank", "charger", "lamp", "mouse"] as const;
+
+export function bestSellerRank(id: string) {
+  const index = bestSellerIds.indexOf(id as (typeof bestSellerIds)[number]);
+  return index === -1 ? bestSellerIds.length : index;
+}
+
+const bestSellerReply =
+  "These three products are your best sellers. Studio ANC Headphones did $18,640 from 76 orders, the USB-C Power Bank did $6,370 from 130, and the Portable Charger did $5,310 from 90.";
+
+const bestSellerChips: Chip[] = [
+  { label: "Build a campaign", tone: "secondary" },
+  { label: "Bundle them", tone: "primary" },
+];
 
 /** Shared operating picture for an electronics store. Every sidekick can act on these figures. */
 const storeFacts = [
@@ -568,7 +590,7 @@ const storeFacts = [
   "Last 7 days: $11,285, 92 orders. Today: $2,079 and 14 orders, 9 of them fulfilled. Today matches the analytics cards.",
   "Studio ANC Headphones, $249: $18,640 and 76 orders, about 39% of revenue. 14 units left. Reorder before Monday’s ads.",
   "USB-C Power Bank, $49: $6,370 and 130 orders. A sitewide 20% off is creating accessory-only carts and pulling the average order down.",
-  "Portable Charger, $59: $5,310 and 90 orders. Desk Lamp, $89: $4,450 and 50 orders. Wireless Mouse, $39: $3,120 and 80 orders.",
+  "Portable Charger, $59: $5,310 and 90 orders. Desk Lamp, $89: $4,450 and 50 orders. Wireless Mouse, $39: $3,120 and 80 orders. Those five are the best sellers. Talk about the headphones, the power bank, and the portable charger first.",
   "The Desk Lamp page says it ships in 5–7 days. Ads running this week say it ships this week.",
   "Open orders: #1078 Danielle Hudson, $369.99, paid, unfulfilled, 3 items (headphones and accessories). #1077 Maya Chen, $89, paid, unfulfilled, desk lamp. #1075 Priya Patel, $58, unpaid and unfulfilled.",
   "Shop app conversion is 1.6% against 2.7% on Online Store. The Shop listing crops the headphone photo.",
@@ -582,7 +604,7 @@ const persona = {
   sidekick:
     "You are Sidekick, Shopify's built-in assistant, helping a merchant run an electronics store. You know Shopify deeply and can act in the admin. When the merchant wants to review payments, call showArtifact payments-plan and navigatePreview payments, then explain the plan in your own words: Shopify Payments setup has four parts (business details, identity, account security, payout bank account) and takes about 10 minutes. When they want to start Shopify Payments setup, navigate to payments-setup with wide true. Remaining setup tasks: payments, theme, domain, shipping, retail address, POS.",
   chief:
-    "You are the merchant's Chief of Staff inside this electronics store. Lead with how sales are actually doing, the few things worth doing today, and what the other sidekicks are already working on. When asked for best sellers, call showArtifact best-sellers and navigatePreview home-active.",
+    "You are the merchant's Chief of Staff inside this electronics store. Lead with how sales are actually doing, the few things worth doing today, and what the other sidekicks are already working on. When asked for best sellers, call showArtifact best-sellers and do not navigate away: that opens Products, filtered to the five best sellers. Name the top three in the reply, Studio ANC Headphones, USB-C Power Bank, and Portable Charger, and offer a next step such as building a campaign or bundling them.",
   ideas:
     "You are Product ideas. You turn this store's carts and search into one testable product. You can add a product with the addProduct tool. The live draft is a $289 bundle: Studio ANC Headphones, the earbuds case, and a cable, meant to lift the $125 average order.",
   trends:
@@ -863,7 +885,7 @@ export const seedProducts: Product[] = [
     id: "earbuds",
     title: "Wireless Earbuds Case",
     price: "29.00",
-    status: "Draft",
+    status: "Active",
     tone: "coral",
     image: "/assets/products/wireless-earbuds-case.webp",
     description:
@@ -874,7 +896,7 @@ export const seedProducts: Product[] = [
     id: "bank",
     title: "USB-C Power Bank",
     price: "49.00",
-    status: "Draft",
+    status: "Active",
     tone: "blue",
     image: "/assets/products/usb-c-power-bank.webp",
     description: "A compact 10,000 mAh power bank with a single USB-C cable for phones and earbuds.",
@@ -884,7 +906,7 @@ export const seedProducts: Product[] = [
     id: "lamp",
     title: "Desk Lamp",
     price: "89.00",
-    status: "Draft",
+    status: "Active",
     tone: "lamp",
     image: "/assets/products/desk-lamp.webp",
     description: "A matte task lamp with a warm beam. Delivery and warranty should stay visible on the product page.",
@@ -904,7 +926,7 @@ export const seedProducts: Product[] = [
     id: "headphones",
     title: "Studio ANC Headphones",
     price: "249.00",
-    status: "Draft",
+    status: "Active",
     tone: "headphones",
     image: "/assets/products/studio-anc-headphones.webp",
     description: "Over-ear headphones with a carrying case. The bundle is the best seller this month.",
@@ -914,7 +936,7 @@ export const seedProducts: Product[] = [
     id: "mouse",
     title: "Wireless Mouse",
     price: "39.00",
-    status: "Draft",
+    status: "Active",
     tone: "mint",
     image: "/assets/products/wireless-mouse.webp",
     description: "A quiet wireless mouse for the desk set.",
@@ -924,7 +946,7 @@ export const seedProducts: Product[] = [
     id: "charger",
     title: "Portable Charger",
     price: "59.00",
-    status: "Draft",
+    status: "Active",
     tone: "sand",
     image: "/assets/products/portable-charger.webp",
     description: "Pocket charger for travel days.",
@@ -944,7 +966,7 @@ export const seedProducts: Product[] = [
     id: "adapter",
     title: "Travel Adapter",
     price: "18.00",
-    status: "Draft",
+    status: "Active",
     tone: "violet",
     image: "/assets/products/travel-adapter.webp",
     description: "A universal adapter that folds flat.",
@@ -954,7 +976,7 @@ export const seedProducts: Product[] = [
     id: "stand",
     title: "Tablet Stand",
     price: "32.00",
-    status: "Draft",
+    status: "Active",
     tone: "navy",
     image: "/assets/products/tablet-stand.webp",
     description: "An aluminum stand for checkout or the kitchen counter.",
@@ -964,7 +986,7 @@ export const seedProducts: Product[] = [
     id: "speaker",
     title: "Mini Speaker",
     price: "45.00",
-    status: "Draft",
+    status: "Active",
     tone: "amber",
     image: "/assets/products/mini-speaker.webp",
     description: "A pocket speaker with a warm finish.",
@@ -974,7 +996,7 @@ export const seedProducts: Product[] = [
     id: "pad",
     title: "Wireless Charging Pad",
     price: "38.00",
-    status: "Draft",
+    status: "Active",
     tone: "aqua",
     image: "/assets/products/wireless-charging-pad.webp",
     description: "A low charging pad for the nightstand.",
@@ -984,7 +1006,7 @@ export const seedProducts: Product[] = [
     id: "laptop-stand",
     title: "Laptop Stand",
     price: "54.00",
-    status: "Draft",
+    status: "Active",
     tone: "navy",
     image: "/assets/products/laptop-stand.webp",
     description: "A folding aluminum stand that lifts the screen to eye level.",
@@ -994,7 +1016,7 @@ export const seedProducts: Product[] = [
     id: "cables",
     title: "Cable Organizer",
     price: "14.00",
-    status: "Draft",
+    status: "Active",
     tone: "mint",
     image: "/assets/products/cable-organizer.webp",
     description: "A silicone clip that keeps five cables in place on the desk.",
@@ -1279,6 +1301,21 @@ function ensureInstalled(state: PrototypeState, sourceId: string) {
   return next;
 }
 
+/** The chat names the top three. The wide product list is filtered to every best seller. */
+function showBestSellers(state: PrototypeState) {
+  const agentId = state.agents.some((item) => item.id === "chief" && item.installed) ? "chief" : state.selectedAgentId;
+  const thread = state.threads[agentId] ?? [];
+  if (!thread.some((block) => block.type === "sellers")) {
+    push(state, agentId, { id: id(state), type: "sellers" });
+  }
+  if (!thread.some((block) => block.type === "chips" && block.chips.some((chip) => chip.label === "Bundle them"))) {
+    push(state, agentId, { id: id(state), type: "chips", chips: bestSellerChips });
+  }
+  state.preview = "products";
+  state.previewWide = true;
+  state.view = { ...emptyView(), tab: "Best sellers" };
+}
+
 export function applyEffects(state: PrototypeState, effects: Effect[]) {
   for (const effect of effects) {
     if (effect.type === "navigate") {
@@ -1360,21 +1397,7 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
       state.selectedAgentId = "sidekick";
       state.mode = "thread";
     } else if (effect.type === "artifact" && effect.name === "best-sellers") {
-      const agentId = state.agents.some((item) => item.id === "chief" && item.installed) ? "chief" : state.selectedAgentId;
-      const thread = state.threads[agentId] ?? [];
-      if (!thread.some((block) => block.type === "sellers")) {
-        push(state, agentId, { id: id(state), type: "sellers" });
-        push(state, agentId, {
-          id: id(state),
-          type: "chips",
-          chips: [
-            { label: "Review in more detail", tone: "secondary" },
-            { label: "Confirm changes", tone: "primary" },
-          ],
-        });
-      }
-      state.preview = "home-active";
-      state.previewWide = false;
+      showBestSellers(state);
     } else if (effect.type === "chips") {
       push(state, "sidekick", { id: id(state), type: "chips", chips: effect.chips });
     } else if (effect.type === "lookbook") {
@@ -1404,10 +1427,8 @@ function mentions(text: string, label: string) {
 }
 
 function showLine(page: PreviewId, top = false) {
-  if (page === "products" && top) {
-    return "Products are open. Studio ANC Headphones lead the last 30 days at $18,640 from 76 orders. The USB-C Power Bank is next at $6,370.";
-  }
-  if (page === "products") return "Products are open. The headphones are $18,640 of the last 30 days, and the power bank is next.";
+  if (page === "products" && top) return bestSellerReply;
+  if (page === "products") return "Products are open. The headphones, the power bank, and the portable charger lead the last 30 days.";
   if (page === "orders") return "Orders are open. #1078 and #1077 are paid and still unfulfilled, and #1075 hasn’t been paid.";
   if (page === "home-active") return "Home is open. The last 30 days are $48,393 from 386 orders.";
   if (page === "customers") return "Customers are open. 28% of this month’s orders are from people who have bought before.";
@@ -1762,15 +1783,38 @@ export function runChip(state: PrototypeState, label: string) {
   }
   if (label === "Show the best sellers") {
     push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
-    push(state, "chief", { id: id(state), type: "sellers" });
     push(state, "chief", {
       id: id(state),
       type: "text",
       role: "assistant",
-      text: "Studio ANC Headphones are $18,640 from 76 orders. The USB-C Power Bank is next at $6,370 from 130 orders, mostly because of the 20% off.",
+      text: bestSellerReply,
+    });
+    showBestSellers(state);
+    return;
+  }
+  if (label === "Build a campaign") {
+    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
+    push(state, agentId, {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "I’d build Monday’s campaign around these three. Lead with the Studio ANC Headphones, then the power bank and the portable charger. Leave the desk lamp out until the page says it ships this week.",
+    });
+    state.preview = "campaigns";
+    state.previewWide = true;
+    return;
+  }
+  if (label === "Bundle them") {
+    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
+    push(state, agentId, {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "I’d bundle the Studio ANC Headphones with the earbuds case and a cable at $289. That lifts the $125 average order and keeps the power bank from being the whole cart.",
     });
     state.preview = "products";
     state.previewWide = true;
+    state.view = emptyView();
     return;
   }
   if (label === "Review in more detail") {
@@ -1813,9 +1857,12 @@ export function scriptedTurn(agentId: string, text: string, storeName: string, a
 }
 
 function scriptedReply(agentId: string, text: string, storeName: string): { text: string; effects: Effect[] } {
+  const q = text.toLowerCase();
+  if (/top products|best[- ]?sellers?|best[- ]?selling|headphones|desk lamp/.test(q)) {
+    return { text: bestSellerReply, effects: [{ type: "artifact", name: "best-sellers" }] };
+  }
   const asked = askedAdminPage(text);
   if (asked) return { text: asked.line, effects: [{ type: "navigate", page: asked.page, wide: true }] };
-  const q = text.toLowerCase();
   const effects: Effect[] = [];
   if (agentId === "grok") {
     if (/pass|hand|hub|reply|task/.test(q)) {
@@ -1872,13 +1919,6 @@ function scriptedReply(agentId: string, text: string, storeName: string): { text
     }
     return {
       text: "I opened Shopify Payments. Tell me whether you’re an individual, a registered business, or a non-profit, and I’ll fill that in.",
-      effects,
-    };
-  }
-  if (/best seller|headphones|desk lamp/.test(q)) {
-    effects.push({ type: "artifact", name: "best-sellers" });
-    return {
-      text: "This month’s best sellers are the Studio ANC Headphones, $18,640 from 76 orders, and the USB-C Power Bank, $6,370 from 130 orders. I’d reorder the headphones and stop the sitewide discount on the bank.",
       effects,
     };
   }
@@ -2495,7 +2535,10 @@ function settleWorkspace(prev: PrototypeState, next: PrototypeState, action: Act
     return next;
   }
   if (action.type !== "view" && next.preview !== prev.preview && !sameDesk(prev.preview, next.preview)) {
-    next.view = emptyView();
+    const tab = next.view.tab !== prev.view.tab ? next.view.tab : "";
+    const query = next.view.query !== prev.view.query ? next.view.query : "";
+    const sort = next.view.sort !== prev.view.sort ? next.view.sort : "";
+    next.view = { ...emptyView(), ...(tab ? { tab } : {}), ...(query ? { query } : {}), ...(sort ? { sort } : {}) };
   }
   const samePlace = next.preview === prev.preview && next.selectedAgentId === prev.selectedAgentId;
   const scroll = samePlace ? (live ?? next.view.scroll) : next.view.scroll;

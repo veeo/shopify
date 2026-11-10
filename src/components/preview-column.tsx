@@ -9,7 +9,7 @@ import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { WorkspaceViewProvider, useWorkspaceView, type WorkspaceViewApi } from "@/components/workspace-view";
 import { isSettingsPage, sectionChoices, sharesSection } from "@/lib/admin-nav";
 import { bindScrollReader } from "@/lib/workspace";
-import type { BusinessType, PreviewId, Product, ProductTone, PrototypeState } from "@/lib/prototype";
+import { bestSellerIds, bestSellerRank, type BusinessType, type PreviewId, type Product, type ProductTone, type PrototypeState } from "@/lib/prototype";
 
 type Nav = PageNav & {
   onPreview: (page: PreviewId, wide?: boolean) => void;
@@ -1388,12 +1388,15 @@ function Products({ state, onProduct, onAdd, nav }: { state: PrototypeState; onP
   const view = useWorkspaceView();
   const query = view?.query ?? "";
   const tab = view?.tab || "All";
+  const best = new Set<string>(bestSellerIds);
   const shown = state.products.filter((product) => {
+    if (tab === "Best sellers" && !best.has(product.id)) return false;
     if (tab === "Active" && product.status !== "Active") return false;
     if (tab === "Draft" && product.status !== "Draft") return false;
     return product.title.toLowerCase().includes(query.trim().toLowerCase());
   });
-  if (view?.sort === "name") shown.sort((a, b) => a.title.localeCompare(b.title));
+  if (tab === "Best sellers" && (view?.sort || "newest") === "newest") shown.sort((a, b) => bestSellerRank(a.id) - bestSellerRank(b.id));
+  else if (view?.sort === "name") shown.sort((a, b) => a.title.localeCompare(b.title));
   else if (view?.sort === "price") shown.sort((a, b) => Number(b.price) - Number(a.price));
   else if (view?.sort === "oldest") shown.reverse();
   return (
@@ -1427,7 +1430,7 @@ function Products({ state, onProduct, onAdd, nav }: { state: PrototypeState; onP
         </AdminCard>
         <Table
           select
-          toolbar={<TableSearch placeholder="Search and filter" tabs={["All", "Active", "Draft"]} />}
+          toolbar={<TableSearch placeholder="Search and filter" tabs={["All", "Active", "Draft", "Best sellers"]} />}
           onRow={(index) => onProduct(shown[index].id)}
           columns={[
             { label: "", width: 28 },
