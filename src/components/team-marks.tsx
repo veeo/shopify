@@ -522,10 +522,10 @@ export function PosMark({ size }: { size: number }) {
   const id = useId().replace(/:/g, "");
   return (
     <MarkFrame size={size}>
-      <defs>{markShade(`${id}-shade`, "0.35")}</defs>
+      <defs>{markShade(`${id}-shade`, "0.2")}</defs>
       <g filter={`url(#${id}-shade)`}>
-        <rect width="28" height="28" rx="14" fill="#111111" />
-        <path fill="white" transform="translate(6 6)" d={posGlyph} />
+        <rect width="28" height="28" rx="14" fill="white" />
+        <path fill="#141413" transform="translate(6 6)" d={posGlyph} />
       </g>
     </MarkFrame>
   );
