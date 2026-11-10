@@ -13,6 +13,7 @@ import {
   type OrbProps,
   type OrbState,
 } from '@/voiceorbs/lib/orb-state';
+import { useOnScreen } from '@/voiceorbs/lib/use-in-view';
 import { useOrbAnimator, type OrbFrame } from '@/voiceorbs/lib/use-orb-animator';
 import { useReducedMotion } from '@/voiceorbs/lib/use-reduced-motion';
 import { useWebGLSupport } from '@/voiceorbs/lib/use-webgl-support';
@@ -251,17 +252,20 @@ export const AuraField = ({
     spring: { x: AURA_TABLE[state].scale, v: 0 },
   });
   const [lost, setLost] = useState(false);
+  const [painted, setPainted] = useState(false);
   const support = useWebGLSupport();
+  const { ref: screenRef, on: onScreen } = useOnScreen();
   const reduced = useReducedMotion();
-  const showCanvas = support === true && !lost;
+  const showCanvas = support === true && onScreen && !lost;
 
   const setRefs = useCallback(
     (node: HTMLDivElement | null) => {
       hostRef.current = node;
+      screenRef(node);
       if (typeof ref === 'function') ref(node);
       else if (ref) ref.current = node;
     },
-    [ref],
+    [ref, screenRef],
   );
 
 
@@ -401,7 +405,9 @@ export const AuraField = ({
     gl.uniform1f(loc.uRes, px);
     gl.uniform1f(loc.uBleed, AURA_BLEED);
     glRef.current = { gl, loc };
+    gl.clear(gl.COLOR_BUFFER_BIT);
     drawRef.current(frameRef.current);
+    setPainted(true);
 
     const onLost = (event: Event) => {
       event.preventDefault();
@@ -415,6 +421,7 @@ export const AuraField = ({
       glRef.current = null;
       gl.deleteBuffer(buffer);
       dropResources();
+      setPainted(false);
     };
   }, [size, showCanvas, frameRef]);
 
@@ -461,9 +468,11 @@ export const AuraField = ({
               left: (size - size * AURA_BLEED) / 2,
               top: (size - size * AURA_BLEED) / 2,
               display: 'block',
+              background: 'transparent',
+              opacity: painted ? 1 : 0,
             }}
           />
-        ) : (
+        ) : support === false || lost ? (
           <div ref={fallbackRef} style={{ position: 'absolute', inset: 0 }}>
             <div ref={brandLayerRef} style={fallbackRing(colorFrom, colorTo, size)} />
             <div
@@ -471,7 +480,7 @@ export const AuraField = ({
               style={{ ...fallbackRing(ERROR_COLOR_FROM, ERROR_COLOR_TO, size), opacity: 0 }}
             />
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

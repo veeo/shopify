@@ -16,6 +16,7 @@ import {
 } from '@/voiceorbs/lib/orb-state';
 import { mixHex, mixRgb, rgbToHex, shadeHex, tintHex, type Rgb } from '@/voiceorbs/lib/orb-color';
 import { useOrbAnimator, type OrbFrame } from '@/voiceorbs/lib/use-orb-animator';
+import { useOnScreen } from '@/voiceorbs/lib/use-in-view';
 import { useReducedMotion } from '@/voiceorbs/lib/use-reduced-motion';
 import { useWebGLSupport } from '@/voiceorbs/lib/use-webgl-support';
 
@@ -31,17 +32,19 @@ interface PaperHost {
 }
 
 const brandPalette = (from: string, to: string): string[] => [
-  shadeHex(from, 0.35),
+  shadeHex(from, 0.58),
   from,
-  mixHex(from, to, 0.5),
+  mixHex(from, to, 0.45),
   to,
-  tintHex(to, 0.35),
+  shadeHex(to, 0.12),
 ];
 
 const ERROR_PALETTE = brandPalette(ERROR_COLOR_FROM, ERROR_COLOR_TO);
 
 const GL_ATTRIBUTES: WebGLContextAttributes = {
+  alpha: true,
   antialias: false,
+  premultipliedAlpha: true,
   powerPreference: 'low-power',
 };
 
@@ -63,9 +66,9 @@ type PlasmaTune = {
 };
 
 const TUNE: Record<OrbState, PlasmaTune> = {
-  idle: { flow: 0.3, distortion: 0.42, swirl: 0.26, grain: 0.06, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
-  hover: { flow: 0.3, distortion: 0.42, swirl: 0.26, grain: 0.06, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
-  selected: { flow: 0.3, distortion: 0.42, swirl: 0.26, grain: 0.06, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
+  idle: { flow: 0.48, distortion: 0.5, swirl: 0.34, grain: 0.04, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
+  hover: { flow: 0.48, distortion: 0.5, swirl: 0.34, grain: 0.04, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
+  selected: { flow: 0.48, distortion: 0.5, swirl: 0.34, grain: 0.04, outer: 0.08, inner: 0.12, beat: 0, beatRate: 0.3, error: 0 },
   connecting: { flow: 0.4, distortion: 0.4, swirl: 0.4, grain: 0.08, outer: 0.1, inner: 0.1, beat: 0.6, beatRate: 0.28, error: 0 },
   listening: { flow: 0.85, distortion: 0.5, swirl: 0.32, grain: 0.1, outer: 0.16, inner: 0.95, beat: 0, beatRate: 0.3, error: 0 },
   thinking: { flow: 0.7, distortion: 0.35, swirl: 0.78, grain: 0.1, outer: 0.08, inner: 0.35, beat: 0.4, beatRate: 0.45, error: 0 },
@@ -98,7 +101,15 @@ export const PlasmaOrb = ({
   const clockRef = useRef({ phase: 0, shader: 0, beat: 0, colors: '' });
   const reduced = useReducedMotion();
   const webgl = useWebGLSupport();
-  const showShader = webgl === true;
+  const screen = useOnScreen();
+  const onScreen = screen.on;
+  const showShader = webgl === true && onScreen;
+  const [revealed, setRevealed] = useState(false);
+  const [revealKey, setRevealKey] = useState(showShader);
+  if (revealKey !== showShader) {
+    setRevealKey(showShader);
+    setRevealed(false);
+  }
   const [seed] = useState(() => {
     const tune = TUNE[state];
     return { ...tune, colors: livePalette(colorFrom, colorTo, tune.error).map(rgbToHex) };
@@ -106,6 +117,7 @@ export const PlasmaOrb = ({
 
   const setRootRef = (node: HTMLDivElement | null) => {
     rootRef.current = node;
+    screen.ref(node);
     if (typeof ref === 'function') {
       ref(node);
     } else if (ref) {
@@ -154,6 +166,18 @@ export const PlasmaOrb = ({
   };
 
   useOrbAnimator(rootRef, { state, levelRef, speed, onFrame });
+
+  useEffect(() => {
+    if (!showShader) return;
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => setRevealed(true));
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, [showShader]);
 
   useEffect(() => {
     if (state !== 'error' || reduced) return;
@@ -223,6 +247,7 @@ export const PlasmaOrb = ({
         }}
       >
         {showShader ? (
+          <div style={{ position: 'absolute', inset: 0, opacity: revealed ? 1 : 0, background: 'transparent' }}>
           <MeshGradient
             ref={bindShader}
             width={size}
@@ -234,11 +259,12 @@ export const PlasmaOrb = ({
             speed={0}
             frame={BASE_FRAME}
             grainMixer={seed.grain}
-            grainOverlay={0.05}
+            grainOverlay={0.02}
             minPixelRatio={1}
             maxPixelCount={size * size * MAX_PIXEL_RATIO * MAX_PIXEL_RATIO}
             webGlContextAttributes={GL_ATTRIBUTES}
           />
+          </div>
         ) : (
           <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: '50%' }}>
             {fallbackLayers.map((layer) => (
@@ -273,7 +299,7 @@ export const PlasmaOrb = ({
             borderRadius: '50%',
             pointerEvents: 'none',
             backgroundImage:
-              'radial-gradient(circle at 31% 22%, rgba(255,255,255,0.55), transparent 14%), radial-gradient(circle at 30% 26%, rgba(255,255,255,0.28), transparent 48%), radial-gradient(circle at 68% 76%, rgba(10,14,24,0.42), transparent 60%)',
+              'radial-gradient(circle at 30% 24%, rgba(255,255,255,0.92), rgba(255,255,255,0.28) 9%, transparent 20%), radial-gradient(circle at 34% 32%, rgba(255,255,255,0.34), transparent 42%), linear-gradient(155deg, rgba(255,255,255,0.2), transparent 38%, rgba(0,0,0,0.28) 100%)',
           }}
         />
       </div>

@@ -638,6 +638,12 @@ body {
     transform: scale(var(--fit));
     transform-origin: top left;
     pointer-events: none;
+    background: transparent;
+  }
+
+  .voice-orb-fit canvas,
+  .voice-orb canvas {
+    background-color: transparent !important;
   }
 
 }
