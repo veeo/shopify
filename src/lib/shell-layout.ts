@@ -31,7 +31,7 @@ export const SHELL = {
 
 export type ShellMode = "desktop-wide" | "desktop" | "compact" | "mobile" | "fold-open";
 
-export type AgentsPresentation = "rail" | "drawer" | "strip";
+export type AgentsPresentation = "rail" | "drawer";
 export type AdminPresentation = "docked" | "sheet";
 
 export type ShellLayout = {
@@ -67,7 +67,8 @@ export function resolveShellLayout({ width, spanning = false, coarsePointer = fa
       mode: "fold-open",
       width,
       spanning: true,
-      agents: coarsePointer ? "strip" : "rail",
+      // Collapsed rail keeps every sidekick one tap away beside the chat pane.
+      agents: "rail",
       admin: "docked",
       preferNavCollapsed: true,
       allowAdminWide: false,
