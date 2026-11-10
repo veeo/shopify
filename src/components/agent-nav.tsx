@@ -53,10 +53,13 @@ export function AgentNav({
   const [menu, setMenu] = useState<"account" | "store" | null>(null);
   const [hiddenOpen, setHiddenOpen] = useState(false);
   const query = state.search.trim().toLowerCase();
-  const hiddenItems = catalog
-    .filter((item) => hiddenSidekicks.has(item.id))
-    .map((item) => state.agents.find((agent) => agent.id === item.id) ?? item)
-    .filter((item) => !query || item.name.toLowerCase().includes(query));
+  const hiddenItems =
+    state.scenario === "setup"
+      ? []
+      : catalog
+          .filter((item) => hiddenSidekicks.has(item.id))
+          .map((item) => state.agents.find((agent) => agent.id === item.id) ?? item)
+          .filter((item) => !query || item.name.toLowerCase().includes(query));
   const hiddenSelection = hiddenSidekicks.has(state.selectedAgentId) && state.mode === "thread" ? state.selectedAgentId : "";
   const [openedFor, setOpenedFor] = useState("");
   if (hiddenSelection !== openedFor) {
