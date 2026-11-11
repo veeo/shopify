@@ -522,7 +522,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         <DesignSystem onBack={() => setDesign(false)} />
       ) : (
       <>
-        {showAgentRail ? (
+        {showAgentRail && !takeover ? (
           <AgentNav
             present={panels.nav}
             state={state}
@@ -574,7 +574,10 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         <div
           aria-hidden
           className="rail-reveal my-3 shrink-0 bg-white/10"
-          style={{ width: showAgentRail && panels.nav ? 1 : 0, opacity: showAgentRail && panels.nav ? 1 : 0 }}
+          style={{
+            width: showAgentRail && panels.nav && !takeover ? 1 : 0,
+            opacity: showAgentRail && panels.nav && !takeover ? 1 : 0,
+          }}
         />
         <div
           ref={chatRef}

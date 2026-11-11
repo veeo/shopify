@@ -1,9 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useDismiss } from "@/components/admin-ui";
+import { Orb } from "@/components/marks";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { channelNav, mainNav, navFor, type NavItem, type PreviewId } from "@/lib/admin-nav";
+import type { Agent } from "@/lib/prototype";
+import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 
 const channelIds = new Set(channelNav.map((item) => item.id));
 
@@ -17,6 +20,7 @@ export function AdminRail({
   onToggle,
   embedded = false,
   revealed = false,
+  lead = null,
 }: {
   expanded: boolean;
   preview: PreviewId;
@@ -28,6 +32,8 @@ export function AdminRail({
   embedded?: boolean;
   /** The sheet is open, so the groups can ease in. */
   revealed?: boolean;
+  /** Optional block above Search — used for the merged sidekick affordance in full layout. */
+  lead?: ReactNode;
 }) {
   const { id: active, child } = navFor(preview);
   const [alerts, setAlerts] = useState(false);
@@ -37,10 +43,11 @@ export function AdminRail({
   return (
     <nav
       className={`relative flex h-full shrink-0 flex-col pb-3 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
-        embedded ? "w-full px-2 pt-[72px]" : expanded ? "w-[220px] px-2 pt-8" : "w-[52px] px-[10px] pt-8"
+        embedded ? "w-full px-2 pt-[72px]" : expanded ? "w-[220px] px-2 pt-6" : "w-[52px] px-[10px] pt-6"
       } ${embedded && revealed ? "menu-stagger" : ""}`}
       aria-label="Shopify admin"
     >
+      {lead}
       {expanded ? (
         <button
           type="button"
@@ -125,6 +132,45 @@ export function AdminRail({
 export function initials(name: string) {
   const words = name.trim().split(/\s+/).filter(Boolean);
   return ((words[0]?.[0] ?? "M") + (words[1]?.[0] ?? words[0]?.[1] ?? "S")).toUpperCase();
+}
+
+/** Collapsed sidekick roster entry at the top of the merged full-layout rail. */
+export function SidekickLead({
+  agent,
+  expanded,
+  onView,
+}: {
+  agent: Agent;
+  expanded: boolean;
+  onView: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`View sidekicks — ${agent.name}`}
+      onClick={onView}
+      className={`press mb-3 flex w-full items-center rounded-[12px] text-left transition-colors hover:bg-white/[0.08] ${
+        expanded ? "gap-2 px-1.5 py-1.5" : "h-8 justify-center px-0"
+      }`}
+    >
+      <span className="relative grid size-[31px] shrink-0 place-items-center rounded-full">
+        <Orb
+          id={agent.orb}
+          agentId={agent.id}
+          size={ORB_SIZE.nav}
+          colorFrom={agent.orbFrom}
+          colorTo={agent.orbTo}
+          presence="rest"
+        />
+      </span>
+      {expanded ? (
+        <span className="min-w-0 flex-1 overflow-hidden">
+          <span className="block truncate text-[13px] font-semibold leading-[1.3] tracking-[-0.13px] text-white">{agent.name}</span>
+          <span className="block truncate text-[12px] leading-4 text-[#8e8f8b]">View sidekicks</span>
+        </span>
+      ) : null}
+    </button>
+  );
 }
 
 function ItemIcon({ item, on }: { item: NavItem; on: boolean }) {

@@ -270,13 +270,17 @@ export function useDismiss(open: boolean, ref: React.RefObject<HTMLElement | nul
   }, [open, ref]);
 }
 
-const layoutModeCopy: Record<AdminLayoutMode, { label: string; hint: string }> = {
-  sidebar: { label: "Sidebar", hint: "Standard admin beside chat" },
-  expanded: { label: "Expanded", hint: "Wider admin, chat stays open" },
-  takeover: { label: "Full", hint: "Admin fills the workspace" },
+const layoutModeCopy: Record<AdminLayoutMode, { label: string }> = {
+  sidebar: { label: "Sidebar" },
+  expanded: { label: "Expanded" },
+  takeover: { label: "Full" },
 };
 
-/** Gray control that picks among sidebar, expanded, and full takeover. */
+const LAYOUT_MODES: AdminLayoutMode[] = ["sidebar", "expanded", "takeover"];
+const LAYOUT_IDLE_MS = 2800;
+const LAYOUT_SLOT = 32;
+
+/** Bottom-right hover pill: collapsed shows the current mode; hover expands to three glyphs. */
 export function AdminLayoutControl({
   mode,
   onChange,
@@ -285,76 +289,114 @@ export function AdminLayoutControl({
   onChange: (mode: AdminLayoutMode) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-  useDismiss(open, ref, () => setOpen(false));
-  const current = layoutModeCopy[mode];
+  const [pinned, setPinned] = useState(false);
+  const idleRef = useRef<number | null>(null);
+  const index = Math.max(0, LAYOUT_MODES.indexOf(mode));
+
+  function clearIdle() {
+    if (idleRef.current !== null) {
+      window.clearTimeout(idleRef.current);
+      idleRef.current = null;
+    }
+  }
+
+  function scheduleIdle() {
+    clearIdle();
+    idleRef.current = window.setTimeout(() => {
+      setOpen(false);
+      setPinned(false);
+      idleRef.current = null;
+    }, LAYOUT_IDLE_MS);
+  }
+
+  useEffect(() => () => clearIdle(), []);
+
+  function expand() {
+    setOpen(true);
+    if (pinned) scheduleIdle();
+    else clearIdle();
+  }
+
+  function collapseUnlessPinned() {
+    if (pinned) scheduleIdle();
+    else {
+      clearIdle();
+      setOpen(false);
+    }
+  }
+
+  function pick(next: AdminLayoutMode) {
+    onChange(next);
+    setPinned(true);
+    setOpen(true);
+    scheduleIdle();
+  }
+
   return (
-    <span ref={ref} className="relative">
-      <button
-        type="button"
-        aria-label={`Admin layout: ${current.label}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls="admin-layout-menu"
-        onClick={() => setOpen((value) => !value)}
-        className="press inline-flex h-8 shrink-0 items-center gap-1 rounded-lg bg-[#f1f1f1] px-2 text-[#303030] hover:bg-[#e3e3e3] active:bg-[#dcdcdc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005bd3]"
+    <div
+      className="pointer-events-auto absolute bottom-6 right-6 z-40"
+      onMouseEnter={expand}
+      onMouseLeave={collapseUnlessPinned}
+      onFocusCapture={expand}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) collapseUnlessPinned();
+      }}
+    >
+      <div
+        role="toolbar"
+        aria-label="Admin layout"
+        aria-orientation="horizontal"
+        className={`flex h-10 items-center overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.12)] transition-[width,border-radius,padding] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)] motion-reduce:transition-none ${
+          open ? "w-[104px] rounded-full px-1" : "w-10 rounded-[12px] px-0"
+        }`}
       >
-        <AdminLayoutGlyph mode={mode} />
-        <span className={`text-[#616161] transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
-          <PIcon name="ChevronDown" size={14} />
-        </span>
-      </button>
-      {open ? (
-        <span
-          id="admin-layout-menu"
-          role="menu"
-          aria-label="Admin layout"
-          className="pop-in absolute left-0 top-9 z-50 flex w-56 flex-col rounded-xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.14)]"
+        <div
+          className="flex items-center will-change-transform motion-reduce:transition-none"
+          style={{
+            width: LAYOUT_SLOT * LAYOUT_MODES.length,
+            transform: open ? "translateX(0)" : `translateX(${-index * LAYOUT_SLOT}px)`,
+            transition: "transform 300ms cubic-bezier(0.2, 0.8, 0, 1)",
+          }}
         >
-          {(Object.keys(layoutModeCopy) as AdminLayoutMode[]).map((item) => {
+          {LAYOUT_MODES.map((item) => {
             const on = item === mode;
             const copy = layoutModeCopy[item];
             return (
               <button
                 key={item}
                 type="button"
-                role="menuitemradio"
+                role="radio"
                 aria-checked={on}
-                onClick={() => {
-                  setOpen(false);
-                  onChange(item);
-                }}
-                className={`press flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-left ${
-                  on ? "bg-[#f1f1f1]" : "hover:bg-[#f6f6f6]"
+                aria-label={copy.label}
+                tabIndex={open || on ? 0 : -1}
+                onClick={() => pick(item)}
+                className={`press grid size-8 shrink-0 place-items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#005bd3] ${
+                  on ? "text-[#171817]" : "text-[#9a9a9a] hover:text-[#616161]"
                 }`}
               >
-                <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-white text-[#303030] shadow-[0_0_0_1px_#e3e3e3]">
-                  <AdminLayoutGlyph mode={item} />
-                </span>
-                <span className="min-w-0">
-                  <span className={`block text-[13px] leading-5 ${on ? "font-semibold text-[#171817]" : "font-medium text-[#303030]"}`}>
-                    {copy.label}
-                  </span>
-                  <span className="block text-[12px] leading-4 text-[#616161]">{copy.hint}</span>
-                </span>
+                <AdminLayoutGlyph mode={item} />
               </button>
             );
           })}
-        </span>
-      ) : null}
-    </span>
+        </div>
+      </div>
+    </div>
   );
 }
 
+const layoutGlyphPaths: Record<AdminLayoutMode, string> = {
+  sidebar:
+    "M11 1C13.2091 1 15 2.79086 15 5V11C15 13.14 13.3194 14.8879 11.2061 14.9951L11 15H5L4.79395 14.9951C2.7488 14.8913 1.10865 13.2512 1.00488 11.2061L1 11V5C1 2.79086 2.79086 1 5 1H11ZM5 2.5C3.61929 2.5 2.5 3.61929 2.5 5V11C2.5 12.3807 3.61929 13.5 5 13.5H11C12.3807 13.5 13.5 12.3807 13.5 11V5C13.5 3.61929 12.3807 2.5 11 2.5H5ZM11.25 4C11.6642 4 12 4.33579 12 4.75V11.25C12 11.6642 11.6642 12 11.25 12C10.8358 12 10.5 11.6642 10.5 11.25V4.75C10.5 4.33579 10.8358 4 11.25 4Z",
+  expanded:
+    "M11 1C13.2091 1 15 2.79086 15 5V11C15 13.14 13.3194 14.8879 11.2061 14.9951L11 15H5L4.79395 14.9951C2.7488 14.8913 1.10865 13.2512 1.00488 11.2061L1 11V5C1 2.79086 2.79086 1 5 1H11ZM5 2.5C3.61929 2.5 2.5 3.61929 2.5 5V11C2.5 12.3807 3.61929 13.5 5 13.5H11C12.3807 13.5 13.5 12.3807 13.5 11V5C13.5 3.61929 12.3807 2.5 11 2.5H5ZM11 4C11.5523 4 12 4.44772 12 5V11C12 11.5523 11.5523 12 11 12H9.5C8.94772 12 8.5 11.5523 8.5 11V5C8.5 4.44772 8.94772 4 9.5 4H11Z",
+  takeover:
+    "M11 1C13.2091 1 15 2.79086 15 5V11C15 13.14 13.3194 14.8879 11.2061 14.9951L11 15H5L4.79395 14.9951C2.7488 14.8913 1.10865 13.2512 1.00488 11.2061L1 11V5C1 2.79086 2.79086 1 5 1H11ZM5 2.5C3.61929 2.5 2.5 3.61929 2.5 5V11C2.5 12.3807 3.61929 13.5 5 13.5H11C12.3807 13.5 13.5 12.3807 13.5 11V5C13.5 3.61929 12.3807 2.5 11 2.5H5ZM11 4C11.5523 4 12 4.44772 12 5V11C12 11.5523 11.5523 12 11 12H6.5C5.94772 12 5.5 11.5523 5.5 11V5C5.5 4.44772 5.94772 4 6.5 4H11Z",
+};
+
 function AdminLayoutGlyph({ mode }: { mode: AdminLayoutMode }) {
-  // Mini shell: agents rail + chat + admin. Filled region is the admin pane.
-  const fill =
-    mode === "sidebar" ? "M10.5 3.5h2v9h-2z" : mode === "expanded" ? "M8 3.5h4.5v9H8z" : "M5.25 3.5H12.5v9H5.25z";
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden className="shrink-0">
-      <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" fill="none" stroke="currentColor" strokeWidth="1.25" />
-      <path d="M4.75 3.5v9" fill="none" stroke="currentColor" strokeWidth="1.25" />
-      <path d={fill} fill="currentColor" opacity="0.88" />
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden className="shrink-0" fill="currentColor">
+      <path d={layoutGlyphPaths[mode]} />
     </svg>
   );
 }

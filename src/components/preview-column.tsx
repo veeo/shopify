@@ -4,13 +4,14 @@ import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type
 import { flushSync } from "react-dom";
 import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
+import { AdminRail, SidekickLead } from "@/components/admin-rail";
 import { AdminLayoutControl, Badge, Body, Btn, Card as AdminCard, circleButton, HeaderExtras, HeaderSlotProvider, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { WorkspaceViewProvider, useWorkspaceView, type WorkspaceViewApi } from "@/components/workspace-view";
 import { isSettingsPage, sectionChoices, sharesSection } from "@/lib/admin-nav";
 import type { AdminLayoutMode } from "@/lib/shell-layout";
 import { bindScrollReader } from "@/lib/workspace";
-import { bestSellerIds, bestSellerRank, type BusinessType, type PreviewId, type Product, type ProductTone, type PrototypeState } from "@/lib/prototype";
+import { bestSellerIds, bestSellerRank, selectedAgent, type BusinessType, type PreviewId, type Product, type ProductTone, type PrototypeState } from "@/lib/prototype";
 
 type Nav = PageNav & {
   onPreview: (page: PreviewId, wide?: boolean) => void;
@@ -53,9 +54,9 @@ export function PreviewColumn({
   sheetEdge?: "bottom" | "end";
   /** Width when docked; falls back to the classic 393 / 584 sizes. Omitted in takeover (flex). */
   dockWidth?: number;
-  /** Admin fills the workspace beside the agents rail. */
+  /** Admin fills the workspace — chat and sidekick rail hide behind it. */
   takeover?: boolean;
-  /** Desktop layout-mode dropdown in the admin chrome. */
+  /** Bottom-right layout hover control (desktop/docked only). */
   showLayoutControl?: boolean;
   onLayout?: (mode: AdminLayoutMode) => void;
   onCloseSheet?: () => void;
@@ -79,6 +80,8 @@ export function PreviewColumn({
   const layoutMode = state.adminLayout;
   const wide = !sheet && (layoutMode === "expanded" || layoutMode === "takeover");
   const panelWidth = takeover ? undefined : dockWidth ?? (wide ? 584 : 393);
+  const [adminNavOpen, setAdminNavOpen] = useState(true);
+  const sidekick = selectedAgent(state);
   const [entering, setEntering] = useState(false);
   const [seenPresent, setSeenPresent] = useState(present);
   if (seenPresent !== present) {
@@ -250,7 +253,8 @@ export function PreviewColumn({
   };
   if (sheet && !sheetOpen) return null;
 
-  const panel = (
+  const showChromeMenu = !takeover && state.preview !== "product" && !settingsLevel;
+  const content = (
       <div
         data-admin-page={state.preview}
         data-admin-wide={wide ? "true" : "false"}
@@ -259,17 +263,21 @@ export function PreviewColumn({
         data-admin-tab={state.view.tab}
         data-admin-record={state.view.recordId}
         data-admin={sheet ? "sheet" : takeover ? "takeover" : "docked"}
-        inert={!present && !sheet ? true : undefined}
-        aria-hidden={!present && !sheet ? true : undefined}
-        className={`p-partial-theme-admin-next-light relative flex h-full w-full shrink-0 flex-col overflow-hidden text-[#303030] ${
+        inert={!takeover && !present && !sheet ? true : undefined}
+        aria-hidden={!takeover && !present && !sheet ? true : undefined}
+        className={`p-partial-theme-admin-next-light relative flex h-full min-w-0 flex-1 flex-col overflow-hidden text-[#303030] ${
           sheet
             ? sheetEdge === "bottom"
               ? "shell-admin-sheet-bottom rounded-t-[20px]"
               : "shell-admin-sheet-end rounded-l-[20px]"
-            : "rounded-[20px]"
+            : takeover
+              ? "rounded-[20px]"
+              : "w-full rounded-[20px]"
         } ${kind || closing ? "bg-[#e3e3e3]" : state.preview === "product" ? "bg-[#f7f7f7]" : "bg-white"} ${
           state.motion ? "transition-[background-color] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)]" : ""
-        } ${!present && !sheet ? "pointer-events-none translate-x-full opacity-0" : ""} ${present && curtain && !sheet ? "panel-reveal" : ""}`}
+        } ${!takeover && !present && !sheet ? "pointer-events-none translate-x-full opacity-0" : ""} ${
+          !takeover && present && curtain && !sheet ? "panel-reveal" : ""
+        }`}
       >
       <WorkspaceViewProvider value={viewApi}>
       <HeaderSlotProvider slot={slot}>
@@ -306,7 +314,7 @@ export function PreviewColumn({
             >
               <PIcon name="ChevronLeft" size={20} />
             </button>
-          ) : (
+          ) : showChromeMenu ? (
             <button
               type="button"
               aria-label={menu ? "Close admin menu" : "Open admin menu"}
@@ -323,21 +331,6 @@ export function PreviewColumn({
                   <PIcon name="X" size={20} />
                 </span>
               </span>
-            </button>
-          )}
-          {showLayoutControl && onLayout && !sheet ? (
-            <AdminLayoutControl mode={layoutMode} onChange={onLayout} />
-          ) : null}
-          {takeover && onLayout ? (
-            <button
-              type="button"
-              aria-label="Show conversation"
-              title="Show conversation"
-              onClick={() => onLayout("expanded")}
-              className="press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-[#f1f1f1] px-2.5 text-[12px] font-medium text-[#303030] hover:bg-[#e3e3e3] active:bg-[#dcdcdc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005bd3]"
-            >
-              <PIcon name="Chat" size={16} />
-              Conversation
             </button>
           ) : null}
           {sheet ? (
@@ -362,7 +355,7 @@ export function PreviewColumn({
           }}
           className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none]"
         >
-          {state.menuStyle === "push" ? (
+          {state.menuStyle === "push" && !takeover ? (
             <div
               className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
                 menu ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
@@ -377,9 +370,9 @@ export function PreviewColumn({
           ) : null}
           <div
             key={underlayPage}
-            className={`${state.motion && quietFor !== underlayPage ? "page-in" : ""} ${menu && state.menuStyle === "push" ? "opacity-40 transition-opacity duration-300" : "opacity-100 transition-opacity duration-300"}`}
+            className={`${state.motion && quietFor !== underlayPage ? "page-in" : ""} ${menu && !takeover && state.menuStyle === "push" ? "opacity-40 transition-opacity duration-300" : "opacity-100 transition-opacity duration-300"}`}
             onPointerDownCapture={(event) => {
-              if (!menu || state.menuStyle !== "push") return;
+              if (!menu || takeover || state.menuStyle !== "push") return;
               swallow.current = true;
               event.preventDefault();
               event.stopPropagation();
@@ -413,7 +406,7 @@ export function PreviewColumn({
             />
           </div>
         </div>
-        {state.menuStyle === "drop" && menu ? (
+        {state.menuStyle === "drop" && menu && !takeover ? (
           <>
             <button type="button" aria-label="Close admin menu" onClick={() => setMenu(false)} className="absolute inset-0 z-20" />
             <div
@@ -460,9 +453,46 @@ export function PreviewColumn({
             </div>
           </div>
         ) : null}
+        {showLayoutControl && onLayout && !sheet && !takeover ? (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-28 bg-gradient-to-t from-white via-white/85 to-transparent"
+          />
+        ) : null}
+        {showLayoutControl && onLayout && !sheet ? <AdminLayoutControl mode={layoutMode} onChange={onLayout} /> : null}
       </HeaderSlotProvider>
       </WorkspaceViewProvider>
       </div>
+  );
+
+  const panel = takeover ? (
+    <div
+      className={`p-partial-theme-admin-next-dark flex h-full w-full overflow-hidden rounded-[20px] bg-[#0c0d0c] ${
+        !present ? "pointer-events-none translate-x-full opacity-0" : ""
+      } ${present && curtain ? "panel-reveal" : ""}`}
+      data-admin-layout="takeover"
+      inert={!present ? true : undefined}
+      aria-hidden={!present ? true : undefined}
+    >
+      <AdminRail
+        expanded={adminNavOpen}
+        preview={state.preview}
+        onOpen={onRail}
+        onGo={(page) => onPreview(page)}
+        onSearch={onSearch}
+        onToggle={() => setAdminNavOpen((open) => !open)}
+        lead={
+          <SidekickLead
+            agent={sidekick}
+            expanded={adminNavOpen}
+            onView={() => onLayout?.("sidebar")}
+          />
+        }
+      />
+      {content}
+    </div>
+  ) : (
+    content
   );
 
   if (sheet) {
