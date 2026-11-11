@@ -30,6 +30,7 @@ import {
   type Connection,
   type Conversation,
   type OrbId,
+  type PreviewId,
   type PrototypeState,
   type Segment,
   type Source,
@@ -57,6 +58,8 @@ export function ChatColumn({
   onAddCatalog,
   onCreate,
   onEditAgent,
+  onTogglePin,
+  onToggleHide,
   onConversations,
   onNewChat,
   onOpenConversation,
@@ -87,7 +90,20 @@ export function ChatColumn({
   onStart: () => void;
   onAddCatalog: (id: string) => void;
   onCreate: (name: string, purpose: string) => void;
-  onEditAgent: (patch: { id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string }) => void;
+  onEditAgent: (patch: {
+    id: string;
+    name: string;
+    purpose: string;
+    orb: OrbId;
+    connections: Connection[];
+    orbFrom?: string;
+    orbTo?: string;
+    attachOn: boolean;
+    attachPage: PreviewId;
+    attachWide: boolean;
+  }) => void;
+  onTogglePin: (id: string) => void;
+  onToggleHide: (id: string) => void;
   onConversations: (open: boolean) => void;
   onNewChat: () => void;
   onOpenConversation: (id: string) => void;
@@ -213,7 +229,7 @@ export function ChatColumn({
             ) : null}
             {listing ? (
               <ChatsMenu
-                agentName={agent.name}
+                agent={agent}
                 current={thread.some((block) => block.type === "text" && block.role === "user") ? agent.topic || "Current conversation" : null}
                 list={state.conversations[agent.id] ?? []}
                 onClose={() => onConversations(false)}
@@ -222,6 +238,8 @@ export function ChatColumn({
                   onConversations(false);
                   setEditing(true);
                 }}
+                onTogglePin={() => onTogglePin(agent.id)}
+                onToggleHide={() => onToggleHide(agent.id)}
                 onOpen={onOpenConversation}
                 onDelete={onDeleteConversation}
               />
@@ -570,22 +588,36 @@ function dayGroup(at: number, now: number) {
   return "Older";
 }
 
+function MenuSwitch({ on }: { on: boolean }) {
+  return (
+    <span className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${on ? "bg-white" : "bg-white/20"}`}>
+      <span
+        className={`absolute top-0.5 size-3 rounded-full transition-[left,background-color] duration-150 ${on ? "left-[14px] bg-[#1a1a1a]" : "left-0.5 bg-white"}`}
+      />
+    </span>
+  );
+}
+
 function ChatsMenu({
-  agentName,
+  agent,
   current,
   list,
   onClose,
   onNewChat,
   onEdit,
+  onTogglePin,
+  onToggleHide,
   onOpen,
   onDelete,
 }: {
-  agentName: string;
+  agent: Agent;
   current: string | null;
   list: Conversation[];
   onClose: () => void;
   onNewChat: () => void;
   onEdit: () => void;
+  onTogglePin: () => void;
+  onToggleHide: () => void;
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
@@ -595,6 +627,7 @@ function ChatsMenu({
     name,
     rows: rows.filter((row) => dayGroup(row.at, now) === name),
   }));
+  const row = "press press-row flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] font-medium hover:bg-white/[0.07]";
   return (
     <Popover id="chats-menu" onDismiss={onClose} className="left-0 top-[calc(100%+6px)] w-[340px] origin-top-left p-1.5">
       <button
@@ -603,18 +636,24 @@ function ChatsMenu({
           onClose();
           onNewChat();
         }}
-        className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] font-medium hover:bg-white/[0.07]"
+        className={row}
       >
         <PIcon name="Compose" size={18} />
         Start new chat
       </button>
-      <button
-        type="button"
-        onClick={onEdit}
-        className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] font-medium hover:bg-white/[0.07]"
-      >
+      <button type="button" onClick={onEdit} className={row}>
         <PIcon name="Edit" size={18} />
-        Edit {agentName}
+        Edit {agent.name}
+      </button>
+      <button type="button" role="switch" aria-checked={agent.pinned} onClick={onTogglePin} className={row}>
+        <PIcon name="Star" size={18} />
+        <span className="flex-1">Pin</span>
+        <MenuSwitch on={agent.pinned} />
+      </button>
+      <button type="button" role="switch" aria-checked={agent.hidden} onClick={onToggleHide} className={row}>
+        <PIcon name="CircleDashed" size={18} />
+        <span className="flex-1">{agent.hidden ? "Hidden" : "Hide"}</span>
+        <MenuSwitch on={agent.hidden} />
       </button>
       <div className="my-1 h-px bg-white/10" />
       <div className="scroll-thin max-h-[380px] overflow-y-auto">
@@ -1154,7 +1193,7 @@ function SidekickSwitcher({
   onPick: (id: string) => void;
   onAdd?: () => void;
 }) {
-  const agents = state.agents.filter((item) => item.installed && isNavSidekick(item.id));
+  const agents = state.agents.filter((item) => item.installed && isNavSidekick(item.id, item));
   return (
     <Popover id="sidekick-switcher" onDismiss={onDismiss} className="bottom-[calc(100%+8px)] left-0 w-64 origin-bottom-left p-1.5">
       <p className="px-2 pb-1 pt-1.5 text-[12px] text-[#8e8f8b]">Switch sidekick</p>
@@ -1211,7 +1250,7 @@ function PlusMenu({
 }) {
   const [sub, setSub] = useState<"mention" | "skills" | "apps" | null>(null);
   const [generate, setGenerate] = useState(true);
-  const agents = state.agents.filter((item) => item.installed && isNavSidekick(item.id));
+  const agents = state.agents.filter((item) => item.installed && isNavSidekick(item.id, item));
   const row = `flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left ${light ? "text-[12px] text-[#303030] hover:bg-[#f1f1f1]" : "text-[13px] text-white hover:bg-white/[0.07]"}`;
   const divider = `my-1 h-px ${light ? "bg-[#ebebeb]" : "bg-white/10"}`;
 
@@ -1545,6 +1584,20 @@ function orbChoices(agent: Agent): { id: OrbId; label: string }[] {
   return choices;
 }
 
+const attachPageChoices: { page: PreviewId; label: string; wide?: boolean }[] = [
+  { page: "home-active", label: "Home" },
+  { page: "orders", label: "Orders", wide: true },
+  { page: "products", label: "Products", wide: true },
+  { page: "customers", label: "Customers", wide: true },
+  { page: "campaigns", label: "Campaigns" },
+  { page: "analytics", label: "Analytics", wide: true },
+  { page: "finance", label: "Finances", wide: true },
+  { page: "online-store", label: "Online Store" },
+  { page: "shop", label: "Shop" },
+  { page: "pos", label: "Point of Sale" },
+  { page: "agentic", label: "Agentic" },
+];
+
 function EditSidekick({
   agent,
   onClose,
@@ -1552,7 +1605,17 @@ function EditSidekick({
 }: {
   agent: Agent;
   onClose: () => void;
-  onSave: (patch: { name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string }) => void;
+  onSave: (patch: {
+    name: string;
+    purpose: string;
+    orb: OrbId;
+    connections: Connection[];
+    orbFrom?: string;
+    orbTo?: string;
+    attachOn: boolean;
+    attachPage: PreviewId;
+    attachWide: boolean;
+  }) => void;
 }) {
   const [name, setName] = useState(agent.name);
   const [purpose, setPurpose] = useState(agent.purpose);
@@ -1561,9 +1624,12 @@ function EditSidekick({
   const starting = isVoiceOrb(initialOrb) ? voiceOrbTint[initialOrb] : voiceOrbTint.plasma;
   const [colorFrom, setColorFrom] = useState(agent.orbFrom ?? starting.from);
   const [colorTo, setColorTo] = useState(agent.orbTo ?? starting.to);
+  const [attachOn, setAttachOn] = useState(agent.attachOn);
+  const [attachPage, setAttachPage] = useState<PreviewId>(agent.attachPage);
   const voice = isVoiceOrb(orb);
   const combos = voice ? colorCombosFor(orb) : [];
   const field = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white outline-none placeholder:text-[#8e8f8b] focus:border-white/30";
+  const attachWide = attachPageChoices.find((item) => item.page === attachPage)?.wide ?? agent.attachWide;
   return createPortal(
     <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" role="presentation" onMouseDown={onClose}>
       <form
@@ -1573,7 +1639,16 @@ function EditSidekick({
         onMouseDown={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
-          onSave({ name, purpose, orb, connections: agent.connections, ...(voice ? { orbFrom: colorFrom, orbTo: colorTo } : {}) });
+          onSave({
+            name,
+            purpose,
+            orb,
+            connections: agent.connections,
+            attachOn,
+            attachPage,
+            attachWide,
+            ...(voice ? { orbFrom: colorFrom, orbTo: colorTo } : {}),
+          });
         }}
       >
         <div className="flex items-center justify-between gap-3">
@@ -1646,6 +1721,38 @@ function EditSidekick({
           Purpose
           <textarea value={purpose} rows={3} onChange={(event) => setPurpose(event.target.value)} className={`${field} resize-none leading-5`} />
         </label>
+        <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={attachOn}
+            onClick={() => setAttachOn((on) => !on)}
+            className="press flex w-full items-center gap-2.5 text-left text-[13px] text-white"
+          >
+            <PIcon name="Target" size={18} />
+            <span className="flex-1">
+              <span className="block">Attach to admin</span>
+              <span className="block text-[12px] font-normal text-[#8e8f8b]">Open this page whenever you select {agent.name}</span>
+            </span>
+            <MenuSwitch on={attachOn} />
+          </button>
+          {attachOn ? (
+            <label className="flex flex-col gap-1.5 text-[12px] text-[#8e8f8b]">
+              Admin page
+              <select
+                value={attachPage}
+                onChange={(event) => setAttachPage(event.target.value as PreviewId)}
+                className={`${field} appearance-none`}
+              >
+                {attachPageChoices.map((item) => (
+                  <option key={item.page} value={item.page}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="press rounded-full px-3 py-1.5 text-[13px] text-[#c4c4c4] hover:bg-white/10 hover:text-white">
             Cancel

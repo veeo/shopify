@@ -579,6 +579,8 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
           onAddCatalog={(id) => dispatch({ type: "add-catalog", id })}
           onCreate={(name, purpose) => dispatch({ type: "create-agent", name, purpose })}
           onEditAgent={(patch) => dispatch({ type: "edit-agent", ...patch })}
+          onTogglePin={(id) => dispatch({ type: "toggle-pin", id })}
+          onToggleHide={(id) => dispatch({ type: "toggle-hide", id })}
           onConversations={(open) => dispatch({ type: "conversations", open })}
           onNewChat={() => dispatch({ type: "new-chat" })}
           onOpenConversation={(id) => dispatch({ type: "open-conversation", id })}

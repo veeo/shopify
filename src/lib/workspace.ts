@@ -22,9 +22,6 @@ export function emptyView(): ViewState {
   return { query: "", tab: "All", sort: "newest", recordId: "", draft: {}, scroll: 0 };
 }
 
-/** Opening one of these sidekicks shows its admin page in the wide panel. */
-const expandedTools = new Set(["customers", "orders", "finance", "analytics"]);
-
 function place(page: PreviewId, wide: boolean, extra?: Partial<ViewState>): Workspace {
   return { ...emptyView(), page, wide, ...extra };
 }
@@ -100,17 +97,22 @@ export function captureWorkspace(state: Capturable, scroll = state.view.scroll):
 
 type EditableProduct = { id: string; title: string; description: string; price: string; status: "Draft" | "Active" };
 
+type Attachable = { attachOn?: boolean; attachPage?: PreviewId; attachWide?: boolean };
+
 /** Copies a sidekick's saved place onto the live admin. First visits use `homeFor`. */
 export function applyWorkspace<P extends EditableProduct>(
   state: Omit<Capturable, "products"> & { products: P[]; workspaces: Record<string, Workspace> },
   agentId: string,
   scenario: WorkspaceScenario,
+  attach?: Attachable | null,
 ) {
   const saved = state.workspaces[agentId];
   let workspace = saved ? { ...saved, draft: { ...saved.draft } } : homeFor(agentId, scenario);
-  const home = sidekickHomes[agentId];
-  if (home && expandedTools.has(agentId)) {
-    workspace = workspace.page === home.page ? { ...workspace, wide: true } : { ...home, draft: { ...home.draft } };
+  if (attach?.attachOn && attach.attachPage) {
+    workspace =
+      workspace.page === attach.attachPage
+        ? { ...workspace, wide: attach.attachWide ?? workspace.wide }
+        : { ...emptyView(), page: attach.attachPage, wide: attach.attachWide ?? false, draft: {} };
   }
   state.workspaces = { ...state.workspaces, [agentId]: workspace };
   const productMissing = workspace.page === "product" && !state.products.some((item) => item.id === workspace.recordId);

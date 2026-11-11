@@ -1,6 +1,6 @@
 import { channelNav, findNav, mainNav, navFor, pageMeta, previewPages, settingsNav, type PreviewId } from "@/lib/admin-nav";
 import type { ChoiceCard, ChoiceMode } from "@/lib/choices";
-import { applyWorkspace, captureWorkspace, emptyView, homeFor, readLiveScroll, sameDesk, type SavedWork, type ViewState, type Workspace } from "@/lib/workspace";
+import { applyWorkspace, captureWorkspace, emptyView, homeFor, readLiveScroll, sameDesk, sidekickHomes, type SavedWork, type ViewState, type Workspace } from "@/lib/workspace";
 
 export { previewPages, type PreviewId };
 
@@ -100,8 +100,17 @@ export function isListedSidekick(id: string) {
 }
 
 /** In the main nav, the switcher, and mentions. Hidden ones stay in the Hidden tray. */
-export function isNavSidekick(id: string) {
-  return isListedSidekick(id) && !hiddenSidekicks.has(id);
+export function isNavSidekick(id: string, agent?: Pick<Agent, "hidden">) {
+  if (!isListedSidekick(id)) return false;
+  if (agent) return !agent.hidden;
+  return !hiddenSidekicks.has(id);
+}
+
+/** Rail section for an installed sidekick after pin/hide. */
+export function railGroup(agent: Agent): AgentGroup {
+  if (agent.hidden) return "hidden";
+  if (agent.pinned) return "favorites";
+  return agent.baseGroup === "favorites" || agent.baseGroup === "hidden" ? "teams" : agent.baseGroup;
 }
 
 function isDefaultSidekick(id: string) {
@@ -174,6 +183,16 @@ export type Agent = {
   id: string;
   name: string;
   group: AgentGroup;
+  /** Natural group when unpinned (Team / Channels / Tools). */
+  baseGroup: AgentGroup;
+  /** Top untitled rail section — Product ideas, Trends, Campaigns, etc. */
+  pinned: boolean;
+  /** Lives under Hidden instead of the main rail / switcher. */
+  hidden: boolean;
+  /** When on, selecting this sidekick always opens `attachPage` in admin. */
+  attachOn: boolean;
+  attachPage: PreviewId;
+  attachWide: boolean;
   preview: string;
   topic: string;
   placeholder: string;
@@ -687,22 +706,39 @@ function connectionsFor(id: string): Connection[] {
   return connectionChoices.map((item) => ({ ...item, on: on.has(item.id) }));
 }
 
+const attachDefaults = new Set(["customers", "orders", "finance", "analytics", "store", "shop", "pos", "agentic"]);
+const attachWideDefaults = new Set(["customers", "orders", "finance", "analytics"]);
+
 function agent(
-  partial: Omit<Agent, "persona" | "installed" | "unread" | "purpose" | "connections"> & {
+  partial: Omit<Agent, "persona" | "installed" | "unread" | "purpose" | "connections" | "baseGroup" | "pinned" | "hidden" | "attachOn" | "attachPage" | "attachWide"> & {
     unread?: number;
     installed?: boolean;
     purpose?: string;
     connections?: Connection[];
+    baseGroup?: AgentGroup;
+    pinned?: boolean;
+    hidden?: boolean;
+    attachOn?: boolean;
+    attachPage?: PreviewId;
+    attachWide?: boolean;
   },
 ): Agent {
   const { purpose, connections, ...rest } = partial;
+  const baseGroup = partial.baseGroup ?? (partial.group === "hidden" ? "teams" : partial.group);
+  const home = sidekickHomes[partial.id] ?? sidekickHomes.custom;
   return {
+    ...rest,
     unread: partial.unread ?? 0,
     installed: partial.installed ?? false,
     persona: `${persona[partial.orb === "custom" ? "custom" : (partial.id as keyof typeof persona)] ?? persona.custom} ${storeFacts}`,
     purpose: purpose ?? purposeFor[partial.id] ?? partial.preview,
     connections: connections ?? connectionsFor(partial.id),
-    ...rest,
+    baseGroup,
+    pinned: partial.pinned ?? partial.group === "favorites",
+    hidden: partial.hidden ?? hiddenSidekicks.has(partial.id),
+    attachOn: partial.attachOn ?? attachDefaults.has(partial.id),
+    attachPage: partial.attachPage ?? home.page,
+    attachWide: partial.attachWide ?? attachWideDefaults.has(partial.id),
     orb: canonicalOrb(partial.orb),
     orbFrom: partial.orbFrom ?? defaultOrbTint(partial.id, partial.orb)?.from,
     orbTo: partial.orbTo ?? defaultOrbTint(partial.id, partial.orb)?.to,
@@ -1342,7 +1378,18 @@ export function activeState(storeName = "My Store"): PrototypeState {
 
 export function visibleAgents(state: PrototypeState) {
   const query = state.search.trim().toLowerCase();
-  return state.agents.filter((item) => item.installed && isNavSidekick(item.id) && (!query || item.name.toLowerCase().includes(query)));
+  return state.agents.filter(
+    (item) => item.installed && isNavSidekick(item.id, item) && (!query || item.name.toLowerCase().includes(query)),
+  );
+}
+
+export function hiddenAgents(state: PrototypeState) {
+  const query = state.search.trim().toLowerCase();
+  const fromState = state.agents.filter((item) => item.hidden && isListedSidekick(item.id));
+  const missing = catalog
+    .filter((item) => item.hidden && !state.agents.some((agent) => agent.id === item.id))
+    .map((item) => item);
+  return [...fromState, ...missing].filter((item) => !query || item.name.toLowerCase().includes(query));
 }
 
 function ensureInstalled(state: PrototypeState, sourceId: string) {
@@ -2070,7 +2117,9 @@ export type Action =
   | { type: "toggle-purpose"; id: string }
   | { type: "add-catalog"; id: string }
   | { type: "create-agent"; name: string; purpose: string }
-  | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string }
+  | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string; attachOn: boolean; attachPage: PreviewId; attachWide: boolean }
+  | { type: "toggle-pin"; id: string }
+  | { type: "toggle-hide"; id: string }
   | { type: "intro-seen" }
   | { type: "preview"; page: PreviewId; wide?: boolean }
   | { type: "view"; patch: Partial<Omit<ViewState, "draft">> & { draft?: Record<string, string> } }
@@ -2133,9 +2182,9 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
     case "select": {
       const installed = next.agents.some((item) => item.id === action.id && item.installed);
       if (!installed) {
-        if (!hiddenSidekicks.has(action.id)) return state;
         const source = catalog.find((item) => item.id === action.id);
-        if (!source) return state;
+        if (!source || !isListedSidekick(action.id)) return state;
+        if (!source.hidden && !hiddenSidekicks.has(action.id)) return state;
         const revealed = { ...source, installed: true, unread: 0 };
         next.agents = next.agents.some((item) => item.id === action.id)
           ? next.agents.map((item) => (item.id === action.id ? revealed : item))
@@ -2394,7 +2443,55 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
         persona: `You are ${name}, a Shopify sidekick. Purpose: ${purpose}.`,
         orbFrom: action.orbFrom,
         orbTo: action.orbTo,
+        attachOn: action.attachOn,
+        attachPage: action.attachPage,
+        attachWide: action.attachWide,
       });
+      if (action.attachOn && next.selectedAgentId === action.id) {
+        const prior = next.workspaces[action.id];
+        next.workspaces = {
+          ...next.workspaces,
+          [action.id]: {
+            ...(prior ?? { ...emptyView(), page: action.attachPage, wide: action.attachWide }),
+            page: action.attachPage,
+            wide: action.attachWide,
+            draft: { ...(prior?.draft ?? {}) },
+          },
+        };
+        openPage(next, action.attachPage, action.attachWide);
+      }
+      return next;
+    }
+    case "toggle-pin": {
+      const current = next.agents.find((item) => item.id === action.id);
+      if (!current || !isListedSidekick(action.id)) return state;
+      const pinned = !current.pinned;
+      patchAgent(next, action.id, {
+        pinned,
+        hidden: pinned ? false : current.hidden,
+        group: pinned ? "favorites" : current.baseGroup === "favorites" ? "teams" : current.baseGroup,
+      });
+      return next;
+    }
+    case "toggle-hide": {
+      const current = next.agents.find((item) => item.id === action.id);
+      if (!current && hiddenSidekicks.has(action.id)) {
+        const source = catalog.find((item) => item.id === action.id);
+        if (!source) return state;
+        const revealed = { ...source, installed: true, hidden: false, pinned: false, unread: 0 };
+        next.agents = [...next.agents, revealed];
+        if (!next.threads[action.id]?.length) next.threads[action.id] = activeThread(action.id);
+        return next;
+      }
+      if (!current || !isListedSidekick(action.id)) return state;
+      const hidden = !current.hidden;
+      patchAgent(next, action.id, {
+        hidden,
+        pinned: hidden ? false : current.pinned,
+        group: hidden ? "hidden" : current.pinned ? "favorites" : current.baseGroup === "favorites" ? "teams" : current.baseGroup,
+        installed: true,
+      });
+      if (!next.threads[action.id]?.length) next.threads[action.id] = activeThread(action.id);
       return next;
     }
     case "preview":
@@ -2587,7 +2684,8 @@ function settleWorkspace(prev: PrototypeState, next: PrototypeState, action: Act
     next.workspaces = { ...next.workspaces, [prev.selectedAgentId]: captureWorkspace(prev, live ?? prev.view.scroll) };
   }
   if (restoringActions.has(action.type)) {
-    applyWorkspace(next, next.selectedAgentId, next.scenario);
+    const selected = next.agents.find((item) => item.id === next.selectedAgentId);
+    applyWorkspace(next, next.selectedAgentId, next.scenario, selected);
     return next;
   }
   if (action.type !== "view" && next.preview !== prev.preview && !sameDesk(prev.preview, next.preview)) {
@@ -2638,7 +2736,8 @@ export function restoreWork(state: PrototypeState, saved: SavedWork): PrototypeS
     seq: Math.max(state.seq, saved.seq || 0),
     view: emptyView(),
   };
-  applyWorkspace(next, selected, next.scenario);
+  const agent = next.agents.find((item) => item.id === selected);
+  applyWorkspace(next, selected, next.scenario, agent);
   return next;
 }
 
