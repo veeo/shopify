@@ -847,7 +847,7 @@ function Sidekick() {
         <div className="flex flex-col gap-2">
           <p className="text-[13px] font-medium text-[#c6c6c6]">Chat</p>
           <div className="flex justify-end">
-            <p className="max-w-[360px] rounded-[20px] bg-[#2a2a2a] px-4 py-2.5 text-[15px] leading-[1.4]">What should I do first?</p>
+            <p className="max-w-[360px] rounded-[20px] bg-[#2a2a2a] px-4 py-2.5 text-[15px] leading-[1.4]">Show top priorities</p>
           </div>
           <p className="max-w-[520px] text-[15px] leading-[1.45] text-white">
             End the sitewide 20% on the power bank, and reorder the headphones before Monday’s ads. Two orders are paid and still unfulfilled.
@@ -860,7 +860,7 @@ function Sidekick() {
         <div className="flex flex-col gap-2">
           <p className="text-[13px] font-medium text-[#c6c6c6]">Suggestions</p>
           <div className="flex max-w-sm flex-col">
-            {["Show the best sellers", "What should I do first?"].map((text) => (
+            {["Show bestsellers", "Show top priorities"].map((text) => (
               <span key={text} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] text-[#c4c4c4]">
                 <PIcon name="ArrowRight" size={16} />
                 {text}
@@ -868,8 +868,8 @@ function Sidekick() {
             ))}
           </div>
           <div className="flex flex-wrap gap-2 pt-1">
-            <ChipButton label="Show the best sellers" tone="primary" onClick={() => undefined} />
-            <ChipButton label="What should I do first?" tone="secondary" onClick={() => undefined} />
+            <ChipButton label="Show bestsellers" tone="primary" onClick={() => undefined} />
+            <ChipButton label="Show top priorities" tone="secondary" onClick={() => undefined} />
           </div>
         </div>
         <div className="flex flex-col gap-2">
