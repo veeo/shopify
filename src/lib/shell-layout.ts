@@ -29,13 +29,6 @@ export const SHELL = {
   adminWide: 584,
   /** Thin conversation handle while admin is in takeover. */
   chatTakeoverStrip: 56,
-  /**
-   * Conversation pane must keep at least this much width with an expanded admin
-   * docked beside it — otherwise the panels touch/crowd and we floor to sidebar.
-   */
-  chatMinBesideExpanded: 360,
-  /** Outer padding + inter-pane gutters around the three columns. */
-  chromeX: 16,
 } as const;
 
 /** Desktop docked admin width modes. Mobile/compact sheets ignore these. */
@@ -103,11 +96,6 @@ export type ShellLayout = {
   allowAdminWide: boolean;
   /** Allow the full-takeover admin layout (docked desktops only). */
   allowAdminTakeover: boolean;
-  /**
-   * Auto floor for docked admin when the merchant has not pinned a tighter size:
-   * roomy viewports prefer expanded; tight ones stay sidebar so chat is not crowded.
-   */
-  preferredAdminLayout: "sidebar" | "expanded";
   /** Admin panel width when docked in sidebar mode. */
   adminWidth: number;
   /** Chat should show a compact chrome (logo + admin affordance). */
@@ -124,50 +112,9 @@ export type ShellSignals = {
   coarsePointer?: boolean;
 };
 
-/**
- * Whether an expanded (584) admin can sit beside the agents rail without crowding
- * the conversation. Uses the expanded rail width — the comfortable docked case.
- */
-export function fitsExpandedAdmin(width: number, navWidth: number = SHELL.navExpanded): boolean {
-  return width >= navWidth + SHELL.adminWide + SHELL.chatMinBesideExpanded + SHELL.chromeX;
-}
-
-/** Auto floor for docked admin: roomy → expanded, tight → sidebar. */
-export function preferredDockedAdminLayout(width: number, navWidth: number = SHELL.navExpanded): "sidebar" | "expanded" {
-  return fitsExpandedAdmin(width, navWidth) ? "expanded" : "sidebar";
-}
-
-/**
- * Resolve a docked admin mode against the viewport floor.
- *
- * - Tight viewports always floor expanded down to sidebar (chat must not be crowded).
- * - Takeover survives only while the shell allows it.
- * - Roomy viewports promote to expanded unless the merchant explicitly pinned sidebar.
- * - Programmatic expands (Orders, Settings, etc.) are left alone on roomy screens
- *   even if the merchant previously pinned sidebar for the empty desk.
- */
-export function resolveAdminLayoutForViewport(
-  current: AdminLayoutMode,
-  preferred: "sidebar" | "expanded",
-  allowTakeover: boolean,
-  choice: "auto" | AdminLayoutMode = "auto",
-): AdminLayoutMode {
-  if (current === "takeover") {
-    return allowTakeover ? "takeover" : preferred;
-  }
-  if (preferred === "sidebar") return "sidebar";
-  if (current === "expanded") return "expanded";
-  if (choice === "sidebar") return "sidebar";
-  return "expanded";
-}
-
 /** Resolve the shell layout from viewport signals. Pure — safe for tests and SSR defaults. */
 export function resolveShellLayout({ width, spanning = false, coarsePointer = false }: ShellSignals): ShellLayout {
   if (spanning && width >= SHELL.compactMax) {
-    const preferNavCollapsed = true;
-    const navWidth = SHELL.navCollapsed;
-    const preferredAdminLayout = preferredDockedAdminLayout(width, navWidth);
-    const allowAdminWide = preferredAdminLayout === "expanded";
     return {
       mode: "fold-open",
       width,
@@ -175,10 +122,9 @@ export function resolveShellLayout({ width, spanning = false, coarsePointer = fa
       // Collapsed rail keeps every sidekick one tap away beside the chat pane.
       agents: "rail",
       admin: "docked",
-      preferNavCollapsed,
-      allowAdminWide,
+      preferNavCollapsed: true,
+      allowAdminWide: true,
       allowAdminTakeover: true,
-      preferredAdminLayout,
       adminWidth: Math.min(SHELL.adminNarrow, Math.round(width * 0.42)),
       chatChrome: "compact",
       adminSheetEdge: "end",
@@ -195,7 +141,6 @@ export function resolveShellLayout({ width, spanning = false, coarsePointer = fa
       preferNavCollapsed: true,
       allowAdminWide: false,
       allowAdminTakeover: false,
-      preferredAdminLayout: "sidebar",
       adminWidth: SHELL.adminNarrow,
       chatChrome: "mobile",
       adminSheetEdge: "bottom",
@@ -212,16 +157,12 @@ export function resolveShellLayout({ width, spanning = false, coarsePointer = fa
       preferNavCollapsed: true,
       allowAdminWide: false,
       allowAdminTakeover: false,
-      preferredAdminLayout: "sidebar",
       adminWidth: SHELL.adminNarrow,
       // Touch tablets prefer a bottom sheet; mouse-driven windows slide from the end.
       chatChrome: "compact",
       adminSheetEdge: coarsePointer || width < 900 ? "bottom" : "end",
     };
   }
-
-  const preferredAdminLayout = preferredDockedAdminLayout(width, SHELL.navExpanded);
-  const allowAdminWide = preferredAdminLayout === "expanded";
 
   if (width <= SHELL.desktopMax) {
     return {
@@ -231,9 +172,8 @@ export function resolveShellLayout({ width, spanning = false, coarsePointer = fa
       agents: "rail",
       admin: "docked",
       preferNavCollapsed: false,
-      allowAdminWide,
+      allowAdminWide: true,
       allowAdminTakeover: true,
-      preferredAdminLayout,
       adminWidth: SHELL.adminNarrow,
       chatChrome: "desktop",
       adminSheetEdge: "end",
@@ -247,10 +187,9 @@ export function resolveShellLayout({ width, spanning = false, coarsePointer = fa
     agents: "rail",
     admin: "docked",
     preferNavCollapsed: false,
-    allowAdminWide,
+    allowAdminWide: true,
     allowAdminTakeover: true,
-    preferredAdminLayout,
-    adminWidth: allowAdminWide ? SHELL.adminWide : SHELL.adminNarrow,
+    adminWidth: SHELL.adminWide,
     chatChrome: "desktop",
     adminSheetEdge: "end",
   };

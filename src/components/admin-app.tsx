@@ -33,12 +33,7 @@ import { segmentsOf, sourcesOf } from "@/lib/turn";
 import type { Chip, Product } from "@/lib/prototype";
 import { emptyWork, readWorkSnapshot, saveWork, subscribeWork } from "@/lib/workspace";
 import { useShellLayout } from "@/hooks/use-shell-layout";
-import {
-  agentsRailModeFor,
-  resolveAdminLayoutForViewport,
-  SHELL,
-  type AdminLayoutMode,
-} from "@/lib/shell-layout";
+import { agentsRailModeFor, SHELL, type AdminLayoutMode } from "@/lib/shell-layout";
 
 const bootMs = 1500;
 
@@ -56,8 +51,6 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   const [palette, setPalette] = useState<{ open: boolean; scope?: string }>({ open: false });
   const [design, setDesign] = useState(false);
   const layout = useShellLayout();
-  /** Merchant layout pick — `auto` follows the roomy/tight floor; explicit picks are kept when they fit. */
-  const layoutChoice = useRef<"auto" | AdminLayoutMode>("auto");
   // The turn being streamed. Cleared in the same update that commits its reply, so the live view and
   // the committed message swap in one render instead of leaving a blank frame between them.
   const [live, setLive] = useState<{ agentId: string; from: number } | null>(null);
@@ -65,7 +58,6 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
 
   function enter(update: (current: PrototypeState) => PrototypeState) {
     clearTypedOnce();
-    layoutChoice.current = "auto";
     setState(update);
     if (bootTimer.current) window.clearTimeout(bootTimer.current);
     setBooting(true);
@@ -77,10 +69,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   const [appliedWork, setAppliedWork] = useState(false);
   if (client && !appliedWork) {
     setAppliedWork(true);
-    if (saved) {
-      if (saved.adminLayout) layoutChoice.current = saved.adminLayout;
-      setState((current) => restoreWork(current, saved));
-    }
+    if (saved) setState((current) => restoreWork(current, saved));
   }
   useEffect(() => {
     clearTypedOnce();
@@ -108,17 +97,6 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   const applied = useRef(new Set<string>());
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
   const dispatch = (action: Action) => setState((current) => reducer(current, action));
-  // Keep docked admin on the viewport floor: roomy → expanded, tight → sidebar.
-  useEffect(() => {
-    if (layout.admin === "sheet") return;
-    const next = resolveAdminLayoutForViewport(
-      state.adminLayout,
-      layout.preferredAdminLayout,
-      layout.allowAdminTakeover,
-      layoutChoice.current,
-    );
-    if (next !== state.adminLayout) dispatch({ type: "admin-layout", mode: next });
-  }, [layout.admin, layout.preferredAdminLayout, layout.allowAdminTakeover, state.adminLayout]);
   const opening = sidekickStage(state);
   const [room, setRoom] = useState(false);
   const [seenOpening, setSeenOpening] = useState(opening);
@@ -534,21 +512,8 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
 
   function setAdminLayout(mode: AdminLayoutMode) {
     // Entering full expands the hybrid rail; leaving full restores sidekick focus.
-    layoutChoice.current = mode;
     if (mode === "takeover") setSidebarOpen(true);
-    const next = resolveAdminLayoutForViewport(
-      mode,
-      layout.preferredAdminLayout,
-      layout.allowAdminTakeover,
-      mode,
-    );
-    dispatch({ type: "admin-layout", mode: next });
-  }
-
-  function openSettings() {
-    // Settings always aims for the comfortable expanded dock when the viewport allows it.
-    layoutChoice.current = "expanded";
-    dispatch({ type: "rail", id: "settings" });
+    dispatch({ type: "admin-layout", mode });
   }
 
   function viewSidekicks() {
@@ -577,7 +542,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             navOpen={navOpen}
             railMode={railMode}
             onToggleNav={() => setSidebarOpen((open) => !open)}
-            onSettings={openSettings}
+            onSettings={() => dispatch({ type: "rail", id: "settings" })}
             onLogout={logout}
             onSelect={(id) => dispatch({ type: "select", id })}
             onAdd={() => dispatch({ type: "toggle-add" })}
@@ -588,13 +553,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
             onDesignSystem={() => setDesign(true)}
             onViewSidekicks={viewSidekicks}
-            onAdminOpen={(id) => {
-              if (id === "settings") {
-                openSettings();
-                return;
-              }
-              dispatch({ type: "rail", id });
-            }}
+            onAdminOpen={(id) => dispatch({ type: "rail", id })}
             onAdminGo={(page) => dispatch({ type: "preview", page, layout: "takeover" })}
             onAdminSearch={(scope) => setPalette({ open: true, scope })}
           />
@@ -610,7 +569,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onToggleNav={() => setAgentsDrawerOpen(false)}
             onSettings={() => {
               setAgentsDrawerOpen(false);
-              openSettings();
+              dispatch({ type: "rail", id: "settings" });
             }}
             onLogout={logout}
             onSelect={(id) => dispatch({ type: "select", id })}
