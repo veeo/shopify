@@ -185,27 +185,33 @@ const mixHex = (a: string, b: string, t: number) => {
   return `#${[r, g, bl].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 };
 
-/** Calm idle look — shared by idle and listening so the mic doesn't wake the ring. */
-const IDLE_TUNE = { speed: 0.22, awake: 0.03, glow: 0.95, wobble: 0.04, trail: 0.12, highlight: 0.1 };
+/**
+ * Thick speaking look is the base for every live state. Idle keeps that body;
+ * listening / thinking / speaking only add voice reaction on top.
+ */
+const THICK = { awake: 0.95, glow: 1.32, wobble: 0.35, trail: 0.85, highlight: 1.15 };
 
-/** Voice states → ring energy. Idle stays round and even; talk wakes the bead. */
+/** Voice states → motion rate. Visual thickness comes from THICK; speed is what changes. */
 const TUNE: Record<
   OrbState,
   { speed: number; awake: number; glow: number; wobble: number; trail: number; highlight: number }
 > = {
-  idle: IDLE_TUNE,
-  hover: { speed: 0.32, awake: 0.08, glow: 0.98, wobble: 0.1, trail: 0.35, highlight: 0.3 },
-  selected: { speed: 0.35, awake: 0.1, glow: 1.0, wobble: 0.12, trail: 0.4, highlight: 0.35 },
-  connecting: { speed: 0.85, awake: 0.35, glow: 1.12, wobble: 0.55, trail: 0.95, highlight: 0.85 },
-  listening: IDLE_TUNE,
-  thinking: { speed: 0.95, awake: 0.5, glow: 1.15, wobble: 0.7, trail: 1.0, highlight: 0.9 },
-  speaking: { speed: 1.4, awake: 0.95, glow: 1.32, wobble: 1.05, trail: 1.3, highlight: 1.2 },
+  idle: { ...THICK, speed: 0.35 },
+  hover: { ...THICK, speed: 0.42 },
+  selected: { ...THICK, speed: 0.45 },
+  connecting: { ...THICK, speed: 0.9 },
+  listening: { ...THICK, speed: 1.05 },
+  thinking: { ...THICK, speed: 0.9 },
+  speaking: { ...THICK, speed: 1.4 },
   error: { speed: 1.15, awake: 0.55, glow: 1.18, wobble: 1.1, trail: 0.7, highlight: 0.95 },
-  disabled: { speed: 0, awake: 0, glow: 0.8, wobble: 0.08, trail: 0.2, highlight: 0.15 },
+  disabled: { speed: 0, awake: 0.15, glow: 0.9, wobble: 0.08, trail: 0.25, highlight: 0.2 },
 };
 
-/** UV zoom: higher = smaller ring with more margin so glow isn't clipped by the canvas. */
+/** UV zoom: a touch smaller than a filled orb so the thick glow isn't clipped. */
 const ORBIT_SCALE = 0.98;
+
+const reactsToVoice = (state: OrbState) =>
+  state === 'listening' || state === 'thinking' || state === 'speaking' || state === 'connecting';
 
 type Program = { program: WebGLProgram; uniforms: Record<string, WebGLUniformLocation | null> };
 
@@ -351,10 +357,10 @@ export function OrbitOrb({
       const tune = TUNE[live.state];
       const raw = live.levelRef?.current;
       const hasLive = typeof raw === 'number' && raw >= 0;
-      // Listening matches idle: don't invent a fake mic level that wakes the ring.
-      const voiced = live.state === 'speaking';
-      const level = live.reduced ? 0 : hasLive && live.state !== 'listening' ? raw : voiced ? 0.35 : 0;
-      const awake = tune.awake * (0.55 + level * 0.9);
+      const reacting = reactsToVoice(live.state);
+      // Thick base always; voice states layer level on top. Idle stays at full thickness.
+      const level = live.reduced ? 0 : reacting ? (hasLive ? raw : 0.35) : 0;
+      const awake = tune.awake * (reacting ? 0.85 + level * 0.45 : 1);
 
       gl.useProgram(program.program);
       gl.bindVertexArray(vao);
@@ -368,11 +374,11 @@ export function OrbitOrb({
       gl.uniform3fv(u.uColor1, c1);
       gl.uniform3fv(u.uColor2, c2);
       gl.uniform3fv(u.uColor3, c3);
-      // Slightly smaller than a filled orb so the glow stays inside the canvas.
+      // Slightly smaller than a filled orb so the thick glow stays inside the canvas.
       gl.uniform1f(u.uScale, ORBIT_SCALE / (1 + motion.pulse * 0.85));
-      gl.uniform1f(u.uWobble, tune.wobble);
+      gl.uniform1f(u.uWobble, tune.wobble * (1 + level * 0.35));
       gl.uniform1f(u.uGlow, tune.glow);
-      gl.uniform1f(u.uBleed, 0.85);
+      gl.uniform1f(u.uBleed, 1);
       gl.uniform1f(u.uHighlight, motion.highlight);
       gl.uniform2f(u.uEcho, motion.echo * 0.55, motion.echo < 1 ? (1 - motion.echo) * (1 - motion.echo) : 0);
       gl.uniform1f(u.uSwirl, motion.swirl);
@@ -391,22 +397,26 @@ export function OrbitOrb({
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       const tune = TUNE[live.state];
-      const rate = live.reduced || !active ? 0 : Math.max(live.speed, 0) * tune.speed;
+      const raw = live.levelRef?.current;
+      const hasLive = typeof raw === 'number' && raw >= 0;
+      const reacting = reactsToVoice(live.state);
+      const level = live.reduced ? 0 : reacting ? (hasLive ? raw : 0.35) : 0;
+      const rate =
+        live.reduced || !active ? 0 : Math.max(live.speed, 0) * tune.speed * (1 + level * 0.75);
       const step = dt * rate;
       motion.time += step;
-      // Idle / listening swirl stays slow so the color split doesn't freeze mid-asymmetry.
-      const calm =
-        live.state === 'idle' || live.state === 'listening' || live.state === 'hover' || live.state === 'selected';
-      motion.swirl += step * (calm ? 0.65 : 2) * (1 + motion.kick);
+      // Idle keeps a steady swirl; voice states push harder with level.
+      motion.swirl += step * (reacting ? 1.2 + level : 0.65) * (1 + motion.kick);
       motion.orbit -= step;
       motion.orbit = Math.atan2(Math.sin(motion.orbit), Math.cos(motion.orbit));
       motion.echo = Math.min(1, motion.echo + dt / 1.2);
       motion.kick *= Math.exp(-dt * 2.5);
       motion.pulseSpeed += (-170 * motion.pulse - 11 * motion.pulseSpeed) * dt;
       motion.pulse += motion.pulseSpeed * dt;
-      motion.highlight += (tune.highlight - motion.highlight) * (1 - Math.exp(-dt / 0.18));
-      // Soft awake reach without cursor — keeps the ring breathing.
-      const targetHover = live.reduced ? 0 : tune.awake;
+      const highlightTarget = tune.highlight * (1 + level * 0.35);
+      motion.highlight += (highlightTarget - motion.highlight) * (1 - Math.exp(-dt / 0.18));
+      // Soft awake reach without cursor — keeps the thick ring breathing.
+      const targetHover = live.reduced ? 0 : tune.awake * (reacting ? 0.85 + level * 0.45 : 1);
       motion.hover += (targetHover - motion.hover) * (1 - Math.exp(-dt / 0.16));
       motion.near += (targetHover * 0.35 - motion.near) * (1 - Math.exp(-dt / 0.12));
       motion.reachX *= Math.exp(-dt * 3);
