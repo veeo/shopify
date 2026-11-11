@@ -196,13 +196,20 @@ export function ChipButton({
   label,
   tone,
   onClick,
+  fill = false,
 }: {
   label: string;
   tone: "secondary" | "primary";
   onClick: () => void;
+  /** Stretch to the parent width — used for stacked Chief priority actions. */
+  fill?: boolean;
 }) {
   return (
-    <s-button variant={tone === "primary" ? "primary" : "secondary"} onClick={onClick}>
+    <s-button
+      variant={tone === "primary" ? "primary" : "secondary"}
+      inlineSize={fill ? "fill" : "auto"}
+      onClick={onClick}
+    >
       {label}
     </s-button>
   );

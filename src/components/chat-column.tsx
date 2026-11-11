@@ -30,8 +30,10 @@ import {
   type Connection,
   type Conversation,
   type OrbId,
+  type PreviewId,
   type PrototypeState,
   type Segment,
+  type SoftLinkTarget,
   type Source,
 } from "@/lib/prototype";
 import type { LiveSegment } from "@/lib/turn";
@@ -278,6 +280,8 @@ export function ChatColumn({
                       onCreate={onCreate}
                       onChoose={onChoose}
                       onBundle={onBundle}
+                      onSwitch={onSwitch}
+                      onOpenPreview={(page) => onChip(`Open ${pageMeta(page).title}`)}
                     />
                   ),
                 )}
@@ -1668,6 +1672,23 @@ function isAnswer(list: Block[], index: number) {
   return false;
 }
 
+function SoftLink({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline p-0 text-inherit underline decoration-dotted decoration-[#8e8f8b] underline-offset-[3px] transition-[text-decoration-color] hover:decoration-white/70"
+    >
+      {children}
+    </button>
+  );
+}
+
+function followSoftLink(target: SoftLinkTarget, onSwitch: (id: string) => void, onOpenPreview: (page: PreviewId) => void) {
+  if (target.kind === "agent") onSwitch(target.id);
+  else onOpenPreview(target.page);
+}
+
 function BlockView({
   block,
   answer,
@@ -1679,6 +1700,8 @@ function BlockView({
   onCreate,
   onChoose,
   onBundle,
+  onSwitch,
+  onOpenPreview,
 }: {
   block: Block;
   answer: boolean;
@@ -1690,6 +1713,8 @@ function BlockView({
   onCreate: (name: string, purpose: string) => void;
   onChoose: (blockId: string, cardId: string) => void;
   onBundle: (blockId: string) => void;
+  onSwitch: (id: string) => void;
+  onOpenPreview: (page: PreviewId) => void;
 }) {
   if (block.type === "text" && block.role === "user") {
     return (
@@ -1726,17 +1751,70 @@ function BlockView({
   }
   if (block.type === "chips") {
     const opening = block.id === "arrive-chips";
+    const stacked = block.stacked;
     return (
-      <div className={opening ? "flex flex-wrap gap-2 py-1" : "rise flex flex-wrap gap-2 py-1"}>
+      <div
+        className={
+          stacked
+            ? "rise flex w-full max-w-[420px] flex-col gap-2 py-1"
+            : opening
+              ? "flex flex-wrap gap-2 py-1"
+              : "rise flex flex-wrap gap-2 py-1"
+        }
+      >
         {block.chips.map((chip, index) => (
-          <span key={chip.label} className={opening ? "choice-in" : undefined} style={opening ? { animationDelay: `${280 + index * 140}ms` } : undefined}>
+          <span
+            key={chip.label}
+            className={`${stacked ? "block w-full" : ""} ${opening ? "choice-in" : ""}`}
+            style={opening ? { animationDelay: `${280 + index * 140}ms` } : undefined}
+          >
             <ChipButton
               label={chip.label}
               tone={chip.tone}
+              fill={stacked}
               onClick={() => (chip.send ? onAsk(chip.label) : onChip(chip.label))}
             />
           </span>
         ))}
+      </div>
+    );
+  }
+  if (block.type === "chief-opening") {
+    return (
+      <div className="rise flex max-w-[560px] flex-col gap-6 py-1">
+        <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">
+          {block.weekLead}
+          <SoftLink onClick={() => followSoftLink(block.weekLink.target, onSwitch, onOpenPreview)}>{block.weekLink.label}</SoftLink>
+          {block.weekTail ?? ""}
+        </p>
+
+        <div className="flex flex-col gap-2">
+          <p className="text-[13px] tracking-[-0.13px] text-[#8e8f8b]">{block.summariesTitle}</p>
+          <div className="flex flex-col gap-1.5">
+            {block.summaries.map((item) => (
+              <p key={item.id} className="text-[15px] leading-[1.45] tracking-[-0.15px] text-[#c6c6c6]">
+                <SoftLink onClick={() => onSwitch(item.id)}>
+                  <span className="text-white">{item.name}</span>
+                </SoftLink>
+                {` — ${item.text}`}
+              </p>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[13px] tracking-[-0.13px] text-[#8e8f8b]">{block.prioritiesTitle}</p>
+            <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">{block.prioritiesIntro}</p>
+          </div>
+          <div className="flex w-full max-w-[420px] flex-col gap-2">
+            {block.priorities.map((item) => (
+              <div key={item.id} className="w-full">
+                <ChipButton label={item.label} tone={item.tone} fill onClick={() => onChip(item.label)} />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
