@@ -1790,16 +1790,15 @@ function BlockView({
 
         <div className="flex flex-col gap-2">
           <p className="text-[13px] tracking-[-0.13px] text-[#8e8f8b]">{block.summariesTitle}</p>
-          <div className="flex flex-col gap-1.5">
-            {block.summaries.map((item) => (
-              <p key={item.id} className="text-[15px] leading-[1.45] tracking-[-0.15px] text-[#c6c6c6]">
-                <SoftLink onClick={() => onSwitch(item.id)}>
-                  <span className="text-white">{item.name}</span>
-                </SoftLink>
+          <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">
+            {block.summaries.map((item, index) => (
+              <span key={item.id}>
+                {index > 0 ? " " : null}
+                <SoftLink onClick={() => onSwitch(item.id)}>{item.name}</SoftLink>
                 {` — ${item.text}`}
-              </p>
+              </span>
             ))}
-          </div>
+          </p>
         </div>
 
         <div className="flex flex-col gap-3">
@@ -1807,11 +1806,9 @@ function BlockView({
             <p className="text-[13px] tracking-[-0.13px] text-[#8e8f8b]">{block.prioritiesTitle}</p>
             <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">{block.prioritiesIntro}</p>
           </div>
-          <div className="flex w-full max-w-[420px] flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
             {block.priorities.map((item) => (
-              <div key={item.id} className="w-full">
-                <ChipButton label={item.label} tone={item.tone} fill onClick={() => onChip(item.label)} />
-              </div>
+              <ChipButton key={item.id} label={item.label} tone={item.tone} onClick={() => onChip(item.label)} />
             ))}
           </div>
         </div>

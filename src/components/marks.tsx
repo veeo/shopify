@@ -201,7 +201,7 @@ export function ChipButton({
   label: string;
   tone: "secondary" | "primary";
   onClick: () => void;
-  /** Stretch to the parent width — used for stacked Chief priority actions. */
+  /** Stretch to the parent width — used for stacked chip rows. */
   fill?: boolean;
 }) {
   return (
