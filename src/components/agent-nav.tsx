@@ -341,24 +341,24 @@ export function AgentNav({
         aria-hidden={parked || undefined}
         className={`flex min-h-0 flex-1 flex-col ${collapsed ? "" : "gap-4"} ${parked ? "pointer-events-none -translate-x-full opacity-0" : ""} ${!parked && curtain ? "nav-reveal" : ""}`}
       >
-        <div
-          className={`relative z-0 flex overflow-hidden bg-transparent transition-[max-height,opacity,padding,margin] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            collapsed ? "flex-col items-center gap-4" : "items-center gap-1.5 pl-2"
-          } ${
-            merging
-              ? "pointer-events-none mb-0 max-h-0 pb-0 opacity-0"
-              : collapsed
-                ? "max-h-40 opacity-100"
-                : "mb-0 max-h-16 pb-4 opacity-100"
-          }`}
-        >
+        <div className={`relative z-0 flex bg-transparent ${collapsed ? "flex-col items-center gap-4" : "items-center gap-1.5 pb-4 pl-2"}`}>
           <span className={`size-8 shrink-0 ${collapsed ? "mb-2" : ""}`} aria-hidden />
-          <span data-flip="add" className={collapsed ? "" : "ml-auto"}>
+          <span
+            data-flip="add"
+            className={`${collapsed ? "" : "ml-auto"} transition-[opacity,transform,width,margin] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              merging ? "pointer-events-none w-0 overflow-hidden opacity-0" : "opacity-100"
+            }`}
+          >
             <IconButton label="Add a sidekick" onClick={onAdd} active={state.mode === "add"}>
               <PIcon name="Plus" size={20} />
             </IconButton>
           </span>
-          <span data-flip="search">
+          <span
+            data-flip="search"
+            className={`transition-[opacity,transform,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              merging ? "pointer-events-none w-0 overflow-hidden opacity-0" : "opacity-100"
+            }`}
+          >
             <IconButton label={state.searchOpen ? "Close search" : "Search sidekicks"} onClick={search} active={state.searchOpen}>
               <PIcon name={state.searchOpen ? "X" : "Search"} size={20} />
             </IconButton>
