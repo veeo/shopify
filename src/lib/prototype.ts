@@ -1,6 +1,16 @@
 import { channelNav, findNav, mainNav, navFor, pageMeta, previewPages, settingsNav, type PreviewId } from "@/lib/admin-nav";
 import type { ChoiceCard, ChoiceMode } from "@/lib/choices";
 import { applyWorkspace, captureWorkspace, emptyView, homeFor, readLiveScroll, sameDesk, sidekickHomes, type SavedWork, type ViewState, type Workspace } from "@/lib/workspace";
+import { adminLayoutFromWide, isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
+
+export type { AdminLayoutMode };
+
+/** Programmatic wide opens become expanded, but keep an active takeover until the merchant leaves it. */
+function applyAdminWide(state: { adminLayout: AdminLayoutMode }, wide: boolean | undefined, fallbackWide = false) {
+  const next = adminLayoutFromWide(wide, fallbackWide);
+  if (next === "expanded" && state.adminLayout === "takeover") return;
+  state.adminLayout = next;
+}
 
 export { previewPages, type PreviewId };
 
@@ -308,7 +318,7 @@ export type PrototypeState = {
   selectedAgentId: string;
   threads: Record<string, Block[]>;
   preview: PreviewId;
-  previewWide: boolean;
+  adminLayout: AdminLayoutMode;
   /** Search, tab, sort, open record, form draft, and scroll for the admin that is on screen. */
   view: ViewState;
   /** Last admin place for every sidekick, including ones the merchant created. */
@@ -1174,7 +1184,7 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
             ],
     },
     preview: "home-setup",
-    previewWide: false,
+    adminLayout: "sidebar",
     view: emptyView(),
     workspaces: { sidekick: homeFor("sidekick", "setup") },
     mode: "thread",
@@ -1346,7 +1356,7 @@ export function activeState(storeName = "My Store"): PrototypeState {
     conversations: { ...base.conversations, ...teamConversations(Date.now()) },
     preview: "home-active",
     chiefPhase: "working",
-    previewWide: false,
+    adminLayout: "sidebar",
     view: emptyView(),
     workspaces: { chief: homeFor("chief", "active") },
   };
@@ -1395,7 +1405,7 @@ function showBestSellers(state: PrototypeState) {
     push(state, agentId, { id: id(state), type: "chips", chips: bestSellerChips });
   }
   state.preview = "products";
-  state.previewWide = true;
+  state.adminLayout = "expanded";
   state.view = { ...emptyView(), tab: "Best sellers" };
 }
 
@@ -1403,16 +1413,16 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
   for (const effect of effects) {
     if (effect.type === "navigate") {
       state.preview = effect.page;
-      state.previewWide = effect.wide ?? effect.page === "payments-setup";
+      applyAdminWide(state, effect.wide, effect.page === "payments-setup");
     } else if (effect.type === "focus") {
-      state.previewWide = effect.wide;
+      applyAdminWide(state, effect.wide);
     } else if (effect.type === "complete-step") {
       if (!state.completedSteps.includes(effect.step)) state.completedSteps = [...state.completedSteps, effect.step];
     } else if (effect.type === "business-type") {
       state.businessType = effect.value;
       state.paymentsStep = "identity";
       state.preview = "payments-setup";
-      state.previewWide = true;
+      state.adminLayout = "expanded";
       if (!state.completedSteps.includes(1)) state.completedSteps = [...state.completedSteps, 1];
     } else if (effect.type === "add-product") {
       const product: Product = {
@@ -1427,7 +1437,7 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
       state.products = [product, ...state.products];
       state.selectedProductId = product.id;
       state.preview = "product";
-      state.previewWide = effect.wide ?? false;
+      applyAdminWide(state, effect.wide);
       state.view = {
         ...state.view,
         recordId: product.id,
@@ -1476,7 +1486,7 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
       }
       patchAgent(state, "sidekick", { topic: "Review payments", preview: "Payments setup is about 10 minutes." });
       state.preview = "payments";
-      state.previewWide = false;
+      state.adminLayout = "sidebar";
       state.selectedAgentId = "sidekick";
       state.mode = "thread";
     } else if (effect.type === "artifact" && effect.name === "best-sellers") {
@@ -1489,7 +1499,7 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
       state.theme = effect.name;
       state.lookbook = true;
       state.preview = "online-store";
-      state.previewWide = true;
+      state.adminLayout = "expanded";
       if (!state.cardsDone.includes("theme")) state.cardsDone.push("theme");
       patchAgent(state, "sidekick", { topic: effect.name, preview: `${effect.name} is the design.` });
     }
@@ -1689,7 +1699,7 @@ export function runChip(state: PrototypeState, label: string) {
   if (label === "Open the product") {
     push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
     state.preview = "product";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     push(state, agentId, { id: id(state), type: "text", role: "assistant", text: "Here’s the draft. You can still edit any field." });
     return;
   }
@@ -1712,7 +1722,7 @@ export function runChip(state: PrototypeState, label: string) {
   }
   if (label === "Set up Shopify Payments" || label === "Complete setup") {
     state.preview = "payments-setup";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     state.selectedAgentId = "sidekick";
     state.mode = "thread";
     return;
@@ -1731,7 +1741,7 @@ export function runChip(state: PrototypeState, label: string) {
     });
     patchAgent(state, "sidekick", { topic: "Choose a theme", preview: "Horizon is live. Compare themes." });
     state.preview = "online-store";
-    state.previewWide = false;
+    state.adminLayout = "sidebar";
     return;
   }
   if (label === "Set up domain" || label === "Set up domain →") {
@@ -1841,7 +1851,7 @@ export function runChip(state: PrototypeState, label: string) {
   if (label === "Show the live store") {
     state.scenario = "active";
     state.preview = "home-active";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     const missing = catalog.filter((item) => isDefaultSidekick(item.id) && !state.agents.some((agent) => agent.id === item.id && agent.installed));
     for (const item of missing) {
       state.agents.push({ ...item, installed: true });
@@ -1867,7 +1877,7 @@ export function runChip(state: PrototypeState, label: string) {
   }
   if (label === "Open Orders" || label === "take me to Orders" || label === "Take me to Orders") {
     state.preview = "orders";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     return;
   }
   if (label === "Reorder Studio ANC Headphones") {
@@ -1879,7 +1889,7 @@ export function runChip(state: PrototypeState, label: string) {
       text: "Fourteen units left won’t cover Monday’s ads, and the headphones are still $18,640 of the month. I’d place the reorder today, then keep the power bank behind a headphone in cart instead of the sitewide 20%.",
     });
     state.preview = "products";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     state.view = { ...emptyView(), tab: "Best sellers" };
     return;
   }
@@ -1892,7 +1902,7 @@ export function runChip(state: PrototypeState, label: string) {
       text: "#1078 and #1077 are paid and still unfulfilled. #1075 hasn’t been paid. I opened Orders so you can clear the two that are waiting on packing.",
     });
     state.preview = "orders";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     return;
   }
   if (label === "Bundle the best sellers") {
@@ -1906,7 +1916,7 @@ export function runChip(state: PrototypeState, label: string) {
     ensureInstalled(state, "ideas");
     state.selectedAgentId = "ideas";
     state.preview = "products";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     state.view = emptyView();
     return;
   }
@@ -1921,7 +1931,7 @@ export function runChip(state: PrototypeState, label: string) {
     ensureInstalled(state, "campaigns");
     state.selectedAgentId = "campaigns";
     state.preview = "campaigns";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     return;
   }
   if (label === "Show the best sellers" || label === "Show bestsellers") {
@@ -1944,7 +1954,7 @@ export function runChip(state: PrototypeState, label: string) {
       text: "I’d bundle the Studio ANC Headphones with the earbuds case and a cable at $289. That lifts the $125 average order and keeps the power bank from being the whole cart.",
     });
     state.preview = "products";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     state.view = emptyView();
     return;
   }
@@ -1957,7 +1967,7 @@ export function runChip(state: PrototypeState, label: string) {
       text: "The headphones convert when the case is in the first image. The lamp loses people on shipping: the page says 5–7 days and the ads say this week. I’d make the lamp say “ships this week” and put the $289 bundle next to the headphones.",
     });
     state.preview = "products";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     return;
   }
   if (label === "Confirm changes") {
@@ -2149,7 +2159,8 @@ export type Action =
   | { type: "toggle-pin"; id: string }
   | { type: "toggle-hide"; id: string }
   | { type: "intro-seen" }
-  | { type: "preview"; page: PreviewId; wide?: boolean }
+  | { type: "preview"; page: PreviewId; wide?: boolean; layout?: AdminLayoutMode }
+  | { type: "admin-layout"; mode: AdminLayoutMode }
   | { type: "view"; patch: Partial<Omit<ViewState, "draft">> & { draft?: Record<string, string> } }
   | { type: "product"; id: string }
   | { type: "update-product"; id: string; patch: Partial<Product> }
@@ -2520,12 +2531,16 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
       if (!next.threads[action.id]?.length) next.threads[action.id] = activeThread(action.id);
       return next;
     }
+    case "admin-layout":
+      next.adminLayout = action.mode;
+      return next;
     case "preview":
       if (action.page === next.preview) {
-        next.previewWide = action.wide ?? action.page === "payments-setup";
+        if (action.layout) next.adminLayout = action.layout;
+        else applyAdminWide(next, action.wide, action.page === "payments-setup");
         return next;
       }
-      openPage(next, action.page, action.wide);
+      openPage(next, action.page, action.wide, action.layout);
       return next;
     case "view":
       next.view = {
@@ -2538,7 +2553,7 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
     case "product":
       next.selectedProductId = action.id;
       next.preview = "product";
-      next.previewWide = false;
+      next.adminLayout = "sidebar";
       next.view = { ...next.view, recordId: action.id, scroll: 0 };
       return next;
     case "update-product":
@@ -2559,7 +2574,7 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
       next.products = [product, ...next.products];
       next.selectedProductId = product.id;
       next.preview = "product";
-      next.previewWide = false;
+      next.adminLayout = "sidebar";
       next.view = { ...emptyView(), query: next.view.query, tab: next.view.tab, sort: next.view.sort, recordId: product.id };
       return next;
     }
@@ -2624,7 +2639,7 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
       next.products = [product, ...next.products];
       next.selectedProductId = product.id;
       next.preview = "product";
-      next.previewWide = true;
+      next.adminLayout = "expanded";
       next.view = { ...emptyView(), recordId: product.id };
       next.workingAgentId = action.agentId;
       return next;
@@ -2652,7 +2667,7 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
         .map((block) => (block.type === "choices" && !block.replaced ? { ...block, settled: true } : block));
       if (next.preview === "product") {
         next.preview = "products";
-        next.previewWide = false;
+        next.adminLayout = "sidebar";
         next.view = emptyView();
       }
       push(next, action.agentId, {
@@ -2677,7 +2692,7 @@ function confirmProduct(state: PrototypeState, publish: boolean) {
     item.id === state.selectedProductId ? { ...item, status: publish ? "Active" : "Draft" } : item,
   );
   state.preview = "products";
-  state.previewWide = true;
+  state.adminLayout = "expanded";
   state.view = { ...emptyView() };
   state.workingAgentId = null;
   state.threads[agentId] = (state.threads[agentId] ?? []).filter((block) => block.type !== "status");
@@ -2696,11 +2711,12 @@ function confirmProduct(state: PrototypeState, publish: boolean) {
 const freshActions = new Set<Action["type"]>(["scenario", "reset", "arrival", "boot-active", "logout", "sign-in"]);
 const restoringActions = new Set<Action["type"]>(["select", "add-catalog", "create-agent"]);
 
-function openPage(state: PrototypeState, page: PreviewId, wide?: boolean) {
+function openPage(state: PrototypeState, page: PreviewId, wide?: boolean, layout?: AdminLayoutMode) {
   if (sameDesk(state.preview, page)) state.view = { ...state.view, recordId: "", scroll: 0 };
   else state.view = emptyView();
   state.preview = page;
-  state.previewWide = wide ?? page === "payments-setup";
+  if (layout) state.adminLayout = layout;
+  else applyAdminWide(state, wide, page === "payments-setup");
 }
 
 function settleWorkspace(prev: PrototypeState, next: PrototypeState, action: Action): PrototypeState {
@@ -2796,7 +2812,7 @@ export function prototypeSnapshot(state: PrototypeState) {
     agentName: agent.name,
     persona: agent.persona,
     preview: state.preview,
-    previewWide: state.previewWide,
+    previewWide: isAdminWideLayout(state.adminLayout),
     arrival: state.arrival,
     businessType: state.businessType,
     paymentsStep: state.paymentsStep,

@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { nextSort, sortLabel, useWorkspaceView } from "@/components/workspace-view";
 import type { PreviewId } from "@/lib/admin-nav";
+import type { AdminLayoutMode } from "@/lib/shell-layout";
 
 /** The right side of the panel's hamburger header. Pages portal status notes and actions into it. */
 const HeaderSlot = createContext<HTMLElement | null>(null);
@@ -267,6 +268,95 @@ export function useDismiss(open: boolean, ref: React.RefObject<HTMLElement | nul
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open, ref]);
+}
+
+const layoutModeCopy: Record<AdminLayoutMode, { label: string; hint: string }> = {
+  sidebar: { label: "Sidebar", hint: "Standard admin beside chat" },
+  expanded: { label: "Expanded", hint: "Wider admin, chat stays open" },
+  takeover: { label: "Full", hint: "Admin fills the workspace" },
+};
+
+/** Gray control that picks among sidebar, expanded, and full takeover. */
+export function AdminLayoutControl({
+  mode,
+  onChange,
+}: {
+  mode: AdminLayoutMode;
+  onChange: (mode: AdminLayoutMode) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useDismiss(open, ref, () => setOpen(false));
+  const current = layoutModeCopy[mode];
+  return (
+    <span ref={ref} className="relative">
+      <button
+        type="button"
+        aria-label={`Admin layout: ${current.label}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls="admin-layout-menu"
+        onClick={() => setOpen((value) => !value)}
+        className="press inline-flex h-8 shrink-0 items-center gap-1 rounded-lg bg-[#f1f1f1] px-2 text-[#303030] hover:bg-[#e3e3e3] active:bg-[#dcdcdc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005bd3]"
+      >
+        <AdminLayoutGlyph mode={mode} />
+        <span className={`text-[#616161] transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
+          <PIcon name="ChevronDown" size={14} />
+        </span>
+      </button>
+      {open ? (
+        <span
+          id="admin-layout-menu"
+          role="menu"
+          aria-label="Admin layout"
+          className="pop-in absolute left-0 top-9 z-50 flex w-56 flex-col rounded-xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.14)]"
+        >
+          {(Object.keys(layoutModeCopy) as AdminLayoutMode[]).map((item) => {
+            const on = item === mode;
+            const copy = layoutModeCopy[item];
+            return (
+              <button
+                key={item}
+                type="button"
+                role="menuitemradio"
+                aria-checked={on}
+                onClick={() => {
+                  setOpen(false);
+                  onChange(item);
+                }}
+                className={`press flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-left ${
+                  on ? "bg-[#f1f1f1]" : "hover:bg-[#f6f6f6]"
+                }`}
+              >
+                <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-white text-[#303030] shadow-[0_0_0_1px_#e3e3e3]">
+                  <AdminLayoutGlyph mode={item} />
+                </span>
+                <span className="min-w-0">
+                  <span className={`block text-[13px] leading-5 ${on ? "font-semibold text-[#171817]" : "font-medium text-[#303030]"}`}>
+                    {copy.label}
+                  </span>
+                  <span className="block text-[12px] leading-4 text-[#616161]">{copy.hint}</span>
+                </span>
+              </button>
+            );
+          })}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function AdminLayoutGlyph({ mode }: { mode: AdminLayoutMode }) {
+  // Mini shell: agents rail + chat + admin. Filled region is the admin pane.
+  const fill =
+    mode === "sidebar" ? "M10.5 3.5h2v9h-2z" : mode === "expanded" ? "M8 3.5h4.5v9H8z" : "M5.25 3.5H12.5v9H5.25z";
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden className="shrink-0">
+      <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" fill="none" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M4.75 3.5v9" fill="none" stroke="currentColor" strokeWidth="1.25" />
+      <path d={fill} fill="currentColor" opacity="0.88" />
+    </svg>
+  );
 }
 
 export function Body({ children, className = "" }: { children: ReactNode; className?: string }) {

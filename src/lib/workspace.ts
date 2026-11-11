@@ -1,4 +1,5 @@
 import type { PreviewId } from "@/lib/admin-nav";
+import { adminLayoutFromWide, isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
 
 /** Filters, the open record, and the draft sitting on top of the admin page. */
 export type ViewState = {
@@ -14,6 +15,8 @@ export type ViewState = {
 export type Workspace = ViewState & {
   page: PreviewId;
   wide: boolean;
+  /** Preferred docked layout; older saves only have `wide`. */
+  layout?: AdminLayoutMode;
 };
 
 export type WorkspaceScenario = "setup" | "active";
@@ -65,7 +68,7 @@ export function homeFor(agentId: string, scenario: WorkspaceScenario = "active")
 
 type Capturable = {
   preview: PreviewId;
-  previewWide: boolean;
+  adminLayout: AdminLayoutMode;
   selectedProductId: string;
   products: { id: string; title: string; description: string; price: string; status: string }[];
   view: ViewState;
@@ -85,7 +88,8 @@ export function captureWorkspace(state: Capturable, scroll = state.view.scroll):
     : { ...state.view.draft };
   return {
     page: state.preview,
-    wide: state.previewWide,
+    wide: isAdminWideLayout(state.adminLayout),
+    layout: state.adminLayout,
     query: state.view.query,
     tab: state.view.tab || "All",
     sort: state.view.sort || "newest",
@@ -117,7 +121,9 @@ export function applyWorkspace<P extends EditableProduct>(
   state.workspaces = { ...state.workspaces, [agentId]: workspace };
   const productMissing = workspace.page === "product" && !state.products.some((item) => item.id === workspace.recordId);
   state.preview = productMissing ? "products" : workspace.page;
-  state.previewWide = productMissing ? false : workspace.wide;
+  state.adminLayout = productMissing
+    ? "sidebar"
+    : workspace.layout ?? adminLayoutFromWide(workspace.wide);
   state.view = {
     query: workspace.query,
     tab: workspace.tab || "All",
