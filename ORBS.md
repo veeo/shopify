@@ -41,5 +41,5 @@ Visible orbs keep their idle motion, all at the same pace. Offscreen orbs and hi
 - **Mercury** is the Trends orb. The ripples and contour deepen with the level, and the idle flow is a step faster.
 - **Twisted sphere** keeps the original twist. Chief of staff uses this style. Talking speeds it.
 - **Marble** is the Campaigns orb. A milky glass marble with a soft blue-to-purple ribbon inside. It stays inside the same circle as the others.
-- **Orbit** is the tool ring (React Bits): a centered violet-to-cyan swirl with an orbiting highlight. Idle stays round and calm; listening and talking wake the glow and speed the trail. Adapted from [reactbits.dev/backgrounds/orb](https://reactbits.dev/backgrounds/orb).
+- **Orbit** is the tool ring (React Bits): a centered violet-to-cyan swirl with an orbiting highlight. Idle and listening stay round and calm; talking wakes the glow and speeds the trail. Drawn a touch smaller than the filled orbs so the ring isn’t cropped. Adapted from [reactbits.dev/backgrounds/orb](https://reactbits.dev/backgrounds/orb).
 - **Grok Bot, Slackbot, and Muse** keep their artwork. The mark squashes and stretches with the level. Grok and Slackbot answer with their eyes. Neither grows a mouth.

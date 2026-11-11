@@ -185,21 +185,27 @@ const mixHex = (a: string, b: string, t: number) => {
   return `#${[r, g, bl].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 };
 
+/** Calm idle look — shared by idle and listening so the mic doesn't wake the ring. */
+const IDLE_TUNE = { speed: 0.22, awake: 0.03, glow: 0.95, wobble: 0.04, trail: 0.12, highlight: 0.1 };
+
 /** Voice states → ring energy. Idle stays round and even; talk wakes the bead. */
 const TUNE: Record<
   OrbState,
   { speed: number; awake: number; glow: number; wobble: number; trail: number; highlight: number }
 > = {
-  idle: { speed: 0.22, awake: 0.03, glow: 0.95, wobble: 0.04, trail: 0.12, highlight: 0.1 },
+  idle: IDLE_TUNE,
   hover: { speed: 0.32, awake: 0.08, glow: 0.98, wobble: 0.1, trail: 0.35, highlight: 0.3 },
   selected: { speed: 0.35, awake: 0.1, glow: 1.0, wobble: 0.12, trail: 0.4, highlight: 0.35 },
   connecting: { speed: 0.85, awake: 0.35, glow: 1.12, wobble: 0.55, trail: 0.95, highlight: 0.85 },
-  listening: { speed: 1.1, awake: 0.7, glow: 1.22, wobble: 0.85, trail: 1.15, highlight: 1.05 },
+  listening: IDLE_TUNE,
   thinking: { speed: 0.95, awake: 0.5, glow: 1.15, wobble: 0.7, trail: 1.0, highlight: 0.9 },
   speaking: { speed: 1.4, awake: 0.95, glow: 1.32, wobble: 1.05, trail: 1.3, highlight: 1.2 },
   error: { speed: 1.15, awake: 0.55, glow: 1.18, wobble: 1.1, trail: 0.7, highlight: 0.95 },
   disabled: { speed: 0, awake: 0, glow: 0.8, wobble: 0.08, trail: 0.2, highlight: 0.15 },
 };
+
+/** UV zoom: higher = smaller ring with more margin so glow isn't clipped by the canvas. */
+const ORBIT_SCALE = 0.98;
 
 type Program = { program: WebGLProgram; uniforms: Record<string, WebGLUniformLocation | null> };
 
@@ -345,8 +351,9 @@ export function OrbitOrb({
       const tune = TUNE[live.state];
       const raw = live.levelRef?.current;
       const hasLive = typeof raw === 'number' && raw >= 0;
-      const voiced = live.state === 'listening' || live.state === 'speaking';
-      const level = live.reduced ? 0 : hasLive ? raw : voiced ? 0.35 : 0;
+      // Listening matches idle: don't invent a fake mic level that wakes the ring.
+      const voiced = live.state === 'speaking';
+      const level = live.reduced ? 0 : hasLive && live.state !== 'listening' ? raw : voiced ? 0.35 : 0;
       const awake = tune.awake * (0.55 + level * 0.9);
 
       gl.useProgram(program.program);
@@ -361,8 +368,8 @@ export function OrbitOrb({
       gl.uniform3fv(u.uColor1, c1);
       gl.uniform3fv(u.uColor2, c2);
       gl.uniform3fv(u.uColor3, c3);
-      // Zoom so the ring fills the avatar slot like the filled voice orbs.
-      gl.uniform1f(u.uScale, 0.82 / (1 + motion.pulse * 0.85));
+      // Slightly smaller than a filled orb so the glow stays inside the canvas.
+      gl.uniform1f(u.uScale, ORBIT_SCALE / (1 + motion.pulse * 0.85));
       gl.uniform1f(u.uWobble, tune.wobble);
       gl.uniform1f(u.uGlow, tune.glow);
       gl.uniform1f(u.uBleed, 0.85);
@@ -387,8 +394,10 @@ export function OrbitOrb({
       const rate = live.reduced || !active ? 0 : Math.max(live.speed, 0) * tune.speed;
       const step = dt * rate;
       motion.time += step;
-      // Idle swirl stays slow so the color split doesn't freeze mid-asymmetry.
-      motion.swirl += step * (live.state === 'idle' || live.state === 'hover' || live.state === 'selected' ? 0.65 : 2) * (1 + motion.kick);
+      // Idle / listening swirl stays slow so the color split doesn't freeze mid-asymmetry.
+      const calm =
+        live.state === 'idle' || live.state === 'listening' || live.state === 'hover' || live.state === 'selected';
+      motion.swirl += step * (calm ? 0.65 : 2) * (1 + motion.kick);
       motion.orbit -= step;
       motion.orbit = Math.atan2(Math.sin(motion.orbit), Math.cos(motion.orbit));
       motion.echo = Math.min(1, motion.echo + dt / 1.2);
