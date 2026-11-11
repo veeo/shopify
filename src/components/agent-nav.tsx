@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AccountMenu, AdminNavSections, Alerts, initials, SidekickLead, StoreMenu } from "@/components/admin-rail";
+import { AccountMenu, AdminNavSections, initials, SidekickLead, StoreMenu } from "@/components/admin-rail";
 import { IconButton, Orb, ShopifyMark } from "@/components/marks";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Tip } from "@/components/chat-column";
@@ -74,8 +74,6 @@ export function AgentNav({
   const agents = visibleAgents(state);
   const lead = selectedAgent(state);
   const [menu, setMenu] = useState<"account" | "store" | null>(null);
-  const [alerts, setAlerts] = useState(false);
-  const [alertsRead, setAlertsRead] = useState(false);
   const [hiddenOpen, setHiddenOpen] = useState(false);
   const [mergePhase, setMergePhase] = useState<MergePhase>(merged ? "admin" : "agents");
   const query = state.search.trim().toLowerCase();
@@ -106,7 +104,6 @@ export function AgentNav({
       return;
     }
     setMergePhase("agents");
-    setAlerts(false);
   }, [merged]); // eslint-disable-line react-hooks/exhaustive-deps -- phase machine driven by merged edge
 
   useEffect(() => {
@@ -531,32 +528,6 @@ export function AgentNav({
               ) : null}
             </span>
           </span>
-          {merged ? (
-            <span className="relative ml-auto flex items-center gap-1.5 pr-1">
-              <span className="relative">
-                <IconButton label="Alerts" active={alerts} controls="alerts-menu" onClick={() => setAlerts((open) => !open)}>
-                  <PIcon name="Notification" size={20} />
-                </IconButton>
-                {alertsRead ? null : (
-                  <span className="pointer-events-none absolute -right-0.5 -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">
-                    1
-                  </span>
-                )}
-                {alerts ? (
-                  <Alerts
-                    read={alertsRead}
-                    onRead={() => setAlertsRead(true)}
-                    onClose={() => setAlerts(false)}
-                    onOpen={() => onAdminOpen?.("pos")}
-                    className="bottom-[calc(100%+8px)] right-0 w-[300px] origin-bottom-right"
-                  />
-                ) : null}
-              </span>
-              <IconButton label="Settings" onClick={() => onAdminOpen?.("settings")}>
-                <PIcon name="Settings" size={20} />
-              </IconButton>
-            </span>
-          ) : null}
         </div>
       </div>
     </aside>

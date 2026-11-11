@@ -358,7 +358,7 @@ export function AdminLayoutControl({
 
   return (
     <div
-      className="pointer-events-auto absolute bottom-6 right-6 z-40"
+      className="pointer-events-auto"
       onMouseEnter={expand}
       onMouseLeave={collapseUnlessPinned}
       onFocusCapture={expand}

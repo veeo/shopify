@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
-import { useDismiss } from "@/components/admin-ui";
+import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
+import { circleButton, useDismiss } from "@/components/admin-ui";
 import { Orb } from "@/components/marks";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { channelNav, mainNav, navFor, type NavItem, type PreviewId } from "@/lib/admin-nav";
@@ -380,6 +381,58 @@ function RailButton({
   );
 }
 
+/** Bottom alerts + settings on the white admin panel — sidebar, expanded, and full. */
+export function AdminChromeActions({
+  onSettings,
+  onAlertOpen,
+}: {
+  onSettings: () => void;
+  onAlertOpen: () => void;
+}) {
+  const [alerts, setAlerts] = useState(false);
+  const [read, setRead] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  return (
+    <div className="pointer-events-auto flex items-center gap-1.5">
+      <span className="relative">
+        <button
+          ref={triggerRef}
+          type="button"
+          aria-label="Alerts"
+          aria-expanded={alerts}
+          aria-controls="alerts-menu"
+          onClick={() => setAlerts((open) => !open)}
+          className={`${circleButton} ${alerts ? "bg-[#f1f1f1]" : ""}`}
+        >
+          <PIcon name="Notification" size={20} />
+        </button>
+        {read ? null : (
+          <span className="pointer-events-none absolute -right-0.5 -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">
+            1
+          </span>
+        )}
+        {alerts ? (
+          <Alerts
+            anchorRef={triggerRef}
+            read={read}
+            onRead={() => setRead(true)}
+            onClose={() => setAlerts(false)}
+            onOpen={onAlertOpen}
+          />
+        ) : null}
+      </span>
+      <button type="button" aria-label="Settings" onClick={onSettings} className={circleButton}>
+        <PIcon name="Settings" size={20} />
+      </button>
+    </div>
+  );
+}
+
+const alertsShell =
+  "pop-in z-50 rounded-2xl bg-white text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)]";
+
+/** Alerts list. Pass `anchorRef` to portal + collision-place above the trigger (flips if needed). */
 export function Alerts({
   read,
   onRead,
@@ -387,6 +440,7 @@ export function Alerts({
   onOpen,
   embedded = false,
   className = "",
+  anchorRef,
 }: {
   read: boolean;
   onRead: () => void;
@@ -394,16 +448,68 @@ export function Alerts({
   onOpen: () => void;
   embedded?: boolean;
   className?: string;
+  /** When set, menu portals to `document.body` and stays inside the viewport. */
+  anchorRef?: RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [place, setPlace] = useState<{ top: number; left: number; width: number; origin: string } | null>(null);
   useDismiss(true, ref, onClose);
-  return (
+
+  useLayoutEffect(() => {
+    if (!anchorRef) return;
+    const gap = 8;
+    const pad = 12;
+    const width = 300;
+
+    function update() {
+      const anchor = anchorRef!.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const menuH = ref.current?.offsetHeight ?? 220;
+      const spaceAbove = rect.top - pad;
+      const spaceBelow = window.innerHeight - rect.bottom - pad;
+      const openUp = spaceAbove >= Math.min(menuH, 160) || spaceAbove >= spaceBelow;
+      let top = openUp ? rect.top - gap - menuH : rect.bottom + gap;
+      top = Math.max(pad, Math.min(top, window.innerHeight - pad - menuH));
+      let left = rect.right - width;
+      left = Math.max(pad, Math.min(left, window.innerWidth - pad - width));
+      setPlace({
+        top,
+        left,
+        width,
+        origin: openUp ? "bottom right" : "top right",
+      });
+    }
+
+    update();
+    const frame = window.requestAnimationFrame(update);
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [anchorRef]);
+
+  const body = (
     <div
       ref={ref}
       id="alerts-menu"
-      className={`pop-in absolute z-50 origin-bottom-right rounded-2xl bg-white text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)] ${
-        embedded ? "bottom-full left-0 right-0 mb-1" : "bottom-0 right-[calc(100%+8px)] w-[300px]"
+      role="dialog"
+      aria-label="Alerts"
+      className={`${alertsShell} ${
+        anchorRef
+          ? "fixed w-[300px]"
+          : `absolute origin-bottom-right ${embedded ? "bottom-full left-0 right-0 mb-1" : "bottom-0 right-[calc(100%+8px)] w-[300px]"}`
       } ${className}`}
+      style={
+        anchorRef && place
+          ? { top: place.top, left: place.left, width: place.width, transformOrigin: place.origin }
+          : anchorRef
+            ? { visibility: "hidden", top: 0, left: 0 }
+            : undefined
+      }
     >
       <div className="flex items-center gap-1 px-3 pb-1.5 pt-3">
         <span className="flex-1 text-[13px] font-semibold">Alerts</span>
@@ -434,6 +540,11 @@ export function Alerts({
       <p className="border-t border-[#ebebeb] py-3 text-center text-[12px] text-[#616161]">No more alerts</p>
     </div>
   );
+
+  if (anchorRef && typeof document !== "undefined") {
+    return createPortal(body, document.body);
+  }
+  return body;
 }
 
 const menuShell =
