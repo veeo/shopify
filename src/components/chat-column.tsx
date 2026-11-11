@@ -292,6 +292,16 @@ export function ChatColumn({
                       status={block.id !== "arrive"}
                       onDone={() => markTyped(block.id)}
                     />
+                  ) : block.type === "chief-opening" && !typedSettled.has(block.id) ? (
+                    <ChiefOpeningTurn
+                      key={block.id}
+                      block={block}
+                      instant={!state.motion}
+                      onSwitch={onSwitch}
+                      onOpenPreview={(page) => onChip(`Open ${pageMeta(page).title}`)}
+                      onChip={onChip}
+                      onDone={() => markTyped(block.id)}
+                    />
                   ) : (
                     <BlockView
                       key={block.id}
@@ -1927,40 +1937,20 @@ function BlockView({
   }
   if (block.type === "chief-opening") {
     return (
-      <div className="rise flex max-w-[560px] flex-col gap-6 py-1">
-        <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">
-          {block.weekLead}
-          <SoftLink onClick={() => followSoftLink(block.weekLink.target, onSwitch, onOpenPreview)}>{block.weekLink.label}</SoftLink>
-          {block.weekTail ?? ""}
-        </p>
-
-        <div className="flex flex-col gap-2">
-          <p className="text-[13px] tracking-[-0.13px] text-[#8e8f8b]">{block.summariesTitle}</p>
-          <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">
-            {block.summaries.map((item, index) => (
-              <span key={item.id}>
-                {index > 0 ? " " : null}
-                <SoftLink underlined={false} onClick={() => onSwitch(item.id)}>
-                  {item.name}
-                </SoftLink>
-                {`: ${item.text}`}
-              </span>
-            ))}
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <p className="text-[13px] tracking-[-0.13px] text-[#8e8f8b]">{block.prioritiesTitle}</p>
-            <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">{block.prioritiesIntro}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {block.priorities.map((item) => (
-              <ChipButton key={item.id} label={item.label} tone={item.tone} onClick={() => onChip(item.label)} />
-            ))}
-          </div>
-        </div>
-      </div>
+      <ChiefOpeningBody
+        block={block}
+        weekChars={Infinity}
+        linkReady
+        weekTailReady
+        summariesReady
+        summaryChars={Infinity}
+        prioritiesReady
+        priorityIntroChars={Infinity}
+        chipsReady
+        onSwitch={onSwitch}
+        onOpenPreview={onOpenPreview}
+        onChip={onChip}
+      />
     );
   }
   if (block.type === "steps") {
@@ -2215,6 +2205,17 @@ function Purpose({
 
 const typedOnce = new Set<string>();
 
+/** Drop remembered intros so a refresh / boot types greetings again like a fresh login. */
+export function clearTypedOnce() {
+  typedOnce.clear();
+}
+
+function needsTyping(block: Block, done: Set<string>) {
+  if (done.has(block.id)) return false;
+  if (block.type === "chief-opening") return true;
+  return block.type === "text" && Boolean(block.typed);
+}
+
 /** Typed blocks finish instantly once the merchant has replied after them, so their message never waits behind an animation. */
 function settled(thread: Block[], typed: Set<string>) {
   const lastUser = thread.findLastIndex((block) => block.type === "text" && block.role === "user");
@@ -2225,8 +2226,221 @@ function settled(thread: Block[], typed: Set<string>) {
 }
 
 function visibleBlocks(thread: Block[], done: Set<string>) {
-  const pending = thread.findIndex((block) => block.type === "text" && block.typed && !done.has(block.id));
+  const pending = thread.findIndex((block) => needsTyping(block, done));
   return pending === -1 ? thread : thread.slice(0, pending + 1);
+}
+
+type ChiefOpeningBlock = Extract<Block, { type: "chief-opening" }>;
+
+function ChiefOpeningBody({
+  block,
+  weekChars,
+  linkReady,
+  weekTailReady,
+  summariesReady,
+  summaryChars,
+  prioritiesReady,
+  priorityIntroChars,
+  chipsReady,
+  onSwitch,
+  onOpenPreview,
+  onChip,
+}: {
+  block: ChiefOpeningBlock;
+  weekChars: number;
+  linkReady: boolean;
+  weekTailReady: boolean;
+  summariesReady: boolean;
+  summaryChars: number;
+  prioritiesReady: boolean;
+  priorityIntroChars: number;
+  chipsReady: boolean;
+  onSwitch: (id: string) => void;
+  onOpenPreview: (page: PreviewId) => void;
+  onChip: (label: string) => void;
+}) {
+  const weekLead = block.weekLead.slice(0, Math.max(0, weekChars));
+  const summaryPlain = block.summaries.map((item, index) => `${index > 0 ? " " : ""}${item.name}: ${item.text}`).join("");
+  let remaining = Math.max(0, summaryChars);
+  return (
+    <div className="flex max-w-[560px] flex-col gap-6 py-1">
+      <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">
+        {weekLead}
+        {linkReady ? (
+          <SoftLink onClick={() => followSoftLink(block.weekLink.target, onSwitch, onOpenPreview)}>{block.weekLink.label}</SoftLink>
+        ) : null}
+        {weekTailReady ? (block.weekTail ?? "") : null}
+      </p>
+
+      {summariesReady ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-[13px] tracking-[-0.13px] text-[#8e8f8b]">{block.summariesTitle}</p>
+          <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">
+            {block.summaries.map((item, index) => {
+              if (remaining <= 0) return null;
+              const prefix = index > 0 ? " " : "";
+              const name = item.name;
+              const body = `: ${item.text}`;
+              const takePrefix = Math.min(prefix.length, remaining);
+              remaining -= takePrefix;
+              const takeName = Math.min(name.length, remaining);
+              remaining -= takeName;
+              const nameShown = name.slice(0, takeName);
+              const takeBody = Math.min(body.length, remaining);
+              remaining -= takeBody;
+              const bodyShown = body.slice(0, takeBody);
+              if (!takePrefix && !takeName && !takeBody) return null;
+              return (
+                <span key={item.id}>
+                  {prefix.slice(0, takePrefix)}
+                  {takeName === name.length ? (
+                    <SoftLink underlined={false} onClick={() => onSwitch(item.id)}>
+                      {nameShown}
+                    </SoftLink>
+                  ) : (
+                    nameShown
+                  )}
+                  {bodyShown}
+                </span>
+              );
+            })}
+            {summaryChars >= summaryPlain.length ? null : <span className="ml-0.5 inline-block h-[1em] w-px animate-pulse bg-white/70 align-middle" />}
+          </p>
+        </div>
+      ) : null}
+
+      {prioritiesReady ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[13px] tracking-[-0.13px] text-[#8e8f8b]">{block.prioritiesTitle}</p>
+            <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">
+              {block.prioritiesIntro.slice(0, Math.max(0, priorityIntroChars))}
+              {priorityIntroChars < block.prioritiesIntro.length ? (
+                <span className="ml-0.5 inline-block h-[1em] w-px animate-pulse bg-white/70 align-middle" />
+              ) : null}
+            </p>
+          </div>
+          {chipsReady ? (
+            <div className="flex flex-wrap gap-2">
+              {block.priorities.map((item, index) => (
+                <span key={item.id} className="choice-in" style={{ animationDelay: `${120 + index * 120}ms` }}>
+                  <ChipButton label={item.label} tone={item.tone} onClick={() => onChip(item.label)} />
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Types Chief’s opening the way a fresh login does: week, then summaries, then priorities. */
+function ChiefOpeningTurn({
+  block,
+  instant,
+  onSwitch,
+  onOpenPreview,
+  onChip,
+  onDone,
+}: {
+  block: ChiefOpeningBlock;
+  instant: boolean;
+  onSwitch: (id: string) => void;
+  onOpenPreview: (page: PreviewId) => void;
+  onChip: (label: string) => void;
+  onDone: () => void;
+}) {
+  const summaryPlain = block.summaries.map((item, index) => `${index > 0 ? " " : ""}${item.name}: ${item.text}`).join("");
+  const [weekChars, setWeekChars] = useState(instant ? block.weekLead.length : 0);
+  const [linkReady, setLinkReady] = useState(instant);
+  const [weekTailReady, setWeekTailReady] = useState(instant);
+  const [summariesReady, setSummariesReady] = useState(instant);
+  const [summaryChars, setSummaryChars] = useState(instant ? summaryPlain.length : 0);
+  const [prioritiesReady, setPrioritiesReady] = useState(instant);
+  const [priorityIntroChars, setPriorityIntroChars] = useState(instant ? block.prioritiesIntro.length : 0);
+  const [chipsReady, setChipsReady] = useState(instant);
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  });
+  useEffect(() => {
+    if (instant || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setWeekChars(block.weekLead.length);
+      setLinkReady(true);
+      setWeekTailReady(true);
+      setSummariesReady(true);
+      setSummaryChars(summaryPlain.length);
+      setPrioritiesReady(true);
+      setPriorityIntroChars(block.prioritiesIntro.length);
+      setChipsReady(true);
+      done.current();
+      return;
+    }
+    let cancelled = false;
+    let timer = 0;
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        timer = window.setTimeout(resolve, ms);
+      });
+    void (async () => {
+      await wait(220);
+      let at = 0;
+      while (at < block.weekLead.length && !cancelled) {
+        at = Math.min(block.weekLead.length, at + 8);
+        setWeekChars(at);
+        await wait(24);
+      }
+      if (cancelled) return;
+      setLinkReady(true);
+      await wait(120);
+      setWeekTailReady(true);
+      await wait(280);
+      if (cancelled) return;
+      setSummariesReady(true);
+      at = 0;
+      while (at < summaryPlain.length && !cancelled) {
+        at = Math.min(summaryPlain.length, at + 12);
+        setSummaryChars(at);
+        await wait(22);
+      }
+      if (cancelled) return;
+      await wait(240);
+      setPrioritiesReady(true);
+      at = 0;
+      while (at < block.prioritiesIntro.length && !cancelled) {
+        at = Math.min(block.prioritiesIntro.length, at + 6);
+        setPriorityIntroChars(at);
+        await wait(24);
+      }
+      if (cancelled) return;
+      await wait(140);
+      setChipsReady(true);
+      await wait(120);
+      if (!cancelled) done.current();
+    })();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [block, instant, summaryPlain]);
+
+  return (
+    <ChiefOpeningBody
+      block={block}
+      weekChars={weekChars}
+      linkReady={linkReady}
+      weekTailReady={weekTailReady}
+      summariesReady={summariesReady}
+      summaryChars={summaryChars}
+      prioritiesReady={prioritiesReady}
+      priorityIntroChars={priorityIntroChars}
+      chipsReady={chipsReady}
+      onSwitch={onSwitch}
+      onOpenPreview={onOpenPreview}
+      onChip={onChip}
+    />
+  );
 }
 
 /** Plays a scripted reply back like a live one: "Working on it" for a beat, then the words stream in. */

@@ -4,7 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AgentNav } from "@/components/agent-nav";
-import { ChatColumn } from "@/components/chat-column";
+import { ChatColumn, clearTypedOnce } from "@/components/chat-column";
 import { Orb } from "@/components/marks";
 import { OrbAudioProvider } from "@/components/orb-audio";
 import { DesignSystem } from "@/components/design-system";
@@ -57,6 +57,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   const bootTimer = useRef<number | null>(null);
 
   function enter(update: (current: PrototypeState) => PrototypeState) {
+    clearTypedOnce();
     setState(update);
     if (bootTimer.current) window.clearTimeout(bootTimer.current);
     setBooting(true);
@@ -71,6 +72,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     if (saved) setState((current) => restoreWork(current, saved));
   }
   useEffect(() => {
+    clearTypedOnce();
     bootTimer.current = window.setTimeout(() => setBooting(false), bootMs);
     return () => {
       if (bootTimer.current) window.clearTimeout(bootTimer.current);

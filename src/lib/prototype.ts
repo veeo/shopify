@@ -93,16 +93,13 @@ const defaultSidekicks = new Set([
   "chief",
   "ideas",
   "trends",
-  "campaigns",
   "grok",
   "slack",
-  "muse",
   "store",
   "shop",
   "pos",
   "orders",
   "finance",
-  "analytics",
 ]);
 
 /** A sidekick the merchant can add. Retired ones stay in the catalog only. */
@@ -1184,7 +1181,8 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
             ],
     },
     preview: "home-setup",
-    adminLayout: "sidebar",
+    // Roomy desktops floor to expanded; tight viewports clamp down in the shell.
+    adminLayout: "expanded",
     view: emptyView(),
     workspaces: { sidekick: homeFor("sidekick", "setup") },
     mode: "thread",
@@ -1226,9 +1224,7 @@ export const chiefSummaries: ChiefSummary[] = [
 ];
 
 export const chiefPriorities: ChiefPriority[] = [
-  { id: "reorder", label: "Reorder Studio ANC Headphones", tone: "primary" },
-  { id: "orders", label: "Clear paid unfulfilled orders", tone: "secondary" },
-  { id: "bundle", label: "Bundle the best sellers", tone: "secondary" },
+  { id: "bundle", label: "Bundle the best sellers", tone: "primary" },
   { id: "campaign", label: "Build Monday’s campaign", tone: "secondary" },
 ];
 
@@ -1244,8 +1240,7 @@ function activeThread(agentId: string): Block[] {
         summariesTitle: "Sidekick summaries",
         summaries: chiefSummaries,
         prioritiesTitle: "Top priorities today",
-        prioritiesIntro:
-          "Reorder the headphones before Monday’s ads, clear the paid orders waiting on fulfillment, then lift AOV with a bundle and Monday’s campaign.",
+        prioritiesIntro: "Lift AOV with a best-sellers bundle, then line up Monday’s campaign.",
         priorities: chiefPriorities,
       },
     ];
@@ -1356,7 +1351,8 @@ export function activeState(storeName = "My Store"): PrototypeState {
     conversations: { ...base.conversations, ...teamConversations(Date.now()) },
     preview: "home-active",
     chiefPhase: "working",
-    adminLayout: "sidebar",
+    // Roomy desktops floor to expanded; tight viewports clamp down in the shell.
+    adminLayout: "expanded",
     view: emptyView(),
     workspaces: { chief: homeFor("chief", "active") },
   };
@@ -1369,13 +1365,12 @@ export function visibleAgents(state: PrototypeState) {
   );
 }
 
+/** Only agents the merchant has actually hidden — catalog defaults do not open the tray. */
 export function hiddenAgents(state: PrototypeState) {
   const query = state.search.trim().toLowerCase();
-  const fromState = state.agents.filter((item) => item.hidden && isListedSidekick(item.id));
-  const missing = catalog
-    .filter((item) => item.hidden && !state.agents.some((agent) => agent.id === item.id))
-    .map((item) => item);
-  return [...fromState, ...missing].filter((item) => !query || item.name.toLowerCase().includes(query));
+  return state.agents.filter(
+    (item) => item.hidden && isListedSidekick(item.id) && (!query || item.name.toLowerCase().includes(query)),
+  );
 }
 
 function ensureInstalled(state: PrototypeState, sourceId: string) {
@@ -1871,7 +1866,7 @@ export function runChip(state: PrototypeState, label: string) {
       id: id(state),
       type: "text",
       role: "assistant",
-      text: "Reorder the Studio ANC Headphones first. Fourteen units won’t cover Monday’s ads, and they’re $18,640 of this month. Then turn off the sitewide 20% on the USB-C Power Bank. Then clear #1078 and #1077, both paid and still unfulfilled.",
+      text: "I’d start with a best-sellers bundle to lift AOV, then line up Monday’s campaign around the headphones.",
     });
     return;
   }
@@ -2614,7 +2609,9 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
     }
     case "rail": {
       const page = railPage(action.id, next);
-      openPage(next, page, false);
+      // Settings opens at the comfortable expanded width when the shell allows it.
+      if (action.id === "settings" || page === "settings") openPage(next, page, undefined, "expanded");
+      else openPage(next, page, false);
       return next;
     }
     case "offer-choices": {
@@ -2787,6 +2784,8 @@ export function restoreWork(state: PrototypeState, saved: SavedWork): PrototypeS
     if (index >= 0) agents[index] = { ...agents[index], ...agent, installed: true };
     else agents.push({ ...agent, installed: true });
   }
+  // Keep the fresh active threads from `activeState` so intros type again on refresh.
+  // Only custom sidekick chats are restored from disk.
   const threads = { ...state.threads };
   for (const agent of customAgents) {
     const blocks = saved.threads?.[agent.id];
@@ -2801,7 +2800,8 @@ export function restoreWork(state: PrototypeState, saved: SavedWork): PrototypeS
     if (!workspace || !(previewPages as readonly string[]).includes(workspace.page)) continue;
     workspaces[id] = { ...emptyView(), ...workspace, draft: { ...(workspace.draft ?? {}) } };
   }
-  const selected = agents.some((agent) => agent.id === saved.selectedAgentId && agent.installed) ? saved.selectedAgentId : state.selectedAgentId;
+  // Refresh behaves like a fresh login: open on Chief with its opening animation.
+  const selected = state.selectedAgentId;
   // Prefer the global shell layout; fall back to the selected desk’s legacy snapshot.
   const rawLayout = saved.adminLayout ?? workspaces[selected]?.layout;
   const savedLayout = rawLayout && (ADMIN_LAYOUT_MODES as readonly string[]).includes(rawLayout) ? rawLayout : undefined;
