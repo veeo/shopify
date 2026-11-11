@@ -86,6 +86,7 @@ const defaultSidekicks = new Set([
   "campaigns",
   "grok",
   "slack",
+  "muse",
   "store",
   "shop",
   "pos",
@@ -212,20 +213,18 @@ export type Chip = { label: string; tone: "secondary" | "primary"; send?: boolea
 export type Segment = { type: "text"; text: string } | { type: "tool"; label: string };
 export type Source = { title: string; url: string };
 
-export type BriefingItem = {
-  id: string;
-  name: string;
-  takeaway: string;
-  /** First row is the lead opportunity. */
-  kind?: "opportunity" | "update";
-};
+export type SoftLinkTarget =
+  | { kind: "agent"; id: string }
+  | { kind: "preview"; page: PreviewId };
+
+export type ChiefSummary = { id: string; name: string; text: string };
+export type ChiefPriority = { id: string; label: string; tone: "primary" | "secondary" };
 
 export type Block =
   | { id: string; type: "text"; role: "user" | "assistant"; text: string; typed?: boolean; segments?: Segment[]; sources?: Source[]; streamed?: boolean }
   | { id: string; type: "steps" }
   | { id: string; type: "sellers" }
-  | { id: string; type: "briefing"; title?: string; subtitle?: string; items: BriefingItem[] }
-  | { id: string; type: "chips"; chips: Chip[] }
+  | { id: string; type: "chips"; chips: Chip[]; stacked?: boolean }
   | { id: string; type: "purpose" }
   | { id: string; type: "create" }
   | {
@@ -239,7 +238,20 @@ export type Block =
       replaced?: boolean;
       setKey?: string;
     }
-  | { id: string; type: "status"; label: string };
+  | { id: string; type: "status"; label: string }
+  | {
+      id: string;
+      type: "chief-opening";
+      /** Closing clause of the week paragraph, with an inline soft link. */
+      weekLead: string;
+      weekLink: { label: string; target: SoftLinkTarget };
+      weekTail?: string;
+      summariesTitle: string;
+      summaries: ChiefSummary[];
+      prioritiesTitle: string;
+      prioritiesIntro: string;
+      priorities: ChiefPriority[];
+    };
 
 export type ProductTone =
   | "coral"
@@ -610,9 +622,9 @@ const bestSellerChips: Chip[] = [
 
 /** Shared operating picture for an electronics store. Every sidekick can act on these figures. */
 const storeFacts = [
-  "Store facts for this electronics store, as of Saturday Nov 7, 2026. Use these numbers. Do not invent a different sales total. Home opens on Last 30 days.",
+  "Store facts for this electronics store, as of Wednesday Nov 11, 2026. Use these numbers. Do not invent a different sales total. Home opens on Last 30 days. Chief opens on this week so far (Mon–Wed).",
   "Last 30 days: $48,393 total sales, 386 orders, average order value $125 (down from $134 the previous 30 days). Conversion 2.7% on 14,280 sessions.",
-  "Last 7 days: $11,285, 92 orders. Today: $2,079 and 14 orders, 9 of them fulfilled. Today matches the analytics cards.",
+  "This week so far (Mon–Wed): $5,410 from 44 orders, average order $123. Ahead of the same stretch last week on order count, but AOV is soft because accessory-only carts keep showing up. Last 7 days: $11,285, 92 orders. Today (Wednesday): $2,079 and 14 orders, 9 of them fulfilled. Today matches the analytics cards.",
   "Studio ANC Headphones, $249: $18,640 and 76 orders, about 39% of revenue. 14 units left. Reorder before Monday’s ads.",
   "USB-C Power Bank, $49: $6,370 and 130 orders. A sitewide 20% off is creating accessory-only carts and pulling the average order down.",
   "Portable Charger, $59: $5,310 and 90 orders. Desk Lamp, $89: $4,450 and 50 orders. Wireless Mouse, $39: $3,120 and 80 orders. Those five are the best sellers. Talk about the headphones, the power bank, and the portable charger first.",
@@ -629,7 +641,7 @@ const persona = {
   sidekick:
     "You are Sidekick, Shopify's built-in assistant, helping a merchant run an electronics store. You know Shopify deeply and can act in the admin. When the merchant wants to review payments, call showArtifact payments-plan and navigatePreview payments, then explain the plan in your own words: Shopify Payments setup has four parts (business details, identity, account security, payout bank account) and takes about 10 minutes. When they want to start Shopify Payments setup, navigate to payments-setup with wide true. Remaining setup tasks: payments, theme, domain, shipping, retail address, POS.",
   chief:
-    "You are the merchant's Chief of Staff inside this electronics store — the parent sidekick watching the rest of the team. Open with a tight briefing: top opportunity first (usually the best sellers), then one-line takeaways from the other sidekicks. When asked for best sellers, call showArtifact best-sellers and do not navigate away: that opens Products, filtered to the five best sellers. Name the top three in the reply, Studio ANC Headphones, USB-C Power Bank, and Portable Charger, and offer a next step such as building a campaign or bundling them.",
+    "You are the merchant's Chief of Staff inside this electronics store — the parent sidekick watching the rest of the team. Open with a week-so-far paragraph (with a soft link into Orders), a Sidekick summaries section as one white paragraph (agent names soft-link), and Top priorities today as side-by-side chips that open the right agent or admin page. When asked for best sellers, call showArtifact best-sellers and do not navigate away: that opens Products, filtered to the five best sellers. Name the top three in the reply, Studio ANC Headphones, USB-C Power Bank, and Portable Charger, and offer a next step such as building a campaign or bundling them.",
   ideas:
     "You are Product ideas. You turn this store's carts and search into one testable product. You can add a product with the addProduct tool. The live draft is a $289 bundle: Studio ANC Headphones, the earbuds case, and a cable, meant to lift the $125 average order.",
   trends:
@@ -1190,77 +1202,41 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
   };
 }
 
-/** Opening briefing Chief shows when someone lands on the parent bot. */
-export const chiefBriefing: BriefingItem[] = [
-  {
-    id: "opportunity",
-    name: "Best sellers",
-    kind: "opportunity",
-    takeaway:
-      "Studio ANC Headphones are $18,640 of the month with 14 left — reorder before Monday’s ads, and put the power bank behind a headphone in cart instead of a sitewide 20%.",
-  },
-  {
-    id: "ideas",
-    name: "Product ideas",
-    kind: "update",
-    takeaway: "Drafting a $289 headphone + case + cable bundle to lift AOV from $125.",
-  },
-  {
-    id: "store",
-    name: "Online store",
-    kind: "update",
-    takeaway: "Desk lamp page still says 5–7 days while ads say this week.",
-  },
-  {
-    id: "orders",
-    name: "Orders",
-    kind: "update",
-    takeaway: "#1078 and #1077 are paid and unfulfilled; #1075 still unpaid.",
-  },
-  {
-    id: "shop",
-    name: "Shop app",
-    kind: "update",
-    takeaway: "Shop converts at 1.6% vs 2.7% on the store — listing crops the headphone.",
-  },
-  {
-    id: "campaigns",
-    name: "Campaigns",
-    kind: "update",
-    takeaway: "Monday’s ads still promise the lamp this week; restock line is ready.",
-  },
-  {
-    id: "slack",
-    name: "Slackbot",
-    kind: "update",
-    takeaway: "#ops is on the three open orders; welcome email needs the “14 left” note.",
-  },
+/** Week trend paragraph for Chief’s opening — soft link trails the sentence. */
+export const chiefWeekIntro =
+  "This week through Wednesday you’re at $5,410 from 44 orders. Order count is ahead of the same stretch last week, but average order is soft at $123 — accessory-only carts from the sitewide 20% are still pulling it down. Today is $2,079 from 14 orders. ";
+
+export const chiefSummaries: ChiefSummary[] = [
+  { id: "ideas", name: "Product ideas", text: "Drafting a $289 headphone, case, and cable bundle to lift AOV from $125." },
+  { id: "store", name: "Online store", text: "Rewriting the desk lamp line that still says 5–7 days while ads say this week." },
+  { id: "orders", name: "Orders", text: "#1078 and #1077 are paid and unfulfilled; #1075 still unpaid." },
+  { id: "shop", name: "Shop app", text: "Fixing the listing crop that keeps Shop at 1.6% against 2.7% on the store." },
+  { id: "campaigns", name: "Campaigns", text: "Lining up Monday’s headphone ads; restock line is ready." },
+  { id: "slack", name: "Slackbot", text: "#ops is on the three open orders; welcome email needs the “14 left” note." },
+];
+
+export const chiefPriorities: ChiefPriority[] = [
+  { id: "reorder", label: "Reorder Studio ANC Headphones", tone: "primary" },
+  { id: "orders", label: "Clear paid unfulfilled orders", tone: "secondary" },
+  { id: "bundle", label: "Bundle the best sellers", tone: "secondary" },
+  { id: "campaign", label: "Build Monday’s campaign", tone: "secondary" },
 ];
 
 function activeThread(agentId: string): Block[] {
   if (agentId === "chief") {
     return [
       {
-        id: "c1",
-        type: "text",
-        role: "assistant",
-        text: "Here’s your briefing — one place to see what the team is watching.",
-        typed: true,
-      },
-      {
-        id: "c-briefing",
-        type: "briefing",
-        title: "Across your sidekicks",
-        subtitle: "Last 30 days · $48,393 · 386 orders · AOV $125",
-        items: chiefBriefing,
-      },
-      {
-        id: "c2",
-        type: "chips",
-        chips: [
-          { label: "What should I do first?", tone: "primary" },
-          { label: "Show the best sellers", tone: "secondary" },
-        ],
+        id: "c-opening",
+        type: "chief-opening",
+        weekLead: chiefWeekIntro,
+        weekLink: { label: "Take me to Orders", target: { kind: "preview", page: "orders" } },
+        weekTail: ".",
+        summariesTitle: "Sidekick summaries",
+        summaries: chiefSummaries,
+        prioritiesTitle: "Top priorities today",
+        prioritiesIntro:
+          "Reorder the headphones before Monday’s ads, clear the paid orders waiting on fulfillment, then lift AOV with a bundle and Monday’s campaign.",
+        priorities: chiefPriorities,
       },
     ];
   }
@@ -1355,8 +1331,8 @@ export function activeState(storeName = "My Store"): PrototypeState {
   const installed = catalog.filter((item) => isDefaultSidekick(item.id)).map((item) => ({
     ...item,
     installed: true,
-    preview: item.id === "chief" ? "Last 30 days: $48,393" : item.preview,
-    topic: item.id === "chief" ? "Last 30 days" : item.topic,
+    preview: item.id === "chief" ? "This week so far: $5,410 from 44 orders" : item.preview,
+    topic: item.id === "chief" ? "This week so far" : item.topic,
   }));
   const threads: Record<string, Block[]> = { sidekick: base.threads.sidekick };
   for (const item of installed) threads[item.id] = activeThread(item.id);
@@ -1871,10 +1847,15 @@ export function runChip(state: PrototypeState, label: string) {
       state.agents.push({ ...item, installed: true });
       if (!state.threads[item.id]) state.threads[item.id] = activeThread(item.id);
     }
-    patchAgent(state, "chief", { preview: "Last 30 days: $48,393", topic: "Last 30 days" });
+    patchAgent(state, "chief", { preview: "This week so far: $5,410 from 44 orders", topic: "This week so far" });
     return;
   }
-  if (label === "What should I do next?" || label === "What should I do first?") {
+  if (
+    label === "What should I do next?" ||
+    label === "What should I do first?" ||
+    label === "Show top priorities" ||
+    label === "Other top priorities"
+  ) {
     push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
     push(state, "chief", {
       id: id(state),
@@ -1884,7 +1865,66 @@ export function runChip(state: PrototypeState, label: string) {
     });
     return;
   }
-  if (label === "Show the best sellers") {
+  if (label === "Open Orders" || label === "take me to Orders" || label === "Take me to Orders") {
+    state.preview = "orders";
+    state.previewWide = true;
+    return;
+  }
+  if (label === "Reorder Studio ANC Headphones") {
+    push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
+    push(state, "chief", {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "Fourteen units left won’t cover Monday’s ads, and the headphones are still $18,640 of the month. I’d place the reorder today, then keep the power bank behind a headphone in cart instead of the sitewide 20%.",
+    });
+    state.preview = "products";
+    state.previewWide = true;
+    state.view = { ...emptyView(), tab: "Best sellers" };
+    return;
+  }
+  if (label === "Clear paid unfulfilled orders") {
+    push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
+    push(state, "chief", {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "#1078 and #1077 are paid and still unfulfilled. #1075 hasn’t been paid. I opened Orders so you can clear the two that are waiting on packing.",
+    });
+    state.preview = "orders";
+    state.previewWide = true;
+    return;
+  }
+  if (label === "Bundle the best sellers") {
+    push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
+    push(state, "chief", {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "I’d bundle the Studio ANC Headphones with the earbuds case and a cable at $289. That lifts the $125 average order and keeps the power bank from being the whole cart. Product ideas already has a draft started.",
+    });
+    ensureInstalled(state, "ideas");
+    state.selectedAgentId = "ideas";
+    state.preview = "products";
+    state.previewWide = true;
+    state.view = emptyView();
+    return;
+  }
+  if (label === "Build Monday’s campaign" || label === "Build a campaign") {
+    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
+    push(state, agentId, {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "I’d build Monday’s campaign around these three. Lead with the Studio ANC Headphones, then the power bank and the portable charger. Leave the desk lamp out until the page says it ships this week.",
+    });
+    ensureInstalled(state, "campaigns");
+    state.selectedAgentId = "campaigns";
+    state.preview = "campaigns";
+    state.previewWide = true;
+    return;
+  }
+  if (label === "Show the best sellers" || label === "Show bestsellers") {
     push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
     push(state, "chief", {
       id: id(state),
@@ -1893,18 +1933,6 @@ export function runChip(state: PrototypeState, label: string) {
       text: bestSellerReply,
     });
     showBestSellers(state);
-    return;
-  }
-  if (label === "Build a campaign") {
-    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
-    push(state, agentId, {
-      id: id(state),
-      type: "text",
-      role: "assistant",
-      text: "I’d build Monday’s campaign around these three. Lead with the Studio ANC Headphones, then the power bank and the portable charger. Leave the desk lamp out until the page says it ships this week.",
-    });
-    state.preview = "campaigns";
-    state.previewWide = true;
     return;
   }
   if (label === "Bundle them") {
@@ -2182,13 +2210,11 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
     case "select": {
       const installed = next.agents.some((item) => item.id === action.id && item.installed);
       if (!installed) {
-        const source = catalog.find((item) => item.id === action.id);
-        if (!source || !isListedSidekick(action.id)) return state;
-        if (!source.hidden && !hiddenSidekicks.has(action.id)) return state;
-        const revealed = { ...source, installed: true, unread: 0 };
-        next.agents = next.agents.some((item) => item.id === action.id)
-          ? next.agents.map((item) => (item.id === action.id ? revealed : item))
-          : [...next.agents, revealed];
+        // Soft links and the switcher can land on any listed sidekick — install on select.
+        // Also covers revealing hidden catalog entries (pin/hide flow).
+        if (!isListedSidekick(action.id)) return state;
+        const added = ensureInstalled(next, action.id);
+        if (!added) return state;
         if (!next.threads[action.id]?.length) next.threads[action.id] = activeThread(action.id);
       }
       next.selectedAgentId = action.id;

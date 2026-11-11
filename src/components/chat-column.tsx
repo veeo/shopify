@@ -33,6 +33,7 @@ import {
   type PreviewId,
   type PrototypeState,
   type Segment,
+  type SoftLinkTarget,
   type Source,
 } from "@/lib/prototype";
 import type { LiveSegment } from "@/lib/turn";
@@ -296,6 +297,8 @@ export function ChatColumn({
                       onCreate={onCreate}
                       onChoose={onChoose}
                       onBundle={onBundle}
+                      onSwitch={onSwitch}
+                      onOpenPreview={(page) => onChip(`Open ${pageMeta(page).title}`)}
                     />
                   ),
                 )}
@@ -1775,6 +1778,23 @@ function isAnswer(list: Block[], index: number) {
   return false;
 }
 
+function SoftLink({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline p-0 text-inherit underline decoration-dotted decoration-[#8e8f8b] underline-offset-[3px] transition-[text-decoration-color] hover:decoration-white/70"
+    >
+      {children}
+    </button>
+  );
+}
+
+function followSoftLink(target: SoftLinkTarget, onSwitch: (id: string) => void, onOpenPreview: (page: PreviewId) => void) {
+  if (target.kind === "agent") onSwitch(target.id);
+  else onOpenPreview(target.page);
+}
+
 function BlockView({
   block,
   answer,
@@ -1786,6 +1806,8 @@ function BlockView({
   onCreate,
   onChoose,
   onBundle,
+  onSwitch,
+  onOpenPreview,
 }: {
   block: Block;
   answer: boolean;
@@ -1797,6 +1819,8 @@ function BlockView({
   onCreate: (name: string, purpose: string) => void;
   onChoose: (blockId: string, cardId: string) => void;
   onBundle: (blockId: string) => void;
+  onSwitch: (id: string) => void;
+  onOpenPreview: (page: PreviewId) => void;
 }) {
   if (block.type === "text" && block.role === "user") {
     return (
@@ -1833,17 +1857,67 @@ function BlockView({
   }
   if (block.type === "chips") {
     const opening = block.id === "arrive-chips";
+    const stacked = block.stacked;
     return (
-      <div className={opening ? "flex flex-wrap gap-2 py-1" : "rise flex flex-wrap gap-2 py-1"}>
+      <div
+        className={
+          stacked
+            ? "rise flex w-full max-w-[420px] flex-col gap-2 py-1"
+            : opening
+              ? "flex flex-wrap gap-2 py-1"
+              : "rise flex flex-wrap gap-2 py-1"
+        }
+      >
         {block.chips.map((chip, index) => (
-          <span key={chip.label} className={opening ? "choice-in" : undefined} style={opening ? { animationDelay: `${280 + index * 140}ms` } : undefined}>
+          <span
+            key={chip.label}
+            className={`${stacked ? "block w-full" : ""} ${opening ? "choice-in" : ""}`}
+            style={opening ? { animationDelay: `${280 + index * 140}ms` } : undefined}
+          >
             <ChipButton
               label={chip.label}
               tone={chip.tone}
+              fill={stacked}
               onClick={() => (chip.send ? onAsk(chip.label) : onChip(chip.label))}
             />
           </span>
         ))}
+      </div>
+    );
+  }
+  if (block.type === "chief-opening") {
+    return (
+      <div className="rise flex max-w-[560px] flex-col gap-6 py-1">
+        <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">
+          {block.weekLead}
+          <SoftLink onClick={() => followSoftLink(block.weekLink.target, onSwitch, onOpenPreview)}>{block.weekLink.label}</SoftLink>
+          {block.weekTail ?? ""}
+        </p>
+
+        <div className="flex flex-col gap-2">
+          <p className="text-[13px] tracking-[-0.13px] text-[#8e8f8b]">{block.summariesTitle}</p>
+          <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">
+            {block.summaries.map((item, index) => (
+              <span key={item.id}>
+                {index > 0 ? " " : null}
+                <SoftLink onClick={() => onSwitch(item.id)}>{item.name}</SoftLink>
+                {` — ${item.text}`}
+              </span>
+            ))}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[13px] tracking-[-0.13px] text-[#8e8f8b]">{block.prioritiesTitle}</p>
+            <p className="text-[15px] leading-[1.45] tracking-[-0.15px] text-white">{block.prioritiesIntro}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {block.priorities.map((item) => (
+              <ChipButton key={item.id} label={item.label} tone={item.tone} onClick={() => onChip(item.label)} />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -1891,74 +1965,6 @@ function BlockView({
             <ArtifactRow image={item.image} title={item.title} meta={item.meta} body={item.advice} />
           </div>
         ))}
-      </div>
-    );
-  }
-  if (block.type === "briefing") {
-    return (
-      <div className="rise my-2 max-w-[560px] overflow-hidden rounded-[20px] border border-white/10 bg-[#171817]">
-        {block.title || block.subtitle ? (
-          <div className="border-b border-white/10 px-4 py-3">
-            {block.title ? (
-              <p className="text-[13px] font-medium tracking-[-0.13px] text-white">{block.title}</p>
-            ) : null}
-            {block.subtitle ? (
-              <p className="mt-0.5 text-[12px] leading-[1.35] tracking-[-0.12px] text-[#8e8f8b]">{block.subtitle}</p>
-            ) : null}
-          </div>
-        ) : null}
-        <ul className="flex flex-col">
-          {block.items.map((item, index) => {
-            const agent = catalog.find((entry) => entry.id === item.id);
-            const lead = item.kind === "opportunity";
-            return (
-              <li
-                key={item.id}
-                className={`rise flex items-start gap-3 px-4 py-3 ${index ? "border-t border-white/[0.06]" : ""} ${
-                  lead ? "bg-white/[0.04]" : ""
-                }`}
-                style={{ animationDelay: `${80 + index * 45}ms`, animationFillMode: "backwards" }}
-              >
-                {lead ? (
-                  <img
-                    src="/assets/products/studio-anc-headphones.webp"
-                    alt=""
-                    className="mt-0.5 size-10 shrink-0 rounded-xl object-cover shadow-[inset_0_0_4px_rgba(255,255,255,0.18)]"
-                  />
-                ) : (
-                  <span className="mt-0.5 grid size-10 shrink-0 place-items-center">
-                    <Orb
-                      id={agent?.orb ?? (item.id as OrbId)}
-                      agentId={agent?.id}
-                      size={ORB_SIZE.nav}
-                      colorFrom={agent?.orbFrom}
-                      colorTo={agent?.orbTo}
-                    />
-                  </span>
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`text-[13px] font-semibold leading-[1.3] tracking-[-0.13px] ${
-                        lead ? "text-white" : "text-[#e8e8e8]"
-                      }`}
-                    >
-                      {item.name}
-                    </span>
-                    {lead ? (
-                      <span className="rounded-md bg-[#2a2b29] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.04em] text-[#b5b5b5]">
-                        Top opportunity
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="mt-1 block text-[13px] leading-[1.4] tracking-[-0.13px] text-[#c6c6c6]">
-                    {item.takeaway}
-                  </span>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
       </div>
     );
   }
