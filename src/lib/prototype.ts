@@ -7,9 +7,9 @@ export type { AdminLayoutMode };
 
 /** Programmatic wide opens become expanded, but keep an active takeover until the merchant leaves it. */
 function applyAdminWide(state: { adminLayout: AdminLayoutMode }, wide: boolean | undefined, fallbackWide = false) {
-  const next = adminLayoutFromWide(wide, fallbackWide);
-  if (next === "expanded" && state.adminLayout === "takeover") return;
-  state.adminLayout = next;
+  // Full mode is only left by an explicit admin-layout action (or View sidekicks).
+  if (state.adminLayout === "takeover") return;
+  state.adminLayout = adminLayoutFromWide(wide, fallbackWide);
 }
 
 export { previewPages, type PreviewId };
@@ -2553,7 +2553,7 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
     case "product":
       next.selectedProductId = action.id;
       next.preview = "product";
-      next.adminLayout = "sidebar";
+      if (next.adminLayout !== "takeover") next.adminLayout = "sidebar";
       next.view = { ...next.view, recordId: action.id, scroll: 0 };
       return next;
     case "update-product":

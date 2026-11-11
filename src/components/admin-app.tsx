@@ -522,12 +522,13 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         <DesignSystem onBack={() => setDesign(false)} />
       ) : (
       <>
-        {showAgentRail && !takeover ? (
+        {showAgentRail ? (
           <AgentNav
             present={panels.nav}
             state={state}
             presentation="rail"
             navOpen={navOpen}
+            merged={takeover}
             onToggleNav={() => setSidebarOpen((open) => !open)}
             onSettings={() => dispatch({ type: "rail", id: "settings" })}
             onLogout={logout}
@@ -539,6 +540,10 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
             onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
             onDesignSystem={() => setDesign(true)}
+            onViewSidekicks={() => setAdminLayout("sidebar")}
+            onAdminOpen={(id) => dispatch({ type: "rail", id })}
+            onAdminGo={(page) => dispatch({ type: "preview", page, layout: "takeover" })}
+            onAdminSearch={(scope) => setPalette({ open: true, scope })}
           />
         ) : null}
         {agentsDrawer ? (

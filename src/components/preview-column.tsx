@@ -4,14 +4,13 @@ import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type
 import { flushSync } from "react-dom";
 import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
-import { AdminRail, SidekickLead } from "@/components/admin-rail";
 import { AdminLayoutControl, Badge, Body, Btn, Card as AdminCard, circleButton, HeaderExtras, HeaderSlotProvider, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { WorkspaceViewProvider, useWorkspaceView, type WorkspaceViewApi } from "@/components/workspace-view";
 import { isSettingsPage, sectionChoices, sharesSection } from "@/lib/admin-nav";
 import type { AdminLayoutMode } from "@/lib/shell-layout";
 import { bindScrollReader } from "@/lib/workspace";
-import { bestSellerIds, bestSellerRank, selectedAgent, type BusinessType, type PreviewId, type Product, type ProductTone, type PrototypeState } from "@/lib/prototype";
+import { bestSellerIds, bestSellerRank, type BusinessType, type PreviewId, type Product, type ProductTone, type PrototypeState } from "@/lib/prototype";
 
 type Nav = PageNav & {
   onPreview: (page: PreviewId, wide?: boolean) => void;
@@ -80,8 +79,6 @@ export function PreviewColumn({
   const layoutMode = state.adminLayout;
   const wide = !sheet && (layoutMode === "expanded" || layoutMode === "takeover");
   const panelWidth = takeover ? undefined : dockWidth ?? (wide ? 584 : 393);
-  const [adminNavOpen, setAdminNavOpen] = useState(true);
-  const sidekick = selectedAgent(state);
   const [entering, setEntering] = useState(false);
   const [seenPresent, setSeenPresent] = useState(present);
   if (seenPresent !== present) {
@@ -465,35 +462,7 @@ export function PreviewColumn({
       </div>
   );
 
-  const panel = takeover ? (
-    <div
-      className={`p-partial-theme-admin-next-dark flex h-full w-full overflow-hidden rounded-[20px] bg-[#0c0d0c] ${
-        !present ? "pointer-events-none translate-x-full opacity-0" : ""
-      } ${present && curtain ? "panel-reveal" : ""}`}
-      data-admin-layout="takeover"
-      inert={!present ? true : undefined}
-      aria-hidden={!present ? true : undefined}
-    >
-      <AdminRail
-        expanded={adminNavOpen}
-        preview={state.preview}
-        onOpen={onRail}
-        onGo={(page) => onPreview(page)}
-        onSearch={onSearch}
-        onToggle={() => setAdminNavOpen((open) => !open)}
-        lead={
-          <SidekickLead
-            agent={sidekick}
-            expanded={adminNavOpen}
-            onView={() => onLayout?.("sidebar")}
-          />
-        }
-      />
-      {content}
-    </div>
-  ) : (
-    content
-  );
+  const panel = content;
 
   if (sheet) {
     return (

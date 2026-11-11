@@ -346,12 +346,12 @@ export function AdminLayoutControl({
         role="toolbar"
         aria-label="Admin layout"
         aria-orientation="horizontal"
-        className={`flex h-10 items-center overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.12)] transition-[width,border-radius,padding] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)] motion-reduce:transition-none ${
-          open ? "w-[104px] rounded-full px-1" : "w-10 rounded-[12px] px-0"
+        className={`flex size-8 items-center justify-center overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.12)] transition-[width,border-radius] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)] motion-reduce:transition-none ${
+          open ? "w-[96px] rounded-full" : "rounded-full"
         }`}
       >
         <div
-          className="flex items-center will-change-transform motion-reduce:transition-none"
+          className="flex h-8 items-center will-change-transform motion-reduce:transition-none"
           style={{
             width: LAYOUT_SLOT * LAYOUT_MODES.length,
             transform: open ? "translateX(0)" : `translateX(${-index * LAYOUT_SLOT}px)`,

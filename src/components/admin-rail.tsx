@@ -10,63 +10,31 @@ import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 
 const channelIds = new Set(channelNav.map((item) => item.id));
 
-/** The admin sidebar, docked on the right of the prototype. Collapsed it's an icon rail with hover flyouts; expanded it shows labels and the active item's children inline. */
-export function AdminRail({
+/** Main admin destinations (Home → Apps) without search or footer chrome. */
+export function AdminNavSections({
   expanded,
   preview,
   onOpen,
   onGo,
-  onSearch,
-  onToggle,
-  embedded = false,
-  revealed = false,
-  lead = null,
+  onSearchApps,
 }: {
   expanded: boolean;
   preview: PreviewId;
   onOpen: (id: string) => void;
   onGo: (page: PreviewId) => void;
-  onSearch: (scope?: string) => void;
-  onToggle?: () => void;
-  /** Drawn inside the admin panel instead of the far-right rail. */
-  embedded?: boolean;
-  /** The sheet is open, so the groups can ease in. */
-  revealed?: boolean;
-  /** Optional block above Search — used for the merged sidekick affordance in full layout. */
-  lead?: ReactNode;
+  onSearchApps?: () => void;
 }) {
   const { id: active, child } = navFor(preview);
-  const [alerts, setAlerts] = useState(false);
-  const [read, setRead] = useState(false);
   const [channelsOpen, setChannelsOpen] = useState(true);
   const shared = { expanded, active, child, onOpen, onGo };
   return (
-    <nav
-      className={`relative flex h-full shrink-0 flex-col pb-3 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
-        embedded ? "w-full px-2 pt-[72px]" : expanded ? "w-[220px] px-2 pt-6" : "w-[52px] px-[10px] pt-6"
-      } ${embedded && revealed ? "menu-stagger" : ""}`}
-      aria-label="Shopify admin"
-    >
-      {lead}
-      {expanded ? (
-        <button
-          type="button"
-          onClick={() => onSearch()}
-          className="fade-in mb-1 flex h-8 w-full items-center gap-2 rounded-[10px] bg-white/[0.08] px-2 text-[13px] text-[#b5b5b5] transition-colors hover:bg-white/[0.12] hover:text-white"
-        >
-          <PIcon name="Search" size={18} />
-          <span className="flex-1 text-left">Search</span>
-          <span className="text-[11px] text-[#8a8a8a]">Ctrl K</span>
-        </button>
-      ) : (
-        <RailButton label="Search" shortcut="Ctrl K" icon="Search" onClick={() => onSearch()} />
-      )}
-      <div className="mt-1.5 flex flex-col gap-0.5">
+    <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+      <div className="flex flex-col gap-0.5">
         {mainNav.map((item) => (
           <RailItem key={item.id} item={item} {...shared} />
         ))}
       </div>
-      <span className={`my-2 h-px bg-white/15 ${expanded ? "mx-2" : "mx-1.5"}`} />
+      <span className={`my-2 h-px shrink-0 bg-white/15 ${expanded ? "mx-2" : "mx-1.5"}`} />
       {expanded ? (
         <div className="flex flex-col gap-0.5">
           <button
@@ -85,46 +53,113 @@ export function AdminRail({
       ) : (
         <ChannelsItem active={active} onOpen={onOpen} />
       )}
-      <span className={`my-2 h-px bg-white/15 ${expanded ? "mx-2" : "mx-1.5"}`} />
+      <span className={`my-2 h-px shrink-0 bg-white/15 ${expanded ? "mx-2" : "mx-1.5"}`} />
       {expanded ? (
         <button
           type="button"
-          onClick={() => onSearch("Apps")}
+          onClick={() => onSearchApps?.()}
           className="flex h-7 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-[12px] font-medium text-[#a6a6a6] hover:text-white"
         >
           Apps
           <PIcon name="ChevronRight" size={14} />
         </button>
       ) : (
-        <RailButton label="Apps" icon="Apps" onClick={() => onSearch("Apps")} />
+        <RailButton label="Apps" icon="Apps" onClick={() => onSearchApps?.()} />
       )}
-      <div className="mt-auto flex flex-col gap-1">
-        {onToggle ? (
-          <RailButton
-            label={expanded ? "Collapse admin menu" : "Expand admin menu"}
-            icon="LayoutSidebarRight"
-            onClick={onToggle}
-            text={expanded ? "Collapse" : undefined}
-          />
-        ) : null}
-        <RailItem item={{ id: "settings", label: "Settings", icon: "Settings", page: "settings" }} {...shared} />
-        <span className="relative flex flex-col">
-          <RailButton
-            label="Alerts"
-            icon="Notification"
-            on={alerts}
-            onClick={() => setAlerts(!alerts)}
-            controls="alerts-menu"
-            text={expanded ? "Alerts" : undefined}
-          />
-          {read ? null : (
-            <span className="pointer-events-none absolute left-[22px] -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">1</span>
-          )}
-          {alerts ? (
-            <Alerts embedded={embedded} read={read} onRead={() => setRead(true)} onClose={() => setAlerts(false)} onOpen={() => onOpen("pos")} />
+    </div>
+  );
+}
+
+/** The admin sidebar, docked on the right of the prototype. Collapsed it's an icon rail with hover flyouts; expanded it shows labels and the active item's children inline. */
+export function AdminRail({
+  expanded,
+  preview,
+  onOpen,
+  onGo,
+  onSearch,
+  onToggle,
+  embedded = false,
+  revealed = false,
+  lead = null,
+  hideSearch = false,
+  hideFooter = false,
+}: {
+  expanded: boolean;
+  preview: PreviewId;
+  onOpen: (id: string) => void;
+  onGo: (page: PreviewId) => void;
+  onSearch: (scope?: string) => void;
+  onToggle?: () => void;
+  /** Drawn inside the admin panel instead of the far-right rail. */
+  embedded?: boolean;
+  /** The sheet is open, so the groups can ease in. */
+  revealed?: boolean;
+  /** Optional block above Search — used for the merged sidekick affordance in full layout. */
+  lead?: ReactNode;
+  hideSearch?: boolean;
+  hideFooter?: boolean;
+}) {
+  const { id: active, child } = navFor(preview);
+  const [alerts, setAlerts] = useState(false);
+  const [read, setRead] = useState(false);
+  const shared = { expanded, active, child, onOpen, onGo };
+  return (
+    <nav
+      className={`relative flex h-full shrink-0 flex-col pb-3 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
+        embedded ? "w-full px-2 pt-[72px]" : expanded ? "w-[220px] px-2 pt-6" : "w-[52px] px-[10px] pt-6"
+      } ${embedded && revealed ? "menu-stagger" : ""}`}
+      aria-label="Shopify admin"
+    >
+      {lead}
+      {hideSearch ? null : expanded ? (
+        <button
+          type="button"
+          onClick={() => onSearch()}
+          className="fade-in mb-1 flex h-8 w-full items-center gap-2 rounded-[10px] bg-white/[0.08] px-2 text-[13px] text-[#b5b5b5] transition-colors hover:bg-white/[0.12] hover:text-white"
+        >
+          <PIcon name="Search" size={18} />
+          <span className="flex-1 text-left">Search</span>
+          <span className="text-[11px] text-[#8a8a8a]">Ctrl K</span>
+        </button>
+      ) : (
+        <RailButton label="Search" shortcut="Ctrl K" icon="Search" onClick={() => onSearch()} />
+      )}
+      <AdminNavSections
+        expanded={expanded}
+        preview={preview}
+        onOpen={onOpen}
+        onGo={onGo}
+        onSearchApps={() => onSearch("Apps")}
+      />
+      {hideFooter ? null : (
+        <div className="mt-auto flex flex-col gap-1">
+          {onToggle ? (
+            <RailButton
+              label={expanded ? "Collapse admin menu" : "Expand admin menu"}
+              icon="LayoutSidebarRight"
+              onClick={onToggle}
+              text={expanded ? "Collapse" : undefined}
+            />
           ) : null}
-        </span>
-      </div>
+          <RailItem item={{ id: "settings", label: "Settings", icon: "Settings", page: "settings" }} {...shared} />
+          <span className="relative flex flex-col">
+            <RailButton
+              label="Alerts"
+              icon="Notification"
+              on={alerts}
+              onClick={() => setAlerts(!alerts)}
+              controls="alerts-menu"
+              text={expanded ? "Alerts" : undefined}
+            />
+            {read ? null : (
+              <span className="pointer-events-none absolute left-[22px] -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">1</span>
+            )}
+            {alerts ? (
+              <Alerts embedded={embedded} read={read} onRead={() => setRead(true)} onClose={() => setAlerts(false)} onOpen={() => onOpen("pos")} />
+            ) : null}
+          </span>
+        </div>
+      )}
     </nav>
   );
 }
@@ -345,18 +380,20 @@ function RailButton({
   );
 }
 
-function Alerts({
+export function Alerts({
   read,
   onRead,
   onClose,
   onOpen,
   embedded = false,
+  className = "",
 }: {
   read: boolean;
   onRead: () => void;
   onClose: () => void;
   onOpen: () => void;
   embedded?: boolean;
+  className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(true, ref, onClose);
@@ -366,7 +403,7 @@ function Alerts({
       id="alerts-menu"
       className={`pop-in absolute z-50 origin-bottom-right rounded-2xl bg-white text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)] ${
         embedded ? "bottom-full left-0 right-0 mb-1" : "bottom-0 right-[calc(100%+8px)] w-[300px]"
-      }`}
+      } ${className}`}
     >
       <div className="flex items-center gap-1 px-3 pb-1.5 pt-3">
         <span className="flex-1 text-[13px] font-semibold">Alerts</span>
