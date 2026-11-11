@@ -5,7 +5,24 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { nextSort, sortLabel, useWorkspaceView } from "@/components/workspace-view";
 import type { PreviewId } from "@/lib/admin-nav";
-import type { AdminLayoutMode } from "@/lib/shell-layout";
+import { ADMIN_DESKTOP_MAX, type AdminDensity, type AdminLayoutMode } from "@/lib/shell-layout";
+
+/** Content density for admin pages — compact (phone-width) or desktop (Full takeover). */
+const DensityCtx = createContext<AdminDensity>("compact");
+
+export function AdminDensityProvider({
+  density,
+  children,
+}: {
+  density: AdminDensity;
+  children: ReactNode;
+}) {
+  return <DensityCtx.Provider value={density}>{children}</DensityCtx.Provider>;
+}
+
+export function useAdminDensity(): AdminDensity {
+  return useContext(DensityCtx);
+}
 
 /** The right side of the panel's hamburger header. Pages portal status notes and actions into it. */
 const HeaderSlot = createContext<HTMLElement | null>(null);
@@ -89,12 +106,16 @@ export function TopBar({
       {more.length > 0 ? <MoreMenu items={more} /> : null}
     </>
   ) : null;
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
   const titleName = typeof title === "string" ? titleMotionName(title) : undefined;
   const parentMotion = parent ? titleMotionName(parent.label) : undefined;
   const parentName = parentMotion && parentMotion !== titleName ? parentMotion : undefined;
   const heading = (caret: boolean) => (
     <h2
-      className="flex min-w-0 items-center gap-1 text-[22px] font-semibold leading-8 tracking-[-0.44px] text-[#171817]"
+      className={`flex min-w-0 items-center gap-1 font-semibold tracking-[-0.44px] text-[#171817] ${
+        desktop ? "text-[20px] leading-7" : "text-[22px] leading-8"
+      }`}
       style={titleName ? { viewTransitionName: titleName, viewTransitionClass: "title-word" } : undefined}
     >
       <span className="min-w-0 truncate">{title}</span>
@@ -106,7 +127,10 @@ export function TopBar({
     </h2>
   );
   return (
-    <header className="px-6 pb-6 pt-5">
+    <header
+      className={desktop ? "mx-auto w-full px-8 pb-3.5 pt-4" : "px-6 pb-6 pt-5"}
+      style={desktop ? { maxWidth: ADMIN_DESKTOP_MAX } : undefined}
+    >
       <div className="flex min-w-0 flex-col">
         {back ? null : (
           <div className={`grid ${parent ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
@@ -402,9 +426,28 @@ function AdminLayoutGlyph({ mode }: { mode: AdminLayoutMode }) {
   );
 }
 
-export function Body({ children, className = "" }: { children: ReactNode; className?: string }) {
+/** Scrollable page body. Desktop density widens chrome; pass maxWidth for form pages (Payments). */
+export function Body({
+  children,
+  className = "",
+  maxWidth,
+}: {
+  children: ReactNode;
+  className?: string;
+  /** Override content max-width. Forms stay narrow even in Full. */
+  maxWidth?: number;
+}) {
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
+  const width = maxWidth ?? (desktop ? ADMIN_DESKTOP_MAX : undefined);
   return (
-    <div className={`flex flex-col gap-4 px-6 pb-10 ${className}`} style={{ viewTransitionName: "admin-body" }}>
+    <div
+      className={`flex flex-col gap-4 ${desktop ? "mx-auto w-full px-8 pb-12" : "px-6 pb-10"} ${className}`}
+      style={{
+        viewTransitionName: "admin-body",
+        ...(width != null ? { maxWidth: width } : {}),
+      }}
+    >
       {children}
     </div>
   );
@@ -604,13 +647,28 @@ export function Table({
   footer?: ReactNode;
   select?: boolean;
 }) {
-  const template = [select ? "28px" : null, ...columns.map((column) => (column.width ? `${column.width}px` : "minmax(140px,1fr)"))].filter(Boolean).join(" ");
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
+  const template = [
+    select ? "28px" : null,
+    ...columns.map((column) => {
+      if (desktop) {
+        if (!column.width) return "minmax(0,1fr)";
+        // Narrow utility cols stay fixed; wider content cols share remaining space.
+        if (column.width <= 96) return `${column.width}px`;
+        return `minmax(${Math.min(column.width, 140)}px,1fr)`;
+      }
+      return column.width ? `${column.width}px` : "minmax(140px,1fr)";
+    }),
+  ]
+    .filter(Boolean)
+    .join(" ");
   const min = (select ? 28 : 0) + columns.reduce((sum, column) => sum + (column.width ?? 140), 0) + 16;
   return (
     <Card flush>
       {toolbar}
-      <div className="overflow-x-auto [scrollbar-width:thin]">
-        <div style={{ minWidth: min }}>
+      <div className={desktop ? "overflow-x-visible" : "overflow-x-auto [scrollbar-width:thin]"}>
+        <div style={desktop ? { width: "100%" } : { minWidth: min }}>
           <div className="grid h-8 items-center gap-x-3 bg-[#f7f7f7] px-3 text-[12px] font-medium text-[#616161]" style={{ gridTemplateColumns: template }}>
             {select ? <s-checkbox accessibilityLabel="Select all" /> : null}
             {columns.map((column) => (

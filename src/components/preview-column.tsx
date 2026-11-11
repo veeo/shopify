@@ -4,11 +4,29 @@ import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type
 import { flushSync } from "react-dom";
 import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
-import { AdminLayoutControl, Badge, Body, Btn, Card as AdminCard, circleButton, HeaderExtras, HeaderSlotProvider, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
+import {
+  AdminDensityProvider,
+  AdminLayoutControl,
+  Badge,
+  Body,
+  Btn,
+  Card as AdminCard,
+  circleButton,
+  HeaderExtras,
+  HeaderSlotProvider,
+  Muted,
+  Row,
+  Section,
+  Table,
+  TableSearch,
+  Toggle,
+  TopBar,
+  useAdminDensity,
+} from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { WorkspaceViewProvider, useWorkspaceView, type WorkspaceViewApi } from "@/components/workspace-view";
 import { isSettingsPage, sectionChoices, sharesSection } from "@/lib/admin-nav";
-import type { AdminLayoutMode } from "@/lib/shell-layout";
+import { ADMIN_DESKTOP_MAX, adminDensityForLayout, type AdminLayoutMode } from "@/lib/shell-layout";
 import { bindScrollReader } from "@/lib/workspace";
 import { bestSellerIds, bestSellerRank, type BusinessType, type PreviewId, type Product, type ProductTone, type PrototypeState } from "@/lib/prototype";
 
@@ -78,6 +96,7 @@ export function PreviewColumn({
   const sheet = presentation === "sheet";
   const layoutMode = state.adminLayout;
   const wide = !sheet && (layoutMode === "expanded" || layoutMode === "takeover");
+  const density = adminDensityForLayout(layoutMode, sheet);
   const dockedWidth = dockWidth ?? (wide ? 584 : 393);
   const asideRef = useRef<HTMLElement>(null);
   const [panelWidth, setPanelWidth] = useState(dockedWidth);
@@ -291,6 +310,7 @@ export function PreviewColumn({
         data-admin-page={state.preview}
         data-admin-wide={wide ? "true" : "false"}
         data-admin-layout={sheet ? "sheet" : layoutMode}
+        data-admin-density={density}
         data-admin-query={state.view.query}
         data-admin-tab={state.view.tab}
         data-admin-record={state.view.recordId}
@@ -311,6 +331,7 @@ export function PreviewColumn({
           !takeover && present && curtain && !sheet ? "panel-reveal" : ""
         }`}
       >
+      <AdminDensityProvider density={density}>
       <WorkspaceViewProvider value={viewApi}>
       <HeaderSlotProvider slot={slot}>
         <div
@@ -494,6 +515,7 @@ export function PreviewColumn({
         {showLayoutControl && onLayout && !sheet ? <AdminLayoutControl mode={layoutMode} onChange={onLayout} /> : null}
       </HeaderSlotProvider>
       </WorkspaceViewProvider>
+      </AdminDensityProvider>
       </div>
   );
 
@@ -539,13 +561,18 @@ const designs = [
 ];
 
 function ThemeBoard({ state, onUse }: { state: PrototypeState; onUse: (name: string) => void }) {
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
   return (
-    <div className="flex flex-col gap-4 px-6 pb-8 pt-1">
+    <div
+      className={`flex flex-col gap-4 pb-8 pt-1 ${desktop ? "mx-auto w-full px-8" : "px-6"}`}
+      style={desktop ? { maxWidth: ADMIN_DESKTOP_MAX } : undefined}
+    >
       <div>
         <h2 className="text-[25px] font-medium leading-8 tracking-[-0.75px] text-[#171817]">Pick a design</h2>
         <p className="mt-1 max-w-[36ch] text-[14px] leading-5 text-[#616161]">Three ways {state.storeName} could look. Choose the one that feels like the store.</p>
       </div>
-      <div className="flex flex-col gap-4">
+      <div className={desktop ? "grid grid-cols-3 gap-4" : "flex flex-col gap-4"}>
         {designs.map((theme, index) => {
           const chosen = state.theme === theme.name;
           return (
@@ -740,9 +767,14 @@ function HomeSetup({
   onCard: (id: string) => void;
   onDismiss: (id: string) => void;
 }) {
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
   const hidden = new Set([...state.cardsDone, ...state.cardsDismissed]);
   return (
-    <div className="flex flex-col gap-6 px-6 pb-10 pt-5">
+    <div
+      className={`flex flex-col gap-6 pb-10 pt-5 ${desktop ? "mx-auto w-full px-8" : "px-6"}`}
+      style={desktop ? { maxWidth: ADMIN_DESKTOP_MAX } : undefined}
+    >
       <HeaderExtras>
         <TrialNote onPlan={() => nav.go("plan")} />
       </HeaderExtras>
@@ -758,7 +790,7 @@ function HomeSetup({
         <br />
         Now let’s design your store
       </h2>
-      <ul aria-label="Home feed" className="flex flex-col">
+      <ul aria-label="Home feed" className={desktop ? "grid grid-cols-3 gap-x-3" : "flex flex-col"}>
         {setupCards.map((card) => (
           <CardSlot key={card.id} id={card.id} hidden={hidden.has(card.id)}>
             <SetupCard {...card} onOpen={() => onCard(card.id)} onDismiss={() => onDismiss(card.id)} />
@@ -1000,8 +1032,13 @@ function HomeActive({ nav }: { nav: Nav }) {
   const data = ranges[range];
   const next: Record<RangeId, RangeId> = { today: "week", week: "month", month: "today" };
   const analytics = () => nav.onRail("analytics");
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
   return (
-    <div className="flex flex-col gap-6 px-6 pb-[86px] pt-5">
+    <div
+      className={`flex flex-col gap-6 pb-[86px] pt-5 ${desktop ? "mx-auto w-full px-8" : "px-6"}`}
+      style={desktop ? { maxWidth: ADMIN_DESKTOP_MAX } : undefined}
+    >
       <HeaderExtras>
         <button type="button" onClick={analytics} className={`press rounded-lg px-1.5 py-1 hover:bg-[#f1f1f1] ${headerNote}`}>
           82 visitors right now
@@ -1014,7 +1051,7 @@ function HomeActive({ nav }: { nav: Nav }) {
       </HeaderExtras>
       <div className="flex flex-col gap-6">
         <H1>Home</H1>
-        <div className="-mr-6 flex gap-2 overflow-x-auto pr-6 [scrollbar-width:none]">
+        <div className={`flex gap-2 overflow-x-auto [scrollbar-width:none] ${desktop ? "" : "-mr-6 pr-6"}`}>
           <Pill tone="ink" onClick={() => setRange(next[range])} className="pl-3 pr-[13px]">
             <PIcon name="Calendar" size={20} />
             {data.label}
@@ -1028,11 +1065,11 @@ function HomeActive({ nav }: { nav: Nav }) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <button type="button" onClick={analytics} aria-label="Open analytics" className="block">
+      <div className={desktop ? "grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] items-start gap-6" : "flex flex-col gap-3"}>
+        <button type="button" onClick={analytics} aria-label="Open analytics" className="block min-w-0">
           <SalesChart key={range} scale={data.scale} />
         </button>
-        <div className="flex flex-col gap-1">
+        <div className={desktop ? "grid grid-cols-2 gap-x-3 gap-y-1 content-start" : "flex flex-col gap-1"}>
           <Metric name="Total sales" value={data.sales} prefix="$" decimals={2} delta="24%" up onClick={analytics} rangeKey={range} />
           <Metric name="Sessions" value={data.sessions} delta="18%" up onClick={analytics} rangeKey={range} />
           <Metric name="Total orders" value={data.orders} delta="2%" up={false} onClick={analytics} rangeKey={range} />
@@ -1411,7 +1448,7 @@ function Payments({ nav }: { nav: Nav }) {
   return (
     <>
       <TopBar title="Payments" sections={sectionChoices("payments") ?? undefined} current="payments" onSection={(page) => nav.go(page)} />
-      <Body>
+      <Body maxWidth={560}>
         <Section
           title="Shopify Payments"
           aside={
@@ -1493,6 +1530,41 @@ const toneClass: Record<ProductTone, string> = {
   aqua: "bg-[#ccf3f6]",
 };
 
+function ProductsMetrics({ scenario }: { scenario: PrototypeState["scenario"] }) {
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
+  const items = [
+    ["Average sell-through rate", scenario === "active" ? "18.4%" : "—"],
+    ["Products by days of inventory remaining", scenario === "active" ? "42 days" : "No data"],
+    ["ABC product analysis", scenario === "active" ? "A: 4 · B: 6 · C: 18" : "No data"],
+  ] as const;
+  return (
+    <AdminCard flush>
+      <div
+        className={`flex items-stretch gap-3 px-3 py-2.5 ${
+          desktop ? "" : "overflow-x-auto [scrollbar-width:none]"
+        }`}
+      >
+        <span className="flex shrink-0 items-center gap-1 self-center text-[12px] font-medium">
+          <PIcon name="Calendar" size={16} />
+          30 days
+        </span>
+        {items.map(([label, value]) => (
+          <span
+            key={label}
+            className={`flex flex-col gap-0.5 border-l border-[#ebebeb] pl-3 text-[12px] ${
+              desktop ? "min-w-0 flex-1" : "w-40 shrink-0"
+            }`}
+          >
+            <span className="truncate font-semibold underline decoration-[#b5b5b5] decoration-dotted underline-offset-[3px]">{label}</span>
+            <span className="text-[#616161]">{value}</span>
+          </span>
+        ))}
+      </div>
+    </AdminCard>
+  );
+}
+
 function Products({ state, onProduct, onAdd, nav }: { state: PrototypeState; onProduct: (id: string) => void; onAdd: () => void; nav: Nav }) {
   const view = useWorkspaceView();
   const query = view?.query ?? "";
@@ -1519,24 +1591,7 @@ function Products({ state, onProduct, onAdd, nav }: { state: PrototypeState; onP
         more={[{ label: "View as" }, { label: "Import" }, { label: "Export" }]}
       />
       <Body>
-        <AdminCard flush>
-          <div className="flex items-stretch gap-3 overflow-x-auto px-3 py-2.5 [scrollbar-width:none]">
-            <span className="flex shrink-0 items-center gap-1 self-center text-[12px] font-medium">
-              <PIcon name="Calendar" size={16} />
-              30 days
-            </span>
-            {[
-              ["Average sell-through rate", state.scenario === "active" ? "18.4%" : "—"],
-              ["Products by days of inventory remaining", state.scenario === "active" ? "42 days" : "No data"],
-              ["ABC product analysis", state.scenario === "active" ? "A: 4 · B: 6 · C: 18" : "No data"],
-            ].map(([label, value]) => (
-              <span key={label} className="flex w-40 shrink-0 flex-col gap-0.5 border-l border-[#ebebeb] pl-3 text-[12px]">
-                <span className="truncate font-semibold underline decoration-[#b5b5b5] decoration-dotted underline-offset-[3px]">{label}</span>
-                <span className="text-[#616161]">{value}</span>
-              </span>
-            ))}
-          </div>
-        </AdminCard>
+        <ProductsMetrics scenario={state.scenario} />
         <Table
           select
           toolbar={<TableSearch placeholder="Search and filter" tabs={["All", "Active", "Draft", "Best sellers"]} />}
@@ -1639,6 +1694,159 @@ function ProductEdit({
   const quantity = view?.draft.quantity ?? String(Number.parseInt(product.inventory, 10) || 0);
   const fresh = !product.title && !product.description;
   const title = product.title.trim() || (fresh ? "Add product" : "Untitled product");
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
+  const main = (
+    <>
+      <AdminCard className="flex flex-col gap-3">
+        <label data-field="title" className="flex flex-col gap-1">
+          <Label>Title</Label>
+          <input value={product.title} placeholder="Short sleeve t-shirt" onChange={(event) => onUpdate(product.id, { title: event.target.value })} className={`${inputClass} h-8`} />
+        </label>
+        <div data-field="description" className="flex flex-col gap-1">
+          <Label>Description</Label>
+          <div className="overflow-hidden rounded-lg border border-[#8a8a8a]/40 focus-within:border-[#303030]">
+            <div className="flex items-center gap-0.5 overflow-x-auto border-b border-[#ebebeb] bg-[#f7f7f7] px-1.5 py-1 text-[#4a4a4a] [scrollbar-width:none]">
+              <span className="flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px]">
+                Paragraph <PIcon name="ChevronDown" size={14} />
+              </span>
+              {toolbarIcons.map((icon) => (
+                <span key={icon} className="grid size-6 shrink-0 place-items-center rounded hover:bg-[#ebebeb]">
+                  <PIcon name={icon} size={16} />
+                </span>
+              ))}
+            </div>
+            <textarea
+              rows={4}
+              value={product.description}
+              aria-label="Description"
+              onChange={(event) => onUpdate(product.id, { description: event.target.value })}
+              className="w-full resize-none px-2.5 py-2 text-[12px] leading-[1.5] outline-none"
+            />
+          </div>
+        </div>
+        <div data-field="media" className="flex flex-col gap-1">
+          <Label>Media</Label>
+          <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-[#8a8a8a] px-4 py-5">
+            {product.image ? <img src={product.image} alt="" className="mb-1 size-14 rounded-md object-cover" /> : null}
+            <span className="flex items-center gap-2">
+              <Btn tone="gray">Upload new</Btn>
+              <Btn tone="plain">Select existing</Btn>
+            </span>
+            <span className="text-[11px] text-[#616161]">Accepts images, videos, or 3D models</span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <s-select label="Category" placeholder="Choose a product category" details="Determines tax rates and adds metafields to improve search, filters, and cross-channel sales">
+            <s-option value="none">Uncategorized</s-option>
+          </s-select>
+        </div>
+      </AdminCard>
+      <Section title="Price">
+        <div data-field="price" />
+        <AdminCard flush>
+          <div className="p-3">
+            <label className="flex h-8 w-40 items-center gap-1 rounded-lg border border-[#8a8a8a]/40 px-2.5 text-[12px] focus-within:border-[#303030]">
+              <span className="text-[#616161]">$</span>
+              <input
+                value={product.price}
+                inputMode="decimal"
+                aria-label="Price"
+                onChange={(event) => onUpdate(product.id, { price: event.target.value })}
+                className="min-w-0 flex-1 bg-transparent outline-none"
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-[#ebebeb] px-3 py-2">
+            {["Compare-at", "Unit price"].map((label) => (
+              <span key={label} className="rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
+                {label}
+              </span>
+            ))}
+            <button type="button" onClick={() => view?.setDraft({ taxed: taxed ? "no" : "yes" })} className="flex items-center gap-1 rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
+              Charge tax <span className="rounded bg-[#e3e3e3] px-1 font-medium text-[#303030]">{taxed ? "Yes" : "No"}</span>
+            </button>
+            <span className="rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">Cost per item</span>
+          </div>
+        </AdminCard>
+      </Section>
+      <AdminCard flush>
+        <div className="flex items-center justify-between px-3 py-2.5">
+          <span className="text-[13px] font-semibold">Inventory</span>
+          <span className="flex items-center gap-2 text-[12px] text-[#616161]">
+            Inventory tracked
+            <Toggle on={tracked} onChange={(on) => view?.setDraft({ tracked: on ? "yes" : "no" })} label="Inventory tracked" />
+          </span>
+        </div>
+        {tracked ? (
+          <div className="mx-3 mb-3 overflow-hidden rounded-lg text-[12px] shadow-[0_0_0_1px_#e3e3e3]">
+            <div className="flex justify-between bg-[#f7f7f7] px-2.5 py-1.5 font-medium text-[#616161]">
+              <span>Location</span>
+              <span>Quantity</span>
+            </div>
+            <div className="flex items-center justify-between px-2.5 py-2">
+              <span>Shop location</span>
+              <input
+                aria-label="Quantity"
+                value={quantity}
+                onChange={(event) => view?.setDraft({ quantity: event.target.value })}
+                className={`${inputClass} h-7 w-20 text-right`}
+              />
+            </div>
+            {view?.draft.variant ? (
+              <div data-field="variant" className="flex items-center justify-between border-t border-[#ebebeb] px-2.5 py-2">
+                <span>Variant</span>
+                <span className="font-medium text-[#303030]">{view.draft.variant}</span>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="flex flex-wrap gap-1.5 border-t border-[#ebebeb] px-3 py-2">
+          {["SKU", "Barcodes"].map((label) => (
+            <span key={label} className="rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
+              {label}
+            </span>
+          ))}
+          <span className="flex items-center gap-1 rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
+            Sell when out of stock <span className="rounded bg-[#e3e3e3] px-1 font-medium text-[#303030]">Off</span>
+          </span>
+        </div>
+      </AdminCard>
+    </>
+  );
+  const side = (
+    <>
+      <AdminCard className="flex flex-col gap-3">
+        <s-select label="Status" value={product.status} onChange={(event) => onUpdate(product.id, { status: event.currentTarget.value as Product["status"] })}>
+          <s-option value="Active">Active</s-option>
+          <s-option value="Draft">Draft</s-option>
+        </s-select>
+        <span className="flex items-center justify-between text-[12px]">
+          <span className="font-medium">Publishing</span>
+          <PIcon name="Adjust" size={16} />
+        </span>
+        <span className="flex items-center gap-1.5 text-[12px]">
+          <PIcon name="Channels" size={16} /> All channels
+        </span>
+      </AdminCard>
+      <AdminCard className="flex flex-col gap-3">
+        <span className="flex items-center gap-1 text-[12px] font-semibold">
+          Product organization <PIcon name="Info" size={14} />
+        </span>
+        <s-select label="Type">
+          <s-option value="">None</s-option>
+        </s-select>
+        <s-select label="Vendor">
+          <s-option value="">None</s-option>
+        </s-select>
+        <s-text-field label="Collections" placeholder="Add collections" />
+        <s-text-field label="Tags" placeholder="Add tags" />
+        <s-select label="Theme template">
+          <s-option value="default">Default product</s-option>
+        </s-select>
+      </AdminCard>
+    </>
+  );
   return (
     <>
       <HeaderExtras>
@@ -1667,149 +1875,17 @@ function ProductEdit({
         onChoice={onProduct}
       />
       <Body>
-        <AdminCard className="flex flex-col gap-3">
-          <label data-field="title" className="flex flex-col gap-1">
-            <Label>Title</Label>
-            <input value={product.title} placeholder="Short sleeve t-shirt" onChange={(event) => onUpdate(product.id, { title: event.target.value })} className={`${inputClass} h-8`} />
-          </label>
-          <div data-field="description" className="flex flex-col gap-1">
-            <Label>Description</Label>
-            <div className="overflow-hidden rounded-lg border border-[#8a8a8a]/40 focus-within:border-[#303030]">
-              <div className="flex items-center gap-0.5 overflow-x-auto border-b border-[#ebebeb] bg-[#f7f7f7] px-1.5 py-1 text-[#4a4a4a] [scrollbar-width:none]">
-                <span className="flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px]">
-                  Paragraph <PIcon name="ChevronDown" size={14} />
-                </span>
-                {toolbarIcons.map((icon) => (
-                  <span key={icon} className="grid size-6 shrink-0 place-items-center rounded hover:bg-[#ebebeb]">
-                    <PIcon name={icon} size={16} />
-                  </span>
-                ))}
-              </div>
-              <textarea
-                rows={4}
-                value={product.description}
-                aria-label="Description"
-                onChange={(event) => onUpdate(product.id, { description: event.target.value })}
-                className="w-full resize-none px-2.5 py-2 text-[12px] leading-[1.5] outline-none"
-              />
-            </div>
+        {desktop ? (
+          <div className="grid grid-cols-[minmax(0,1fr)_280px] items-start gap-4">
+            <div className="flex min-w-0 flex-col gap-4">{main}</div>
+            <aside className="sticky top-4 flex flex-col gap-4">{side}</aside>
           </div>
-          <div data-field="media" className="flex flex-col gap-1">
-            <Label>Media</Label>
-            <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-[#8a8a8a] px-4 py-5">
-              {product.image ? <img src={product.image} alt="" className="mb-1 size-14 rounded-md object-cover" /> : null}
-              <span className="flex items-center gap-2">
-                <Btn tone="gray">Upload new</Btn>
-                <Btn tone="plain">Select existing</Btn>
-              </span>
-              <span className="text-[11px] text-[#616161]">Accepts images, videos, or 3D models</span>
-            </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <s-select label="Category" placeholder="Choose a product category" details="Determines tax rates and adds metafields to improve search, filters, and cross-channel sales">
-              <s-option value="none">Uncategorized</s-option>
-            </s-select>
-          </div>
-        </AdminCard>
-        <Section title="Price">
-          <div data-field="price" />
-          <AdminCard flush>
-            <div className="p-3">
-              <label className="flex h-8 w-40 items-center gap-1 rounded-lg border border-[#8a8a8a]/40 px-2.5 text-[12px] focus-within:border-[#303030]">
-                <span className="text-[#616161]">$</span>
-                <input
-                  value={product.price}
-                  inputMode="decimal"
-                  aria-label="Price"
-                  onChange={(event) => onUpdate(product.id, { price: event.target.value })}
-                  className="min-w-0 flex-1 bg-transparent outline-none"
-                />
-              </label>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 border-t border-[#ebebeb] px-3 py-2">
-              {["Compare-at", "Unit price"].map((label) => (
-                <span key={label} className="rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
-                  {label}
-                </span>
-              ))}
-              <button type="button" onClick={() => view?.setDraft({ taxed: taxed ? "no" : "yes" })} className="flex items-center gap-1 rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
-                Charge tax <span className="rounded bg-[#e3e3e3] px-1 font-medium text-[#303030]">{taxed ? "Yes" : "No"}</span>
-              </button>
-              <span className="rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">Cost per item</span>
-            </div>
-          </AdminCard>
-        </Section>
-        <AdminCard flush>
-          <div className="flex items-center justify-between px-3 py-2.5">
-            <span className="text-[13px] font-semibold">Inventory</span>
-            <span className="flex items-center gap-2 text-[12px] text-[#616161]">
-              Inventory tracked
-              <Toggle on={tracked} onChange={(on) => view?.setDraft({ tracked: on ? "yes" : "no" })} label="Inventory tracked" />
-            </span>
-          </div>
-          {tracked ? (
-            <div className="mx-3 mb-3 overflow-hidden rounded-lg text-[12px] shadow-[0_0_0_1px_#e3e3e3]">
-              <div className="flex justify-between bg-[#f7f7f7] px-2.5 py-1.5 font-medium text-[#616161]">
-                <span>Location</span>
-                <span>Quantity</span>
-              </div>
-              <div className="flex items-center justify-between px-2.5 py-2">
-                <span>Shop location</span>
-                <input
-                  aria-label="Quantity"
-                  value={quantity}
-                  onChange={(event) => view?.setDraft({ quantity: event.target.value })}
-                  className={`${inputClass} h-7 w-20 text-right`}
-                />
-              </div>
-              {view?.draft.variant ? (
-                <div data-field="variant" className="flex items-center justify-between border-t border-[#ebebeb] px-2.5 py-2">
-                  <span>Variant</span>
-                  <span className="font-medium text-[#303030]">{view.draft.variant}</span>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="flex flex-wrap gap-1.5 border-t border-[#ebebeb] px-3 py-2">
-            {["SKU", "Barcodes"].map((label) => (
-              <span key={label} className="rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
-                {label}
-              </span>
-            ))}
-            <span className="flex items-center gap-1 rounded-md bg-[#f1f1f1] px-1.5 py-1 text-[11px] text-[#616161]">
-              Sell when out of stock <span className="rounded bg-[#e3e3e3] px-1 font-medium text-[#303030]">Off</span>
-            </span>
-          </div>
-        </AdminCard>
-        <AdminCard className="flex flex-col gap-3">
-          <s-select label="Status" value={product.status} onChange={(event) => onUpdate(product.id, { status: event.currentTarget.value as Product["status"] })}>
-            <s-option value="Active">Active</s-option>
-            <s-option value="Draft">Draft</s-option>
-          </s-select>
-          <span className="flex items-center justify-between text-[12px]">
-            <span className="font-medium">Publishing</span>
-            <PIcon name="Adjust" size={16} />
-          </span>
-          <span className="flex items-center gap-1.5 text-[12px]">
-            <PIcon name="Channels" size={16} /> All channels
-          </span>
-        </AdminCard>
-        <AdminCard className="flex flex-col gap-3">
-          <span className="flex items-center gap-1 text-[12px] font-semibold">
-            Product organization <PIcon name="Info" size={14} />
-          </span>
-          <s-select label="Type">
-            <s-option value="">None</s-option>
-          </s-select>
-          <s-select label="Vendor">
-            <s-option value="">None</s-option>
-          </s-select>
-          <s-text-field label="Collections" placeholder="Add collections" />
-          <s-text-field label="Tags" placeholder="Add tags" />
-          <s-select label="Theme template">
-            <s-option value="default">Default product</s-option>
-          </s-select>
-        </AdminCard>
+        ) : (
+          <>
+            {main}
+            {side}
+          </>
+        )}
       </Body>
     </>
   );

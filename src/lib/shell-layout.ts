@@ -36,12 +36,22 @@ export type AdminLayoutMode = "sidebar" | "expanded" | "takeover";
 
 export const ADMIN_LAYOUT_MODES: readonly AdminLayoutMode[] = ["sidebar", "expanded", "takeover"] as const;
 
+/** Content density inside the admin panel — driven by layout mode, not window width. */
+export type AdminDensity = "compact" | "desktop";
+
+export const ADMIN_DESKTOP_MAX = 1120;
+
 export function adminLayoutFromWide(wide: boolean | undefined, fallbackWide = false): AdminLayoutMode {
   return (wide ?? fallbackWide) ? "expanded" : "sidebar";
 }
 
 export function isAdminWideLayout(mode: AdminLayoutMode): boolean {
   return mode === "expanded" || mode === "takeover";
+}
+
+/** Full takeover uses desktop density; sidebar/expanded/sheets stay compact. */
+export function adminDensityForLayout(mode: AdminLayoutMode, sheet = false): AdminDensity {
+  return !sheet && mode === "takeover" ? "desktop" : "compact";
 }
 
 export type ShellMode = "desktop-wide" | "desktop" | "compact" | "mobile" | "fold-open";
