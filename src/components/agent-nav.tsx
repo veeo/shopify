@@ -198,8 +198,8 @@ export function AgentNav({
         type="button"
         data-flip={`agent-${item.id}`}
         aria-current={selectedRow ? "page" : undefined}
-        aria-label={collapsed ? item.name : undefined}
-        onClick={() => pick(item.id)}
+        aria-label={collapsed ? item.name : merging && isLead ? `View sidekicks — ${item.name}` : undefined}
+        onClick={merging && isLead ? () => onViewSidekicks?.() : () => pick(item.id)}
         onMouseEnter={() => setHotId(item.id)}
         onMouseLeave={() => setHotId((current) => (current === item.id ? null : current))}
         className={
@@ -210,14 +210,15 @@ export function AgentNav({
                   : "hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a] active:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#bdbdbd]"
               }`
             : `press press-row relative flex h-12 w-full min-w-0 items-center gap-2 rounded-full py-2 pl-2 pr-2 text-left transition-[background-color,box-shadow] duration-300 ${
-                selectedRow ? "btn-dark pr-4" : "hover:bg-white/[0.06] active:bg-white/10"
+                selectedRow || (merging && isLead) ? "btn-dark pr-4" : "hover:bg-white/[0.06] active:bg-white/10"
               }`
         }
         style={
           collapsingAway
             ? {
+                // Sweep upward into the lead; farther rows travel farther.
                 opacity: 0,
-                transform: `translateY(${-12 - stackIndex * 10}px) scale(0.86)`,
+                transform: `translateY(${-28 - stackIndex * 36}px) scale(0.82)`,
                 maxHeight: 0,
                 marginTop: 0,
                 marginBottom: 0,
@@ -225,12 +226,12 @@ export function AgentNav({
                 paddingBottom: 0,
                 overflow: "hidden",
                 pointerEvents: "none",
-                transition: `opacity ${mergeEase}, transform ${mergeEase}, max-height ${mergeEase}`,
+                transition: `opacity ${mergeEase}, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
               }
             : {
                 opacity: 1,
                 transform: "translateY(0) scale(1)",
-                transition: `opacity ${mergeEase}, transform ${mergeEase}, max-height ${mergeEase}`,
+                transition: `opacity ${mergeEase}, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
               }
         }
       >
@@ -241,7 +242,7 @@ export function AgentNav({
             size={ORB_SIZE.nav}
             colorFrom={item.orbFrom}
             colorTo={item.orbTo}
-            presence={selectedRow ? "selected" : "rest"}
+            presence={selectedRow || (merging && isLead) ? "selected" : "rest"}
             hot={hotId === item.id}
           />
           {collapsed && item.unread > 0 ? (
@@ -255,11 +256,7 @@ export function AgentNav({
             <span className="block truncate whitespace-nowrap text-[13px] font-semibold leading-[1.3] tracking-[-0.13px] text-white">
               {item.name}
             </span>
-            <span
-              className={`block truncate whitespace-nowrap text-[12px] leading-4 transition-opacity duration-300 ${
-                merging && isLead ? "text-[#8e8f8b]" : "text-[#8e8f8b]"
-              }`}
-            >
+            <span className="block truncate whitespace-nowrap text-[12px] leading-4 text-[#8e8f8b]">
               {merging && isLead ? "View sidekicks" : item.preview}
             </span>
           </span>
@@ -271,13 +268,6 @@ export function AgentNav({
         ) : null}
       </button>
     );
-    if (merging && isLead) {
-      return (
-        <span key={item.id} className="contents">
-          <SidekickLead agent={item} expanded onView={() => onViewSidekicks?.()} />
-        </span>
-      );
-    }
     return collapsed ? (
       <Tip key={item.id} label={item.name} side="right" fixed>
         {button}
@@ -345,8 +335,8 @@ export function AgentNav({
           <span className={`size-8 shrink-0 ${collapsed ? "mb-2" : ""}`} aria-hidden />
           <span
             data-flip="add"
-            className={`${collapsed ? "" : "ml-auto"} transition-[opacity,transform,width,margin] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              merging ? "pointer-events-none w-0 overflow-hidden opacity-0" : "opacity-100"
+            className={`${collapsed ? "" : "ml-auto"} transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              merging ? "pointer-events-none opacity-0" : "opacity-100"
             }`}
           >
             <IconButton label="Add a sidekick" onClick={onAdd} active={state.mode === "add"}>
@@ -355,8 +345,8 @@ export function AgentNav({
           </span>
           <span
             data-flip="search"
-            className={`transition-[opacity,transform,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              merging ? "pointer-events-none w-0 overflow-hidden opacity-0" : "opacity-100"
+            className={`transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              merging ? "pointer-events-none opacity-0" : "opacity-100"
             }`}
           >
             <IconButton label={state.searchOpen ? "Close search" : "Search sidekicks"} onClick={search} active={state.searchOpen}>
@@ -451,20 +441,15 @@ export function AgentNav({
 
           {showAdmin ? (
             <div
-              className={`z-20 flex min-h-0 flex-col px-0.5 ${
+              className={`admin-rail-rise z-20 flex min-h-0 flex-col px-0.5 ${
                 mergePhase === "admin" ? "relative flex-1" : "pointer-events-none absolute inset-0"
               }`}
-              style={{
-                opacity: mergePhase === "admin" ? 1 : 0.7,
-                transform: mergePhase === "collapsing" ? "translateY(18%)" : "translateY(0)",
-                transition: `opacity ${mergeEase}, transform ${mergeEase}`,
-              }}
             >
               {mergePhase === "admin" ? (
                 <SidekickLead agent={lead} expanded onView={() => onViewSidekicks?.()} />
               ) : (
                 // Spacer matching the lead so rising nav lands under it.
-                <div className="mb-3 h-[46px] shrink-0" aria-hidden />
+                <div className="mb-3 h-12 shrink-0" aria-hidden />
               )}
               <AdminNavSections
                 expanded
@@ -549,18 +534,9 @@ export function AgentNav({
           {merged ? (
             <span className="relative ml-auto flex items-center gap-1.5 pr-1">
               <span className="relative">
-                <button
-                  type="button"
-                  aria-label="Alerts"
-                  aria-expanded={alerts}
-                  aria-controls="alerts-menu"
-                  onClick={() => setAlerts((open) => !open)}
-                  className={`press grid size-[31px] place-items-center rounded-full text-[#b5b5b5] transition-colors hover:bg-white/[0.08] hover:text-white ${
-                    alerts ? "bg-white/[0.1] text-white" : "bg-white/[0.06]"
-                  }`}
-                >
-                  <PIcon name="Notification" size={18} />
-                </button>
+                <IconButton label="Alerts" active={alerts} controls="alerts-menu" onClick={() => setAlerts((open) => !open)}>
+                  <PIcon name="Notification" size={20} />
+                </IconButton>
                 {alertsRead ? null : (
                   <span className="pointer-events-none absolute -right-0.5 -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">
                     1
@@ -576,14 +552,9 @@ export function AgentNav({
                   />
                 ) : null}
               </span>
-              <button
-                type="button"
-                aria-label="Settings"
-                onClick={() => onAdminOpen?.("settings")}
-                className="press grid size-[31px] place-items-center rounded-full bg-white/[0.06] text-[#b5b5b5] transition-colors hover:bg-white/[0.08] hover:text-white"
-              >
-                <PIcon name="Settings" size={18} />
-              </button>
+              <IconButton label="Settings" onClick={() => onAdminOpen?.("settings")}>
+                <PIcon name="Settings" size={20} />
+              </IconButton>
             </span>
           ) : null}
         </div>

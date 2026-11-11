@@ -184,8 +184,8 @@ export function SidekickLead({
       type="button"
       aria-label={`View sidekicks — ${agent.name}`}
       onClick={onView}
-      className={`press mb-3 flex w-full items-center rounded-[12px] text-left transition-colors hover:bg-white/[0.08] ${
-        expanded ? "gap-2 px-1.5 py-1.5" : "h-8 justify-center px-0"
+      className={`press press-row mb-3 flex w-full min-w-0 items-center text-left transition-[background-color,box-shadow] duration-300 hover:bg-white/[0.06] active:bg-white/10 ${
+        expanded ? "h-12 gap-2 rounded-full py-2 pl-2 pr-2" : "h-8 justify-center rounded-full px-0"
       }`}
     >
       <span className="relative grid size-[31px] shrink-0 place-items-center rounded-full">

@@ -78,7 +78,42 @@ export function PreviewColumn({
   const sheet = presentation === "sheet";
   const layoutMode = state.adminLayout;
   const wide = !sheet && (layoutMode === "expanded" || layoutMode === "takeover");
-  const panelWidth = takeover ? undefined : dockWidth ?? (wide ? 584 : 393);
+  const dockedWidth = dockWidth ?? (wide ? 584 : 393);
+  const asideRef = useRef<HTMLElement>(null);
+  const [panelWidth, setPanelWidth] = useState(dockedWidth);
+  // Grow/shrink with the same panel-settle width transition used for sidebar ↔ expanded.
+  useLayoutEffect(() => {
+    if (!takeover) {
+      setPanelWidth(dockedWidth);
+      return;
+    }
+    const el = asideRef.current;
+    const parent = el?.parentElement;
+    if (!el || !parent) {
+      setPanelWidth(dockedWidth);
+      return;
+    }
+    function measure() {
+      if (!el || !parent) return;
+      let other = 0;
+      const inFlow: Element[] = [];
+      for (const child of parent.children) {
+        const cs = getComputedStyle(child);
+        if (cs.position === "absolute" || cs.position === "fixed") continue;
+        inFlow.push(child);
+        if (child !== el) other += (child as HTMLElement).getBoundingClientRect().width;
+      }
+      const styles = getComputedStyle(parent);
+      const padX = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+      const gap = parseFloat(styles.columnGap || styles.gap || "0") || 0;
+      const gaps = Math.max(0, inFlow.length - 1) * gap;
+      setPanelWidth(Math.max(dockedWidth, Math.round(parent.clientWidth - padX - other - gaps)));
+    }
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(parent);
+    return () => ro.disconnect();
+  }, [takeover, dockedWidth]);
   const [entering, setEntering] = useState(false);
   const [seenPresent, setSeenPresent] = useState(present);
   if (seenPresent !== present) {
@@ -488,8 +523,9 @@ export function PreviewColumn({
 
   return (
     <aside
-      className={`panel-settle flex h-full justify-end overflow-hidden ${takeover ? "min-w-0 flex-1" : "shrink-0"}`}
-      style={panelWidth !== undefined ? { width: panelWidth } : undefined}
+      ref={asideRef}
+      className="panel-settle flex h-full shrink-0 justify-end overflow-hidden"
+      style={{ width: panelWidth }}
     >
       {panel}
     </aside>

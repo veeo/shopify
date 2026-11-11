@@ -346,12 +346,12 @@ export function AdminLayoutControl({
         role="toolbar"
         aria-label="Admin layout"
         aria-orientation="horizontal"
-        className={`flex size-8 items-center justify-center overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.12)] transition-[width,border-radius] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)] motion-reduce:transition-none ${
-          open ? "w-[96px] rounded-full" : "rounded-full"
+        className={`flex h-8 items-center overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.12)] transition-[width,border-radius] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)] motion-reduce:transition-none ${
+          open ? "w-[96px] rounded-full" : "w-8 rounded-full"
         }`}
       >
         <div
-          className="flex h-8 items-center will-change-transform motion-reduce:transition-none"
+          className="flex h-8 shrink-0 items-center will-change-transform motion-reduce:transition-none"
           style={{
             width: LAYOUT_SLOT * LAYOUT_MODES.length,
             transform: open ? "translateX(0)" : `translateX(${-index * LAYOUT_SLOT}px)`,
@@ -371,7 +371,8 @@ export function AdminLayoutControl({
                 tabIndex={open || on ? 0 : -1}
                 onClick={() => pick(item)}
                 className={`press grid size-8 shrink-0 place-items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#005bd3] ${
-                  on ? "text-[#171817]" : "text-[#9a9a9a] hover:text-[#616161]"
+                  // Collapsed: always black current glyph. Open: selected dark, others muted.
+                  !open ? "text-black" : on ? "text-black" : "text-[#9a9a9a] hover:text-[#616161]"
                 }`}
               >
                 <AdminLayoutGlyph mode={item} />
