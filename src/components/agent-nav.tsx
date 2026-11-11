@@ -6,7 +6,7 @@ import { IconButton, Orb, ShopifyMark } from "@/components/marks";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Tip } from "@/components/chat-column";
 import { PIcon } from "@/components/polaris-icon";
-import { catalog, hiddenSidekicks, visibleAgents, type Agent, type AgentGroup, type PrototypeState } from "@/lib/prototype";
+import { hiddenAgents, railGroup, visibleAgents, type Agent, type AgentGroup, type PrototypeState } from "@/lib/prototype";
 
 const groups: { id: AgentGroup; label: string | null }[] = [
   { id: "favorites", label: null },
@@ -60,14 +60,9 @@ export function AgentNav({
   const [menu, setMenu] = useState<"account" | "store" | null>(null);
   const [hiddenOpen, setHiddenOpen] = useState(false);
   const query = state.search.trim().toLowerCase();
-  const hiddenItems =
-    state.scenario === "setup"
-      ? []
-      : catalog
-          .filter((item) => hiddenSidekicks.has(item.id))
-          .map((item) => state.agents.find((agent) => agent.id === item.id) ?? item)
-          .filter((item) => !query || item.name.toLowerCase().includes(query));
-  const hiddenSelection = hiddenSidekicks.has(state.selectedAgentId) && state.mode === "thread" ? state.selectedAgentId : "";
+  const hiddenItems = state.scenario === "setup" ? [] : hiddenAgents(state);
+  const selectedAgent = state.agents.find((item) => item.id === state.selectedAgentId);
+  const hiddenSelection = selectedAgent?.hidden && state.mode === "thread" ? state.selectedAgentId : "";
   const [openedFor, setOpenedFor] = useState("");
   if (hiddenSelection !== openedFor) {
     setOpenedFor(hiddenSelection);
@@ -88,7 +83,7 @@ export function AgentNav({
   const visibleGroups = groups
     .map((group) => ({
       ...group,
-      items: group.id === "hidden" ? hiddenItems : agents.filter((item) => item.group === group.id),
+      items: group.id === "hidden" ? hiddenItems : agents.filter((item) => railGroup(item) === group.id),
     }))
     .filter((group) => group.items.length > 0);
   const navRef = useRef<HTMLElement>(null);
