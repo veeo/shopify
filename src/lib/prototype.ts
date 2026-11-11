@@ -1,7 +1,7 @@
 import { channelNav, findNav, mainNav, navFor, pageMeta, previewPages, settingsNav, type PreviewId } from "@/lib/admin-nav";
 import type { ChoiceCard, ChoiceMode } from "@/lib/choices";
 import { applyWorkspace, captureWorkspace, emptyView, homeFor, readLiveScroll, sameDesk, sidekickHomes, type SavedWork, type ViewState, type Workspace } from "@/lib/workspace";
-import { adminLayoutFromWide, isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
+import { ADMIN_LAYOUT_MODES, adminLayoutFromWide, isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
 
 export type { AdminLayoutMode };
 
@@ -2768,6 +2768,9 @@ export function restoreWork(state: PrototypeState, saved: SavedWork): PrototypeS
     workspaces[id] = { ...emptyView(), ...workspace, draft: { ...(workspace.draft ?? {}) } };
   }
   const selected = agents.some((agent) => agent.id === saved.selectedAgentId && agent.installed) ? saved.selectedAgentId : state.selectedAgentId;
+  // Prefer the global shell layout; fall back to the selected desk’s legacy snapshot.
+  const rawLayout = saved.adminLayout ?? workspaces[selected]?.layout;
+  const savedLayout = rawLayout && (ADMIN_LAYOUT_MODES as readonly string[]).includes(rawLayout) ? rawLayout : undefined;
   const next: PrototypeState = {
     ...state,
     agents,
@@ -2777,6 +2780,7 @@ export function restoreWork(state: PrototypeState, saved: SavedWork): PrototypeS
     selectedAgentId: selected,
     seq: Math.max(state.seq, saved.seq || 0),
     view: emptyView(),
+    ...(savedLayout ? { adminLayout: savedLayout } : {}),
   };
   const agent = next.agents.find((item) => item.id === selected);
   applyWorkspace(next, selected, next.scenario, agent);

@@ -1,5 +1,5 @@
 import type { PreviewId } from "@/lib/admin-nav";
-import { adminLayoutFromWide, isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
+import { isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
 
 /** Filters, the open record, and the draft sitting on top of the admin page. */
 export type ViewState = {
@@ -11,11 +11,12 @@ export type ViewState = {
   scroll: number;
 };
 
-/** Where one sidekick left the admin. */
+/** Where one sidekick left the admin (page + filters). Shell width is global. */
 export type Workspace = ViewState & {
   page: PreviewId;
+  /** Legacy wide flag; admin panel size is a global shell preference now. */
   wide: boolean;
-  /** Preferred docked layout; older saves only have `wide`. */
+  /** Legacy per-agent layout snapshot; ignored on restore/switch. */
   layout?: AdminLayoutMode;
 };
 
@@ -121,9 +122,8 @@ export function applyWorkspace<P extends EditableProduct>(
   state.workspaces = { ...state.workspaces, [agentId]: workspace };
   const productMissing = workspace.page === "product" && !state.products.some((item) => item.id === workspace.recordId);
   state.preview = productMissing ? "products" : workspace.page;
-  state.adminLayout = productMissing
-    ? "sidebar"
-    : workspace.layout ?? adminLayoutFromWide(workspace.wide);
+  // Keep the merchant’s chosen admin size (sidebar / expanded / takeover) across
+  // sidekick switches — panel layout is a shell preference, not per-agent.
   state.view = {
     query: workspace.query,
     tab: workspace.tab || "All",
@@ -177,6 +177,8 @@ export type SavedWork = {
   scenario: WorkspaceScenario;
   selectedAgentId: string;
   seq: number;
+  /** Global admin panel size; sticky across sidekick switches. */
+  adminLayout?: AdminLayoutMode;
   workspaces: Record<string, Workspace>;
   products: SavedProduct[];
   agents: unknown[];

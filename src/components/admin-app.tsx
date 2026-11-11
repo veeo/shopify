@@ -84,6 +84,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
       scenario: state.scenario,
       selectedAgentId: state.selectedAgentId,
       seq: state.seq,
+      adminLayout: state.adminLayout,
       workspaces: state.workspaces,
       products: state.products,
       agents: custom,
