@@ -86,6 +86,7 @@ const defaultSidekicks = new Set([
   "campaigns",
   "grok",
   "slack",
+  "muse",
   "store",
   "shop",
   "pos",
