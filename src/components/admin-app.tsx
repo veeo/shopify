@@ -247,12 +247,16 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   ];
 
   function finishFill(agentId: string, title: string) {
+    const chips =
+      agentId === "chief"
+        ? [...confirmChips, { label: "Pass this over to Product ideas", tone: "secondary" as const }]
+        : confirmChips;
     setState((prev) =>
       reducer(prev, {
         type: "follow-up",
         agentId,
         text: `${title} is filled in on the product form. Save it as a draft, or publish it. You can still edit any field.`,
-        chips: confirmChips,
+        chips,
       }),
     );
   }

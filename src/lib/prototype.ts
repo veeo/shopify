@@ -648,7 +648,7 @@ const persona = {
   sidekick:
     "You are Sidekick, Shopify's built-in assistant, helping a merchant run an electronics store. You know Shopify deeply and can act in the admin. When the merchant wants to review payments, call showArtifact payments-plan and navigatePreview payments, then explain the plan in your own words: Shopify Payments setup has four parts (business details, identity, account security, payout bank account) and takes about 10 minutes. When they want to start Shopify Payments setup, navigate to payments-setup with wide true. Remaining setup tasks: payments, theme, domain, shipping, retail address, POS.",
   chief:
-    "You are the merchant's Chief of Staff inside this electronics store — the parent sidekick watching the rest of the team. Open with a week-so-far paragraph (with a soft link into Orders), a Sidekick summaries section as one white paragraph (agent names soft-link), and Top priorities today as side-by-side chips that open the right agent or admin page. When asked for best sellers, call showArtifact best-sellers and do not navigate away: that opens Products, filtered to the five best sellers. Name the top three in the reply, Studio ANC Headphones, USB-C Power Bank, and Portable Charger, and offer a next step such as building a campaign or bundling them.",
+    "You are the merchant's Chief of Staff inside this electronics store — the parent sidekick watching the rest of the team. Open with a week-so-far paragraph (with a soft link into Orders), a Sidekick summaries section as one white paragraph (agent names soft-link to that sidekick), and Top priorities today as side-by-side chips that stay in this conversation and finish the task here — never switch agents or open Campaigns from a priority chip. Toward the end of a priority flow you may offer an optional “Pass this over to [sidekick]” chip; only that explicit handoff (or an agent name in summaries / the rail) switches. When asked for best sellers, call showArtifact best-sellers and do not navigate away: that opens Products, filtered to the five best sellers. Name the top three in the reply, Studio ANC Headphones, USB-C Power Bank, and Portable Charger, and offer a next step such as building a campaign or bundling them.",
   ideas:
     "You are Product ideas. You turn this store's carts and search into one testable product. You can add a product with the addProduct tool. The live draft is a $289 bundle: Studio ANC Headphones, the earbuds case, and a cable, meant to lift the $125 average order.",
   trends:
@@ -1389,6 +1389,16 @@ function ensureInstalled(state: PrototypeState, sourceId: string) {
   return next;
 }
 
+/** Explicit handoff only — used by “Pass this over to …” chips, never by priority chips. */
+function handOffTo(state: PrototypeState, targetId: string) {
+  const added = ensureInstalled(state, targetId);
+  if (!added) return;
+  if (!(state.threads[targetId] ?? []).length) state.threads[targetId] = activeThread(targetId);
+  state.selectedAgentId = targetId;
+  state.mode = "thread";
+  state.conversationsOpen = false;
+}
+
 /** The chat names the top three. The wide product list is filtered to every best seller. */
 function showBestSellers(state: PrototypeState) {
   const agentId = state.agents.some((item) => item.id === "chief" && item.installed) ? "chief" : state.selectedAgentId;
@@ -1901,15 +1911,21 @@ export function runChip(state: PrototypeState, label: string) {
     return;
   }
   if (label === "Bundle the best sellers") {
-    push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
-    push(state, "chief", {
+    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
+    push(state, agentId, {
       id: id(state),
       type: "text",
       role: "assistant",
-      text: "I’d bundle the Studio ANC Headphones with the earbuds case and a cable at $289. That lifts the $125 average order and keeps the power bank from being the whole cart. Product ideas already has a draft started.",
+      text: "I’d bundle the Studio ANC Headphones with the earbuds case and a cable at $289. That lifts the $125 average order and keeps the power bank from being the whole cart. We can draft it here — Product ideas already has a start if you want to hand it off later.",
     });
-    ensureInstalled(state, "ideas");
-    state.selectedAgentId = "ideas";
+    push(state, agentId, {
+      id: id(state),
+      type: "chips",
+      chips: [
+        { label: "Draft the $289 bundle", tone: "primary", send: true },
+        { label: "Pass this over to Product ideas", tone: "secondary" },
+      ],
+    });
     state.preview = "products";
     state.adminLayout = "expanded";
     state.view = emptyView();
@@ -1921,12 +1937,41 @@ export function runChip(state: PrototypeState, label: string) {
       id: id(state),
       type: "text",
       role: "assistant",
-      text: "I’d build Monday’s campaign around these three. Lead with the Studio ANC Headphones, then the power bank and the portable charger. Leave the desk lamp out until the page says it ships this week.",
+      text: "I’d build Monday’s campaign around these three. Lead with the Studio ANC Headphones, then the power bank and the portable charger. Leave the desk lamp out until the page says it ships this week. Campaigns isn’t connected yet — we can line the ads up here first.",
     });
-    ensureInstalled(state, "campaigns");
-    state.selectedAgentId = "campaigns";
-    state.preview = "campaigns";
-    state.adminLayout = "expanded";
+    push(state, agentId, {
+      id: id(state),
+      type: "chips",
+      chips: [
+        { label: "Line up Monday’s ads", tone: "primary" },
+        { label: "Pass this over to Campaigns", tone: "secondary" },
+      ],
+    });
+    return;
+  }
+  if (label === "Line up Monday’s ads") {
+    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
+    push(state, agentId, {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "Lined up for Monday: headphone photo first, power bank and portable charger behind it, and the restock line “Back in stock. Ships tomorrow.” Drop the lamp until the product page matches. Nothing is live until you connect Campaigns or publish from there.",
+    });
+    push(state, agentId, {
+      id: id(state),
+      type: "chips",
+      chips: [{ label: "Pass this over to Campaigns", tone: "secondary" }],
+    });
+    return;
+  }
+  if (label === "Pass this over to Product ideas") {
+    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
+    handOffTo(state, "ideas");
+    return;
+  }
+  if (label === "Pass this over to Campaigns") {
+    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
+    handOffTo(state, "campaigns");
     return;
   }
   if (label === "Show the best sellers" || label === "Show bestsellers") {
@@ -1946,7 +1991,15 @@ export function runChip(state: PrototypeState, label: string) {
       id: id(state),
       type: "text",
       role: "assistant",
-      text: "I’d bundle the Studio ANC Headphones with the earbuds case and a cable at $289. That lifts the $125 average order and keeps the power bank from being the whole cart.",
+      text: "I’d bundle the Studio ANC Headphones with the earbuds case and a cable at $289. That lifts the $125 average order and keeps the power bank from being the whole cart. We can draft it here, or pass it to Product ideas when you’re ready.",
+    });
+    push(state, agentId, {
+      id: id(state),
+      type: "chips",
+      chips: [
+        { label: "Draft the $289 bundle", tone: "primary", send: true },
+        { label: "Pass this over to Product ideas", tone: "secondary" },
+      ],
     });
     state.preview = "products";
     state.adminLayout = "expanded";

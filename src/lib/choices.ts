@@ -334,7 +334,10 @@ function offerFor(agentId: string, q: string, previousSet?: string): Intent | nu
       cards: setKey === "a" ? ideaSets[0] : ideaSets[1],
     };
   }
-  if (agentId === "ideas" && /draft the \$?289 bundle|draft the bundle|headphone bundle/.test(q)) {
+  if (
+    (agentId === "ideas" || agentId === "chief") &&
+    /draft the \$?289 bundle|draft the bundle|headphone bundle/.test(q)
+  ) {
     return {
       kind: "offer",
       mode: "single",
