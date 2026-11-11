@@ -95,11 +95,13 @@ vec4 draw(vec2 uv) {
   float r0 = mix(0.8 - 0.04 * uWobble, 0.8 + 0.04 * uWobble, n0);
   float d0 = distance(uv, (r0 * invLen) * uv);
   float v0 = light1(1.0, 10.0 / uGlow, d0);
-  v0 *= smoothstep(r0 * 1.05, r0, len);
+  // Wider outer falloff so the ring reads thick at small avatar sizes.
+  v0 *= smoothstep(r0 * 1.12, r0 * 0.92, len);
   float reach = max(uBleed, 0.04);
-  float innerFade = smoothstep(r0 * (1.0 - 0.2 * reach), r0 * (1.0 - 0.05 * reach), len);
+  // Hollow less of the core — speaking-thick band even when idle.
+  float innerFade = smoothstep(r0 * (1.0 - 0.32 * reach), r0 * (1.0 - 0.02 * reach), len);
   v0 *= mix(innerFade, 1.0, bgLuminance * 0.7 * min(uBleed, 1.0));
-  float body = smoothstep(0.8 - 0.2 * reach, 0.8, len);
+  float body = smoothstep(0.8 - 0.32 * reach, 0.8, len);
   // Idle keeps the swirl near 50/50 so one hue doesn't pull the ring off-level.
   float clRaw = cos(ang + uSwirl) * 0.5 + 0.5;
   float cl = mix(0.5, clRaw, clamp(uAwake * 2.4 + 0.28, 0.0, 1.0));
@@ -207,8 +209,11 @@ const TUNE: Record<
   disabled: { speed: 0, awake: 0.15, glow: 0.9, wobble: 0.08, trail: 0.25, highlight: 0.2 },
 };
 
-/** UV zoom: a touch smaller than a filled orb so the thick glow isn't clipped. */
-const ORBIT_SCALE = 0.98;
+/**
+ * UV zoom: a touch smaller than the old fill (0.82) so glow isn’t clipped,
+ * but still large enough that the thick band reads at nav size.
+ */
+const ORBIT_SCALE = 0.9;
 
 const reactsToVoice = (state: OrbState) =>
   state === 'listening' || state === 'thinking' || state === 'speaking' || state === 'connecting';
