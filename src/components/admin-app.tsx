@@ -34,7 +34,6 @@ import type { Chip, Product } from "@/lib/prototype";
 import { emptyWork, readWorkSnapshot, saveWork, subscribeWork } from "@/lib/workspace";
 import { useShellLayout } from "@/hooks/use-shell-layout";
 import { SHELL, type AdminLayoutMode } from "@/lib/shell-layout";
-import { PIcon } from "@/components/polaris-icon";
 
 const bootMs = 1500;
 
@@ -579,28 +578,10 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         />
         <div
           ref={chatRef}
-          className={`flex min-h-0 flex-col ${takeover ? "shrink-0 overflow-hidden" : "min-w-0 flex-1"}`}
-          style={takeover ? { width: SHELL.chatTakeoverStrip } : undefined}
+          className={`relative flex min-h-0 flex-col ${takeover ? "pointer-events-none absolute inset-y-0 w-0 overflow-hidden opacity-0" : "min-w-0 flex-1"}`}
+          aria-hidden={takeover ? true : undefined}
         >
-          {takeover ? (
-            <button
-              type="button"
-              aria-label="Show conversation"
-              title="Show conversation"
-              onClick={() => setAdminLayout("expanded")}
-              className="press group relative flex h-full w-full flex-col items-center justify-start gap-3 rounded-[20px] bg-[#161716] pt-7 text-[#b5b5b5] transition-colors hover:bg-[#1c1d1c] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005bd3]"
-            >
-              <span className="grid size-8 place-items-center rounded-full bg-white/[0.06] text-white group-hover:bg-white/[0.1]">
-                <PIcon name="Chat" size={18} />
-              </span>
-              <span
-                className="text-[11px] font-medium tracking-[0.04em] text-[#8e8f8b] group-hover:text-white"
-                style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-              >
-                Conversation
-              </span>
-            </button>
-          ) : (
+          {!takeover ? (
             <ChatColumn
               state={state}
               liveSegments={liveAgentId === agent.id ? liveSegments : null}
@@ -632,7 +613,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
               onChoose={choose}
               onBundle={bundleChoices}
             />
-          )}
+          ) : null}
         </div>
       <PreviewColumn
         present={panels.preview}

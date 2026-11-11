@@ -328,6 +328,18 @@ export function PreviewColumn({
           {showLayoutControl && onLayout && !sheet ? (
             <AdminLayoutControl mode={layoutMode} onChange={onLayout} />
           ) : null}
+          {takeover && onLayout ? (
+            <button
+              type="button"
+              aria-label="Show conversation"
+              title="Show conversation"
+              onClick={() => onLayout("expanded")}
+              className="press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-[#f1f1f1] px-2.5 text-[12px] font-medium text-[#303030] hover:bg-[#e3e3e3] active:bg-[#dcdcdc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005bd3]"
+            >
+              <PIcon name="Chat" size={16} />
+              Conversation
+            </button>
+          ) : null}
           {sheet ? (
             <button
               type="button"
