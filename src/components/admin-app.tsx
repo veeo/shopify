@@ -598,7 +598,9 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         <div
           ref={chatRef}
           data-shell-pane="chat"
-          className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
+          // Stays parked under the admin cover during takeover (no flex-shrink);
+          // the panel overlays and reveals this pane instead of collapsing it.
+          className={`relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
             takeover ? "pointer-events-none select-none" : ""
           }`}
           aria-hidden={takeover ? true : undefined}

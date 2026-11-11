@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type ReactNode, type TransitionEvent } from "react";
 import { flushSync } from "react-dom";
 import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
@@ -97,54 +97,99 @@ export function PreviewColumn({
   const layoutMode = state.adminLayout;
   const wide = !sheet && (layoutMode === "expanded" || layoutMode === "takeover");
   const density = adminDensityForLayout(layoutMode, sheet);
-  // Keep the pre-takeover docked width as the animation start so sidebar→full
-  // grows from ~393 (not jumping to the wide fallback while measuring).
+  // Pre-takeover docked width — also the flex slot while the overlay covers chat.
   const dockedWidth = dockWidth ?? (layoutMode === "expanded" ? 584 : 393);
   const asideRef = useRef<HTMLElement>(null);
   const [panelWidth, setPanelWidth] = useState(dockedWidth);
-  // Grow/shrink with panel-settle. Aside is right-anchored (ml-auto + origin-right)
-  // so width changes move the left edge over chat while the right edge stays put.
+  // Cover/reveal: panel is absolute from the docked slot's right edge so it
+  // slides over parked chat; the slot keeps chat from flex-shrinking.
+  const [overlay, setOverlay] = useState(takeover);
+  const [slotWidth, setSlotWidth] = useState(dockedWidth);
+  const overlayRef = useRef(takeover);
+  const seenTakeover = useRef(takeover);
+
   useLayoutEffect(() => {
-    if (!takeover) {
-      setPanelWidth(dockedWidth);
-      return;
-    }
     const el = asideRef.current;
-    const parent = el?.parentElement;
-    if (!el || !parent) {
-      setPanelWidth(dockedWidth);
-      return;
+    const slot = el?.parentElement;
+    const shell = slot?.parentElement;
+
+    function coverWidth() {
+      if (!shell) return dockedWidth;
+      const chat = shell.querySelector<HTMLElement>('[data-shell-pane="chat"]');
+      if (!chat || !slot) return dockedWidth;
+      const chatRect = chat.getBoundingClientRect();
+      const slotRect = slot.getBoundingClientRect();
+      // Grow from the slot's right edge leftward to the chat's left edge.
+      return Math.max(dockedWidth, Math.round(slotRect.right - chatRect.left));
     }
-    function measure() {
-      if (!el || !parent) return;
-      // Chat stays in-flow and flex-shrinks under the growing panel. Count every
-      // in-flow sibling for gaps, but treat the chat pane as zero width so the
-      // panel target is "everything left of the right edge after rail chrome."
-      let other = 0;
-      let inFlow = 0;
-      for (const child of parent.children) {
-        const cs = getComputedStyle(child);
-        if (cs.position === "absolute" || cs.position === "fixed") continue;
-        inFlow += 1;
-        if (child === el) continue;
-        if ((child as HTMLElement).dataset.shellPane === "chat") continue;
-        other += (child as HTMLElement).getBoundingClientRect().width;
+
+    if (takeover) {
+      const enteringCover = !seenTakeover.current;
+      if (enteringCover) {
+        const from = panelWidth > 0 ? panelWidth : dockedWidth;
+        setSlotWidth(from);
+        setPanelWidth(from);
+        setOverlay(true);
+        overlayRef.current = true;
       }
-      const styles = getComputedStyle(parent);
-      const padX = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
-      const gap = parseFloat(styles.columnGap || styles.gap || "0") || 0;
-      const gaps = Math.max(0, inFlow - 1) * gap;
-      setPanelWidth(Math.max(dockedWidth, Math.round(parent.clientWidth - padX - other - gaps)));
+      seenTakeover.current = true;
+
+      let frame = 0;
+      let armed = !enteringCover;
+      const apply = () => setPanelWidth(coverWidth());
+      if (enteringCover) {
+        // Wait until overlay has painted at docked width, then grow.
+        // Keep ResizeObserver disarmed so it cannot snap to full early.
+        frame = window.requestAnimationFrame(() => {
+          frame = window.requestAnimationFrame(() => {
+            apply();
+            armed = true;
+          });
+        });
+      } else {
+        apply();
+      }
+
+      if (!shell) return () => window.cancelAnimationFrame(frame);
+      const ro = new ResizeObserver(() => {
+        if (!armed) return;
+        if (overlayRef.current && seenTakeover.current) apply();
+      });
+      ro.observe(shell);
+      for (const child of shell.children) ro.observe(child);
+      return () => {
+        window.cancelAnimationFrame(frame);
+        ro.disconnect();
+      };
     }
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(parent);
-    // Rail collapse/expand changes sibling widths without resizing the parent.
-    for (const child of parent.children) {
-      if (child !== el) ro.observe(child);
+
+    // Leave cover: shrink to docked while still overlaid, then drop overlay.
+    if (overlayRef.current) {
+      seenTakeover.current = false;
+      setPanelWidth(dockedWidth);
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const timer = window.setTimeout(() => {
+        if (!overlayRef.current) return;
+        overlayRef.current = false;
+        setOverlay(false);
+      }, reduce ? 0 : 340);
+      return () => window.clearTimeout(timer);
     }
-    return () => ro.disconnect();
-  }, [takeover, dockedWidth]);
+
+    seenTakeover.current = false;
+    setOverlay(false);
+    setPanelWidth(dockedWidth);
+  }, [takeover, dockedWidth]); // eslint-disable-line react-hooks/exhaustive-deps -- enter/exit edges; panelWidth read once on enter
+
+  function onPanelTransitionEnd(event: TransitionEvent<HTMLElement>) {
+    if (event.propertyName !== "width") return;
+    if (event.target !== asideRef.current) return;
+    if (!takeover && overlayRef.current) {
+      overlayRef.current = false;
+      setOverlay(false);
+    }
+  }
+
   const [entering, setEntering] = useState(false);
   const [seenPresent, setSeenPresent] = useState(present);
   if (seenPresent !== present) {
@@ -555,17 +600,28 @@ export function PreviewColumn({
     );
   }
 
+  // Slot stays docked-sized in the flex row so chat never shrinks. While
+  // covering, the aside is absolute from the slot's right edge and grows left
+  // over the conversation; on exit it shrinks to reveal chat underneath.
   return (
-    <aside
-      ref={asideRef}
-      data-admin-panel={takeover ? "takeover" : "docked"}
-      // Right-edge anchored: last flex child + origin-right. Width growth moves
-      // the left edge over the conversation while the shell-right edge stays put.
-      className="panel-settle flex h-full shrink-0 origin-right justify-end overflow-hidden"
-      style={{ width: panelWidth }}
+    <div
+      data-shell-pane={overlay ? "admin-slot" : undefined}
+      className={`relative h-full shrink-0 ${overlay ? "" : "panel-settle"}`}
+      style={{ width: overlay ? slotWidth : panelWidth }}
     >
-      {panel}
-    </aside>
+      <aside
+        ref={asideRef}
+        data-admin-panel={overlay || takeover ? "takeover" : "docked"}
+        data-admin-cover={overlay ? "true" : undefined}
+        onTransitionEnd={onPanelTransitionEnd}
+        className={`flex h-full origin-right justify-end overflow-hidden ${
+          overlay ? "panel-settle absolute inset-y-0 right-0 z-20" : "w-full"
+        }`}
+        style={overlay ? { width: panelWidth } : undefined}
+      >
+        {panel}
+      </aside>
+    </div>
   );
 }
 
