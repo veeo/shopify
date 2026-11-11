@@ -97,10 +97,13 @@ export function PreviewColumn({
   const layoutMode = state.adminLayout;
   const wide = !sheet && (layoutMode === "expanded" || layoutMode === "takeover");
   const density = adminDensityForLayout(layoutMode, sheet);
-  const dockedWidth = dockWidth ?? (wide ? 584 : 393);
+  // Keep the pre-takeover docked width as the animation start so sidebar→full
+  // grows from ~393 (not jumping to the wide fallback while measuring).
+  const dockedWidth = dockWidth ?? (layoutMode === "expanded" ? 584 : 393);
   const asideRef = useRef<HTMLElement>(null);
   const [panelWidth, setPanelWidth] = useState(dockedWidth);
-  // Grow/shrink with the same panel-settle width transition used for sidebar ↔ expanded.
+  // Grow/shrink with panel-settle. Aside is right-anchored (ml-auto + origin-right)
+  // so width changes move the left edge over chat while the right edge stays put.
   useLayoutEffect(() => {
     if (!takeover) {
       setPanelWidth(dockedWidth);
@@ -114,23 +117,32 @@ export function PreviewColumn({
     }
     function measure() {
       if (!el || !parent) return;
+      // Chat stays in-flow and flex-shrinks under the growing panel. Count every
+      // in-flow sibling for gaps, but treat the chat pane as zero width so the
+      // panel target is "everything left of the right edge after rail chrome."
       let other = 0;
-      const inFlow: Element[] = [];
+      let inFlow = 0;
       for (const child of parent.children) {
         const cs = getComputedStyle(child);
         if (cs.position === "absolute" || cs.position === "fixed") continue;
-        inFlow.push(child);
-        if (child !== el) other += (child as HTMLElement).getBoundingClientRect().width;
+        inFlow += 1;
+        if (child === el) continue;
+        if ((child as HTMLElement).dataset.shellPane === "chat") continue;
+        other += (child as HTMLElement).getBoundingClientRect().width;
       }
       const styles = getComputedStyle(parent);
       const padX = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
       const gap = parseFloat(styles.columnGap || styles.gap || "0") || 0;
-      const gaps = Math.max(0, inFlow.length - 1) * gap;
+      const gaps = Math.max(0, inFlow - 1) * gap;
       setPanelWidth(Math.max(dockedWidth, Math.round(parent.clientWidth - padX - other - gaps)));
     }
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(parent);
+    // Rail collapse/expand changes sibling widths without resizing the parent.
+    for (const child of parent.children) {
+      if (child !== el) ro.observe(child);
+    }
     return () => ro.disconnect();
   }, [takeover, dockedWidth]);
   const [entering, setEntering] = useState(false);
@@ -546,7 +558,10 @@ export function PreviewColumn({
   return (
     <aside
       ref={asideRef}
-      className="panel-settle flex h-full shrink-0 justify-end overflow-hidden"
+      data-admin-panel={takeover ? "takeover" : "docked"}
+      // Right-edge anchored: last flex child + origin-right. Width growth moves
+      // the left edge over the conversation while the shell-right edge stays put.
+      className="panel-settle flex h-full shrink-0 origin-right justify-end overflow-hidden"
       style={{ width: panelWidth }}
     >
       {panel}

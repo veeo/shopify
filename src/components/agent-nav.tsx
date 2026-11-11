@@ -7,6 +7,7 @@ import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Tip } from "@/components/chat-column";
 import { PIcon } from "@/components/polaris-icon";
 import type { PreviewId } from "@/lib/admin-nav";
+import type { AgentsRailMode } from "@/lib/shell-layout";
 import { hiddenAgents, railGroup, selectedAgent, visibleAgents, type Agent, type AgentGroup, type PrototypeState } from "@/lib/prototype";
 
 const groups: { id: AgentGroup; label: string | null }[] = [
@@ -28,7 +29,7 @@ export function AgentNav({
   present = true,
   presentation = "rail",
   drawerOpen = false,
-  merged = false,
+  railMode = "sidekick",
   onCloseDrawer,
   onToggleNav,
   onSelect,
@@ -52,8 +53,13 @@ export function AgentNav({
   /** In-flow rail, or a mobile/compact overlay drawer. */
   presentation?: "rail" | "drawer";
   drawerOpen?: boolean;
-  /** Full layout: morph sidekick roster into Shopify admin nav. */
-  merged?: boolean;
+  /**
+   * Left-rail adaptation:
+   * - sidekick — agents roster (conversation mode)
+   * - hybrid — admin nav + condensed sidekick (full takeover)
+   * - minimized — icon-only hybrid (collapsed from full)
+   */
+  railMode?: AgentsRailMode;
   onCloseDrawer?: () => void;
   onToggleNav: () => void;
   onSettings: () => void;
@@ -78,7 +84,8 @@ export function AgentNav({
   const [alertsRead, setAlertsRead] = useState(false);
   const alertsRef = useRef<HTMLSpanElement>(null);
   const [hiddenOpen, setHiddenOpen] = useState(false);
-  const [mergePhase, setMergePhase] = useState<MergePhase>(merged ? "admin" : "agents");
+  const adminRail = railMode === "hybrid" || railMode === "minimized";
+  const [mergePhase, setMergePhase] = useState<MergePhase>(adminRail ? "admin" : "agents");
   const query = state.search.trim().toLowerCase();
   const hiddenItems = state.scenario === "setup" ? [] : hiddenAgents(state);
   const selected = state.agents.find((item) => item.id === state.selectedAgentId);
@@ -94,21 +101,20 @@ export function AgentNav({
     if (query && hiddenItems.length > 0) setHiddenOpen(true);
   }
   const drawer = presentation === "drawer";
-  // Drawers always show the expanded roster so agents are easy to pick on a phone.
-  // Full merge always shows labels.
-  const collapsed = drawer || merged ? false : !navOpen;
+  // Drawers always show the expanded roster. Hybrid/minimized use navOpen for width.
+  const collapsed = drawer ? false : !navOpen;
   const merging = mergePhase === "collapsing" || mergePhase === "admin";
   const showAdmin = mergePhase === "collapsing" || mergePhase === "admin";
   const showAgents = mergePhase !== "admin";
 
   useEffect(() => {
-    if (merged) {
+    if (adminRail) {
       if (mergePhase === "agents") setMergePhase("collapsing");
       return;
     }
     setMergePhase("agents");
     setAlerts(false);
-  }, [merged]); // eslint-disable-line react-hooks/exhaustive-deps -- phase machine driven by merged edge
+  }, [adminRail]); // eslint-disable-line react-hooks/exhaustive-deps -- phase machine driven by rail mode edge
 
   useEffect(() => {
     if (mergePhase !== "collapsing") return;
@@ -118,7 +124,7 @@ export function AgentNav({
   }, [mergePhase]);
 
   function pick(id: string) {
-    if (merged) return;
+    if (adminRail) return;
     onSelect(id);
     if (drawer) onCloseDrawer?.();
   }
@@ -281,7 +287,12 @@ export function AgentNav({
   }
 
   function search() {
-    if (merged) return;
+    // In full/hybrid the top search opens the admin palette; sidekick mode searches agents.
+    if (adminRail) {
+      if (collapsed) onToggleNav();
+      onAdminSearch?.();
+      return;
+    }
     if (collapsed) {
       onToggleNav();
       if (!state.searchOpen) onSearch();
@@ -294,11 +305,13 @@ export function AgentNav({
   if (drawer && !drawerOpen) return null;
 
   let agentStack = 0;
+  const logoLabel = drawer ? "Close sidekicks" : navOpen ? "Collapse navigation" : "Expand navigation";
 
   const body = (
     <aside
       ref={navRef}
-      data-agents={drawer ? "drawer" : merged ? "merged" : "rail"}
+      data-agents={drawer ? "drawer" : railMode === "sidekick" ? "rail" : railMode}
+      data-rail={railMode}
       data-merge={mergePhase}
       className={
         drawer
@@ -310,22 +323,18 @@ export function AgentNav({
       <button
         type="button"
         data-flip="logo"
-        aria-label={
-          drawer ? "Close sidekicks" : merged ? "Shopify" : navOpen ? "Collapse navigation" : "Expand navigation"
-        }
-        aria-expanded={drawer || merged ? true : navOpen}
-        aria-keyshortcuts={drawer || merged ? undefined : "Control+B Meta+B"}
-        onClick={drawer ? () => onCloseDrawer?.() : merged ? undefined : onToggleNav}
+        aria-label={logoLabel}
+        aria-expanded={drawer ? true : navOpen}
+        aria-keyshortcuts={drawer ? undefined : "Control+B Meta+B"}
+        onClick={drawer ? () => onCloseDrawer?.() : onToggleNav}
         className={`group/logo press absolute top-7 z-20 grid size-8 place-items-center rounded-full transition-colors hover:bg-white/[0.08] ${collapsed ? "left-4" : "left-5"}`}
       >
-        <span className={`transition-opacity duration-150 ${merged ? "" : "group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0"}`}>
+        <span className="transition-opacity duration-150 group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0">
           <ShopifyMark />
         </span>
-        {merged ? null : (
-          <span className="absolute inset-0 grid place-items-center text-white opacity-0 transition-opacity duration-150 group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100">
-            <PIcon name={drawer ? "X" : "LayoutSidebarLeft"} size={20} />
-          </span>
-        )}
+        <span className="absolute inset-0 grid place-items-center text-white opacity-0 transition-opacity duration-150 group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100">
+          <PIcon name={drawer ? "X" : "LayoutSidebarLeft"} size={20} />
+        </span>
       </button>
       <div
         inert={parked ? true : undefined}
@@ -334,31 +343,32 @@ export function AgentNav({
       >
         <div className={`relative z-0 flex bg-transparent ${collapsed ? "flex-col items-center gap-4" : "items-center gap-1.5 pb-4 pl-2"}`}>
           <span className={`size-8 shrink-0 ${collapsed ? "mb-2" : ""}`} aria-hidden />
-          <span
-            data-flip="add"
-            className={`${collapsed ? "" : "ml-auto"} transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              merging ? "pointer-events-none opacity-0" : "opacity-100"
-            }`}
-          >
-            <IconButton label="Add a sidekick" onClick={onAdd} active={state.mode === "add"}>
+          <span data-flip="add" className={collapsed ? "" : "ml-auto"}>
+            <IconButton
+              label="Add a sidekick"
+              onClick={() => {
+                if (adminRail && collapsed) onToggleNav();
+                onAdd();
+              }}
+              active={state.mode === "add"}
+            >
               <PIcon name="Plus" size={20} />
             </IconButton>
           </span>
-          <span
-            data-flip="search"
-            className={`transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              merging ? "pointer-events-none opacity-0" : "opacity-100"
-            }`}
-          >
-            <IconButton label={state.searchOpen ? "Close search" : "Search sidekicks"} onClick={search} active={state.searchOpen}>
-              <PIcon name={state.searchOpen ? "X" : "Search"} size={20} />
+          <span data-flip="search">
+            <IconButton
+              label={adminRail ? "Search" : state.searchOpen ? "Close search" : "Search sidekicks"}
+              onClick={search}
+              active={!adminRail && state.searchOpen}
+            >
+              <PIcon name={!adminRail && state.searchOpen ? "X" : "Search"} size={20} />
             </IconButton>
           </span>
         </div>
 
         {collapsed ? <div className="mx-auto mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
 
-        {state.searchOpen && !collapsed && !merging ? (
+        {state.searchOpen && !collapsed && !adminRail ? (
           <div className="rise -mt-4 px-1">
             <s-search-field
               label="Search sidekicks"
@@ -447,13 +457,13 @@ export function AgentNav({
               }`}
             >
               {mergePhase === "admin" ? (
-                <SidekickLead agent={lead} expanded onView={() => onViewSidekicks?.()} />
+                <SidekickLead agent={lead} expanded={!collapsed} onView={() => onViewSidekicks?.()} />
               ) : (
                 // Spacer matching the lead so rising nav lands under it.
-                <div className="mb-3 h-12 shrink-0" aria-hidden />
+                <div className={`mb-3 shrink-0 ${collapsed ? "h-8" : "h-12"}`} aria-hidden />
               )}
               <AdminNavSections
-                expanded
+                expanded={!collapsed}
                 preview={state.preview}
                 onOpen={(id) => onAdminOpen?.(id)}
                 onGo={(page) => onAdminGo?.(page)}

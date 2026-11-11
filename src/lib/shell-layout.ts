@@ -36,6 +36,25 @@ export type AdminLayoutMode = "sidebar" | "expanded" | "takeover";
 
 export const ADMIN_LAYOUT_MODES: readonly AdminLayoutMode[] = ["sidebar", "expanded", "takeover"] as const;
 
+/**
+ * Left-rail adaptation — independent of admin panel width, but coupled in practice:
+ *
+ * | Rail mode   | When                         | Left rail chrome                                      |
+ * |-------------|------------------------------|-------------------------------------------------------|
+ * | sidekick    | Conversation (A)             | Agents roster, logo, plus, search, footer             |
+ * | hybrid      | Full admin takeover (B)      | Admin nav + condensed sidekick lead; logo+plus+search |
+ * | minimized   | Collapsed from full (C)      | Icon-only / narrow hybrid; admin stays large          |
+ *
+ * Transitions:
+ * - Entering takeover → hybrid (expanded labels).
+ * - Logo collapse while hybrid → minimized (admin stays takeover).
+ * - Logo expand while minimized → hybrid.
+ * - “View sidekicks” / leaving takeover → sidekick.
+ */
+export type AgentsRailMode = "sidekick" | "hybrid" | "minimized";
+
+export const AGENTS_RAIL_MODES: readonly AgentsRailMode[] = ["sidekick", "hybrid", "minimized"] as const;
+
 /** Content density inside the admin panel — driven by layout mode, not window width. */
 export type AdminDensity = "compact" | "desktop";
 
@@ -52,6 +71,12 @@ export function isAdminWideLayout(mode: AdminLayoutMode): boolean {
 /** Full takeover uses desktop density; sidebar/expanded/sheets stay compact. */
 export function adminDensityForLayout(mode: AdminLayoutMode, sheet = false): AdminDensity {
   return !sheet && mode === "takeover" ? "desktop" : "compact";
+}
+
+/** Resolve the left-rail adaptation from admin layout + collapse preference. */
+export function agentsRailModeFor(adminLayout: AdminLayoutMode, railExpanded: boolean): AgentsRailMode {
+  if (adminLayout !== "takeover") return "sidekick";
+  return railExpanded ? "hybrid" : "minimized";
 }
 
 export type ShellMode = "desktop-wide" | "desktop" | "compact" | "mobile" | "fold-open";

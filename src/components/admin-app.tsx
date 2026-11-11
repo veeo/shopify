@@ -33,7 +33,7 @@ import { segmentsOf, sourcesOf } from "@/lib/turn";
 import type { Chip, Product } from "@/lib/prototype";
 import { emptyWork, readWorkSnapshot, saveWork, subscribeWork } from "@/lib/workspace";
 import { useShellLayout } from "@/hooks/use-shell-layout";
-import { SHELL, type AdminLayoutMode } from "@/lib/shell-layout";
+import { agentsRailModeFor, SHELL, type AdminLayoutMode } from "@/lib/shell-layout";
 
 const bootMs = 1500;
 
@@ -498,6 +498,8 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         ? "sidebar"
         : state.adminLayout;
   const takeover = !adminSheet && effectiveLayout === "takeover" && panels.preview;
+  // A: sidekick · B: hybrid (full) · C: minimized rail while admin stays full.
+  const railMode = agentsRailModeFor(takeover ? "takeover" : effectiveLayout, navOpen);
   const dockedAdminWidth =
     takeover
       ? undefined
@@ -506,7 +508,14 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         : Math.min(layout.adminWidth, SHELL.adminNarrow);
 
   function setAdminLayout(mode: AdminLayoutMode) {
+    // Entering full expands the hybrid rail; leaving full restores sidekick focus.
+    if (mode === "takeover") setSidebarOpen(true);
     dispatch({ type: "admin-layout", mode });
+  }
+
+  function viewSidekicks() {
+    setSidebarOpen(true);
+    setAdminLayout("sidebar");
   }
 
   return (
@@ -528,7 +537,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             state={state}
             presentation="rail"
             navOpen={navOpen}
-            merged={takeover}
+            railMode={railMode}
             onToggleNav={() => setSidebarOpen((open) => !open)}
             onSettings={() => dispatch({ type: "rail", id: "settings" })}
             onLogout={logout}
@@ -540,7 +549,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
             onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
             onDesignSystem={() => setDesign(true)}
-            onViewSidekicks={() => setAdminLayout("sidebar")}
+            onViewSidekicks={viewSidekicks}
             onAdminOpen={(id) => dispatch({ type: "rail", id })}
             onAdminGo={(page) => dispatch({ type: "preview", page, layout: "takeover" })}
             onAdminSearch={(scope) => setPalette({ open: true, scope })}
@@ -580,50 +589,52 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
           aria-hidden
           className="rail-reveal my-3 shrink-0 bg-white/10"
           style={{
+            // Keep a hairline while the admin panel is docked beside chat; hide in full.
             width: showAgentRail && panels.nav && !takeover ? 1 : 0,
             opacity: showAgentRail && panels.nav && !takeover ? 1 : 0,
           }}
         />
         <div
           ref={chatRef}
-          className={`relative flex min-h-0 flex-col ${takeover ? "pointer-events-none absolute inset-y-0 w-0 overflow-hidden opacity-0" : "min-w-0 flex-1"}`}
+          data-shell-pane="chat"
+          className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
+            takeover ? "pointer-events-none select-none" : ""
+          }`}
           aria-hidden={takeover ? true : undefined}
         >
-          {!takeover ? (
-            <ChatColumn
-              state={state}
-              liveSegments={liveAgentId === agent.id ? liveSegments : null}
-              offline={offline}
-              busy={busy && liveAgentId === agent.id}
-              chrome={layout.chatChrome}
-              showAdminButton={adminSheet && panels.preview}
-              adminOpen={adminSheetVisible}
-              onOpenAgents={agentsDrawer ? () => setAgentsDrawerOpen(true) : undefined}
-              onOpenAdmin={adminSheet && panels.preview ? () => setAdminSheetOpen((open) => !open) : undefined}
-              onSwitch={(id) => dispatch({ type: "select", id })}
-              onAddAgent={() => dispatch({ type: "toggle-add" })}
-              locked={busy}
-              onChip={(label) => dispatch({ type: "chip", label })}
-              onSend={send}
-              onStop={stop}
-              onPurpose={(id) => dispatch({ type: "toggle-purpose", id })}
-              onStart={() => dispatch({ type: "chip", label: "Start working" })}
-              onAddCatalog={(id) => dispatch({ type: "add-catalog", id })}
-              onCreate={(name, purpose) => dispatch({ type: "create-agent", name, purpose })}
-              onEditAgent={(patch) => dispatch({ type: "edit-agent", ...patch })}
-              onTogglePin={(id) => dispatch({ type: "toggle-pin", id })}
-              onToggleHide={(id) => dispatch({ type: "toggle-hide", id })}
-              onConversations={(open) => dispatch({ type: "conversations", open })}
-              onNewChat={() => dispatch({ type: "new-chat" })}
-              onOpenConversation={(id) => dispatch({ type: "open-conversation", id })}
-              onDeleteConversation={(id) => dispatch({ type: "delete-conversation", id })}
-              onRate={(id, value) => dispatch({ type: "rate", id, value })}
-              onIntroduced={() => setRoom(true)}
-              onIntroFinished={() => dispatch({ type: "intro-seen" })}
-              onChoose={choose}
-              onBundle={bundleChoices}
-            />
-          ) : null}
+          <ChatColumn
+            state={state}
+            liveSegments={liveAgentId === agent.id ? liveSegments : null}
+            offline={offline}
+            busy={busy && liveAgentId === agent.id}
+            chrome={layout.chatChrome}
+            showAdminButton={adminSheet && panels.preview}
+            adminOpen={adminSheetVisible}
+            onOpenAgents={agentsDrawer ? () => setAgentsDrawerOpen(true) : undefined}
+            onOpenAdmin={adminSheet && panels.preview ? () => setAdminSheetOpen((open) => !open) : undefined}
+            onSwitch={(id) => dispatch({ type: "select", id })}
+            onAddAgent={() => dispatch({ type: "toggle-add" })}
+            locked={busy}
+            onChip={(label) => dispatch({ type: "chip", label })}
+            onSend={send}
+            onStop={stop}
+            onPurpose={(id) => dispatch({ type: "toggle-purpose", id })}
+            onStart={() => dispatch({ type: "chip", label: "Start working" })}
+            onAddCatalog={(id) => dispatch({ type: "add-catalog", id })}
+            onCreate={(name, purpose) => dispatch({ type: "create-agent", name, purpose })}
+            onEditAgent={(patch) => dispatch({ type: "edit-agent", ...patch })}
+            onTogglePin={(id) => dispatch({ type: "toggle-pin", id })}
+            onToggleHide={(id) => dispatch({ type: "toggle-hide", id })}
+            onConversations={(open) => dispatch({ type: "conversations", open })}
+            onNewChat={() => dispatch({ type: "new-chat" })}
+            onOpenConversation={(id) => dispatch({ type: "open-conversation", id })}
+            onDeleteConversation={(id) => dispatch({ type: "delete-conversation", id })}
+            onRate={(id, value) => dispatch({ type: "rate", id, value })}
+            onIntroduced={() => setRoom(true)}
+            onIntroFinished={() => dispatch({ type: "intro-seen" })}
+            onChoose={choose}
+            onBundle={bundleChoices}
+          />
         </div>
       <PreviewColumn
         present={panels.preview}
