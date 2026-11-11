@@ -4,10 +4,11 @@ import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type
 import { flushSync } from "react-dom";
 import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
-import { Badge, Body, Btn, Card as AdminCard, circleButton, HeaderExtras, HeaderSlotProvider, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
+import { AdminLayoutControl, Badge, Body, Btn, Card as AdminCard, circleButton, HeaderExtras, HeaderSlotProvider, Muted, Row, Section, Table, TableSearch, Toggle, TopBar } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { WorkspaceViewProvider, useWorkspaceView, type WorkspaceViewApi } from "@/components/workspace-view";
 import { isSettingsPage, sectionChoices, sharesSection } from "@/lib/admin-nav";
+import type { AdminLayoutMode } from "@/lib/shell-layout";
 import { bindScrollReader } from "@/lib/workspace";
 import { bestSellerIds, bestSellerRank, type BusinessType, type PreviewId, type Product, type ProductTone, type PrototypeState } from "@/lib/prototype";
 
@@ -24,6 +25,9 @@ export function PreviewColumn({
   sheetOpen = false,
   sheetEdge = "end",
   dockWidth,
+  takeover = false,
+  showLayoutControl = false,
+  onLayout,
   onCloseSheet,
   onPreview,
   onChip,
@@ -47,8 +51,13 @@ export function PreviewColumn({
   presentation?: "docked" | "sheet";
   sheetOpen?: boolean;
   sheetEdge?: "bottom" | "end";
-  /** Width when docked; falls back to the classic 393 / 584 sizes. */
+  /** Width when docked; falls back to the classic 393 / 584 sizes. Omitted in takeover (flex). */
   dockWidth?: number;
+  /** Admin fills the workspace beside the agents rail. */
+  takeover?: boolean;
+  /** Desktop layout-mode dropdown in the admin chrome. */
+  showLayoutControl?: boolean;
+  onLayout?: (mode: AdminLayoutMode) => void;
   onCloseSheet?: () => void;
   onPreview: (page: PreviewId, wide?: boolean) => void;
   onChip: (label: string) => void;
@@ -67,8 +76,9 @@ export function PreviewColumn({
   onView: (patch: Partial<PrototypeState["view"]> & { draft?: Record<string, string> }) => void;
 }) {
   const sheet = presentation === "sheet";
-  const wide = !sheet && state.previewWide;
-  const panelWidth = dockWidth ?? (wide ? 584 : 393);
+  const layoutMode = state.adminLayout;
+  const wide = !sheet && (layoutMode === "expanded" || layoutMode === "takeover");
+  const panelWidth = takeover ? undefined : dockWidth ?? (wide ? 584 : 393);
   const [entering, setEntering] = useState(false);
   const [seenPresent, setSeenPresent] = useState(present);
   if (seenPresent !== present) {
@@ -244,10 +254,11 @@ export function PreviewColumn({
       <div
         data-admin-page={state.preview}
         data-admin-wide={wide ? "true" : "false"}
+        data-admin-layout={sheet ? "sheet" : layoutMode}
         data-admin-query={state.view.query}
         data-admin-tab={state.view.tab}
         data-admin-record={state.view.recordId}
-        data-admin={sheet ? "sheet" : "docked"}
+        data-admin={sheet ? "sheet" : takeover ? "takeover" : "docked"}
         inert={!present && !sheet ? true : undefined}
         aria-hidden={!present && !sheet ? true : undefined}
         className={`p-partial-theme-admin-next-light relative flex h-full w-full shrink-0 flex-col overflow-hidden text-[#303030] ${
@@ -314,15 +325,8 @@ export function PreviewColumn({
               </span>
             </button>
           )}
-          {wide ? (
-            <button
-              type="button"
-              aria-label="Collapse admin"
-              onClick={() => onPreview(state.preview, false)}
-              className={`${circleButton} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005bd3]`}
-            >
-              <PIcon name="LayoutSidebarRight" size={18} />
-            </button>
+          {showLayoutControl && onLayout && !sheet ? (
+            <AdminLayoutControl mode={layoutMode} onChange={onLayout} />
           ) : null}
           {sheet ? (
             <button
@@ -472,7 +476,10 @@ export function PreviewColumn({
   }
 
   return (
-    <aside className="panel-settle flex h-full shrink-0 justify-end overflow-hidden" style={{ width: panelWidth }}>
+    <aside
+      className={`panel-settle flex h-full justify-end overflow-hidden ${takeover ? "min-w-0 flex-1" : "shrink-0"}`}
+      style={panelWidth !== undefined ? { width: panelWidth } : undefined}
+    >
       {panel}
     </aside>
   );
