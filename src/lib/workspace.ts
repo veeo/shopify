@@ -1,4 +1,5 @@
 import type { PreviewId } from "@/lib/admin-nav";
+import { isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
 
 /** Filters, the open record, and the draft sitting on top of the admin page. */
 export type ViewState = {
@@ -10,10 +11,13 @@ export type ViewState = {
   scroll: number;
 };
 
-/** Where one sidekick left the admin. */
+/** Where one sidekick left the admin (page + filters). Shell width is global. */
 export type Workspace = ViewState & {
   page: PreviewId;
+  /** Legacy wide flag; admin panel size is a global shell preference now. */
   wide: boolean;
+  /** Legacy per-agent layout snapshot; ignored on restore/switch. */
+  layout?: AdminLayoutMode;
 };
 
 export type WorkspaceScenario = "setup" | "active";
@@ -21,9 +25,6 @@ export type WorkspaceScenario = "setup" | "active";
 export function emptyView(): ViewState {
   return { query: "", tab: "All", sort: "newest", recordId: "", draft: {}, scroll: 0 };
 }
-
-/** Opening one of these sidekicks shows its admin page in the wide panel. */
-const expandedTools = new Set(["customers", "orders", "finance", "analytics"]);
 
 function place(page: PreviewId, wide: boolean, extra?: Partial<ViewState>): Workspace {
   return { ...emptyView(), page, wide, ...extra };
@@ -68,7 +69,7 @@ export function homeFor(agentId: string, scenario: WorkspaceScenario = "active")
 
 type Capturable = {
   preview: PreviewId;
-  previewWide: boolean;
+  adminLayout: AdminLayoutMode;
   selectedProductId: string;
   products: { id: string; title: string; description: string; price: string; status: string }[];
   view: ViewState;
@@ -88,7 +89,8 @@ export function captureWorkspace(state: Capturable, scroll = state.view.scroll):
     : { ...state.view.draft };
   return {
     page: state.preview,
-    wide: state.previewWide,
+    wide: isAdminWideLayout(state.adminLayout),
+    layout: state.adminLayout,
     query: state.view.query,
     tab: state.view.tab || "All",
     sort: state.view.sort || "newest",
@@ -100,22 +102,28 @@ export function captureWorkspace(state: Capturable, scroll = state.view.scroll):
 
 type EditableProduct = { id: string; title: string; description: string; price: string; status: "Draft" | "Active" };
 
+type Attachable = { attachOn?: boolean; attachPage?: PreviewId; attachWide?: boolean };
+
 /** Copies a sidekick's saved place onto the live admin. First visits use `homeFor`. */
 export function applyWorkspace<P extends EditableProduct>(
   state: Omit<Capturable, "products"> & { products: P[]; workspaces: Record<string, Workspace> },
   agentId: string,
   scenario: WorkspaceScenario,
+  attach?: Attachable | null,
 ) {
   const saved = state.workspaces[agentId];
   let workspace = saved ? { ...saved, draft: { ...saved.draft } } : homeFor(agentId, scenario);
-  const home = sidekickHomes[agentId];
-  if (home && expandedTools.has(agentId)) {
-    workspace = workspace.page === home.page ? { ...workspace, wide: true } : { ...home, draft: { ...home.draft } };
+  if (attach?.attachOn && attach.attachPage) {
+    workspace =
+      workspace.page === attach.attachPage
+        ? { ...workspace, wide: attach.attachWide ?? workspace.wide }
+        : { ...emptyView(), page: attach.attachPage, wide: attach.attachWide ?? false, draft: {} };
   }
   state.workspaces = { ...state.workspaces, [agentId]: workspace };
   const productMissing = workspace.page === "product" && !state.products.some((item) => item.id === workspace.recordId);
   state.preview = productMissing ? "products" : workspace.page;
-  state.previewWide = productMissing ? false : workspace.wide;
+  // Keep the merchant’s chosen admin size (sidebar / expanded / takeover) across
+  // sidekick switches — panel layout is a shell preference, not per-agent.
   state.view = {
     query: workspace.query,
     tab: workspace.tab || "All",
@@ -169,6 +177,8 @@ export type SavedWork = {
   scenario: WorkspaceScenario;
   selectedAgentId: string;
   seq: number;
+  /** Global admin panel size; sticky across sidekick switches. */
+  adminLayout?: AdminLayoutMode;
   workspaces: Record<string, Workspace>;
   products: SavedProduct[];
   agents: unknown[];

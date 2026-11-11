@@ -1,6 +1,16 @@
 import { channelNav, findNav, mainNav, navFor, pageMeta, previewPages, settingsNav, type PreviewId } from "@/lib/admin-nav";
 import type { ChoiceCard, ChoiceMode } from "@/lib/choices";
-import { applyWorkspace, captureWorkspace, emptyView, homeFor, readLiveScroll, sameDesk, type SavedWork, type ViewState, type Workspace } from "@/lib/workspace";
+import { applyWorkspace, captureWorkspace, emptyView, homeFor, readLiveScroll, sameDesk, sidekickHomes, type SavedWork, type ViewState, type Workspace } from "@/lib/workspace";
+import { ADMIN_LAYOUT_MODES, adminLayoutFromWide, isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
+
+export type { AdminLayoutMode };
+
+/** Programmatic wide opens become expanded, but keep an active takeover until the merchant leaves it. */
+function applyAdminWide(state: { adminLayout: AdminLayoutMode }, wide: boolean | undefined, fallbackWide = false) {
+  // Full mode is only left by an explicit admin-layout action (or View sidekicks).
+  if (state.adminLayout === "takeover") return;
+  state.adminLayout = adminLayoutFromWide(wide, fallbackWide);
+}
 
 export { previewPages, type PreviewId };
 
@@ -86,6 +96,7 @@ const defaultSidekicks = new Set([
   "campaigns",
   "grok",
   "slack",
+  "muse",
   "store",
   "shop",
   "pos",
@@ -100,8 +111,17 @@ export function isListedSidekick(id: string) {
 }
 
 /** In the main nav, the switcher, and mentions. Hidden ones stay in the Hidden tray. */
-export function isNavSidekick(id: string) {
-  return isListedSidekick(id) && !hiddenSidekicks.has(id);
+export function isNavSidekick(id: string, agent?: Pick<Agent, "hidden">) {
+  if (!isListedSidekick(id)) return false;
+  if (agent) return !agent.hidden;
+  return !hiddenSidekicks.has(id);
+}
+
+/** Rail section for an installed sidekick after pin/hide. */
+export function railGroup(agent: Agent): AgentGroup {
+  if (agent.hidden) return "hidden";
+  if (agent.pinned) return "favorites";
+  return agent.baseGroup === "favorites" || agent.baseGroup === "hidden" ? "teams" : agent.baseGroup;
 }
 
 function isDefaultSidekick(id: string) {
@@ -174,6 +194,16 @@ export type Agent = {
   id: string;
   name: string;
   group: AgentGroup;
+  /** Natural group when unpinned (Team / Channels / Tools). */
+  baseGroup: AgentGroup;
+  /** Top untitled rail section — Product ideas, Trends, Campaigns, etc. */
+  pinned: boolean;
+  /** Lives under Hidden instead of the main rail / switcher. */
+  hidden: boolean;
+  /** When on, selecting this sidekick always opens `attachPage` in admin. */
+  attachOn: boolean;
+  attachPage: PreviewId;
+  attachWide: boolean;
   preview: string;
   topic: string;
   placeholder: string;
@@ -193,20 +223,18 @@ export type Chip = { label: string; tone: "secondary" | "primary"; send?: boolea
 export type Segment = { type: "text"; text: string } | { type: "tool"; label: string };
 export type Source = { title: string; url: string };
 
-export type BriefingItem = {
-  id: string;
-  name: string;
-  takeaway: string;
-  /** First row is the lead opportunity. */
-  kind?: "opportunity" | "update";
-};
+export type SoftLinkTarget =
+  | { kind: "agent"; id: string }
+  | { kind: "preview"; page: PreviewId };
+
+export type ChiefSummary = { id: string; name: string; text: string };
+export type ChiefPriority = { id: string; label: string; tone: "primary" | "secondary" };
 
 export type Block =
   | { id: string; type: "text"; role: "user" | "assistant"; text: string; typed?: boolean; segments?: Segment[]; sources?: Source[]; streamed?: boolean }
   | { id: string; type: "steps" }
   | { id: string; type: "sellers" }
-  | { id: string; type: "briefing"; title?: string; subtitle?: string; items: BriefingItem[] }
-  | { id: string; type: "chips"; chips: Chip[] }
+  | { id: string; type: "chips"; chips: Chip[]; stacked?: boolean }
   | { id: string; type: "purpose" }
   | { id: string; type: "create" }
   | {
@@ -220,7 +248,20 @@ export type Block =
       replaced?: boolean;
       setKey?: string;
     }
-  | { id: string; type: "status"; label: string };
+  | { id: string; type: "status"; label: string }
+  | {
+      id: string;
+      type: "chief-opening";
+      /** Closing clause of the week paragraph, with an inline soft link. */
+      weekLead: string;
+      weekLink: { label: string; target: SoftLinkTarget };
+      weekTail?: string;
+      summariesTitle: string;
+      summaries: ChiefSummary[];
+      prioritiesTitle: string;
+      prioritiesIntro: string;
+      priorities: ChiefPriority[];
+    };
 
 export type ProductTone =
   | "coral"
@@ -277,7 +318,7 @@ export type PrototypeState = {
   selectedAgentId: string;
   threads: Record<string, Block[]>;
   preview: PreviewId;
-  previewWide: boolean;
+  adminLayout: AdminLayoutMode;
   /** Search, tab, sort, open record, form draft, and scroll for the admin that is on screen. */
   view: ViewState;
   /** Last admin place for every sidekick, including ones the merchant created. */
@@ -591,9 +632,9 @@ const bestSellerChips: Chip[] = [
 
 /** Shared operating picture for an electronics store. Every sidekick can act on these figures. */
 const storeFacts = [
-  "Store facts for this electronics store, as of Saturday Nov 7, 2026. Use these numbers. Do not invent a different sales total. Home opens on Last 30 days.",
+  "Store facts for this electronics store, as of Wednesday Nov 11, 2026. Use these numbers. Do not invent a different sales total. Home opens on Last 30 days. Chief opens on this week so far (Mon–Wed).",
   "Last 30 days: $48,393 total sales, 386 orders, average order value $125 (down from $134 the previous 30 days). Conversion 2.7% on 14,280 sessions.",
-  "Last 7 days: $11,285, 92 orders. Today: $2,079 and 14 orders, 9 of them fulfilled. Today matches the analytics cards.",
+  "This week so far (Mon–Wed): $5,410 from 44 orders, average order $123. Ahead of the same stretch last week on order count, but AOV is soft because accessory-only carts keep showing up. Last 7 days: $11,285, 92 orders. Today (Wednesday): $2,079 and 14 orders, 9 of them fulfilled. Today matches the analytics cards.",
   "Studio ANC Headphones, $249: $18,640 and 76 orders, about 39% of revenue. 14 units left. Reorder before Monday’s ads.",
   "USB-C Power Bank, $49: $6,370 and 130 orders. A sitewide 20% off is creating accessory-only carts and pulling the average order down.",
   "Portable Charger, $59: $5,310 and 90 orders. Desk Lamp, $89: $4,450 and 50 orders. Wireless Mouse, $39: $3,120 and 80 orders. Those five are the best sellers. Talk about the headphones, the power bank, and the portable charger first.",
@@ -610,7 +651,7 @@ const persona = {
   sidekick:
     "You are Sidekick, Shopify's built-in assistant, helping a merchant run an electronics store. You know Shopify deeply and can act in the admin. When the merchant wants to review payments, call showArtifact payments-plan and navigatePreview payments, then explain the plan in your own words: Shopify Payments setup has four parts (business details, identity, account security, payout bank account) and takes about 10 minutes. When they want to start Shopify Payments setup, navigate to payments-setup with wide true. Remaining setup tasks: payments, theme, domain, shipping, retail address, POS.",
   chief:
-    "You are the merchant's Chief of Staff inside this electronics store — the parent sidekick watching the rest of the team. Open with a tight briefing: top opportunity first (usually the best sellers), then one-line takeaways from the other sidekicks. When asked for best sellers, call showArtifact best-sellers and do not navigate away: that opens Products, filtered to the five best sellers. Name the top three in the reply, Studio ANC Headphones, USB-C Power Bank, and Portable Charger, and offer a next step such as building a campaign or bundling them.",
+    "You are the merchant's Chief of Staff inside this electronics store — the parent sidekick watching the rest of the team. Open with a week-so-far paragraph (with a soft link into Orders), a Sidekick summaries section as one white paragraph (agent names soft-link), and Top priorities today as side-by-side chips that open the right agent or admin page. When asked for best sellers, call showArtifact best-sellers and do not navigate away: that opens Products, filtered to the five best sellers. Name the top three in the reply, Studio ANC Headphones, USB-C Power Bank, and Portable Charger, and offer a next step such as building a campaign or bundling them.",
   ideas:
     "You are Product ideas. You turn this store's carts and search into one testable product. You can add a product with the addProduct tool. The live draft is a $289 bundle: Studio ANC Headphones, the earbuds case, and a cable, meant to lift the $125 average order.",
   trends:
@@ -687,22 +728,39 @@ function connectionsFor(id: string): Connection[] {
   return connectionChoices.map((item) => ({ ...item, on: on.has(item.id) }));
 }
 
+const attachDefaults = new Set(["customers", "orders", "finance", "analytics", "store", "shop", "pos", "agentic"]);
+const attachWideDefaults = new Set(["customers", "orders", "finance", "analytics"]);
+
 function agent(
-  partial: Omit<Agent, "persona" | "installed" | "unread" | "purpose" | "connections"> & {
+  partial: Omit<Agent, "persona" | "installed" | "unread" | "purpose" | "connections" | "baseGroup" | "pinned" | "hidden" | "attachOn" | "attachPage" | "attachWide"> & {
     unread?: number;
     installed?: boolean;
     purpose?: string;
     connections?: Connection[];
+    baseGroup?: AgentGroup;
+    pinned?: boolean;
+    hidden?: boolean;
+    attachOn?: boolean;
+    attachPage?: PreviewId;
+    attachWide?: boolean;
   },
 ): Agent {
   const { purpose, connections, ...rest } = partial;
+  const baseGroup = partial.baseGroup ?? (partial.group === "hidden" ? "teams" : partial.group);
+  const home = sidekickHomes[partial.id] ?? sidekickHomes.custom;
   return {
+    ...rest,
     unread: partial.unread ?? 0,
     installed: partial.installed ?? false,
     persona: `${persona[partial.orb === "custom" ? "custom" : (partial.id as keyof typeof persona)] ?? persona.custom} ${storeFacts}`,
     purpose: purpose ?? purposeFor[partial.id] ?? partial.preview,
     connections: connections ?? connectionsFor(partial.id),
-    ...rest,
+    baseGroup,
+    pinned: partial.pinned ?? partial.group === "favorites",
+    hidden: partial.hidden ?? hiddenSidekicks.has(partial.id),
+    attachOn: partial.attachOn ?? attachDefaults.has(partial.id),
+    attachPage: partial.attachPage ?? home.page,
+    attachWide: partial.attachWide ?? attachWideDefaults.has(partial.id),
     orb: canonicalOrb(partial.orb),
     orbFrom: partial.orbFrom ?? defaultOrbTint(partial.id, partial.orb)?.from,
     orbTo: partial.orbTo ?? defaultOrbTint(partial.id, partial.orb)?.to,
@@ -1126,7 +1184,7 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
             ],
     },
     preview: "home-setup",
-    previewWide: false,
+    adminLayout: "sidebar",
     view: emptyView(),
     workspaces: { sidekick: homeFor("sidekick", "setup") },
     mode: "thread",
@@ -1154,77 +1212,41 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
   };
 }
 
-/** Opening briefing Chief shows when someone lands on the parent bot. */
-export const chiefBriefing: BriefingItem[] = [
-  {
-    id: "opportunity",
-    name: "Best sellers",
-    kind: "opportunity",
-    takeaway:
-      "Studio ANC Headphones are $18,640 of the month with 14 left — reorder before Monday’s ads, and put the power bank behind a headphone in cart instead of a sitewide 20%.",
-  },
-  {
-    id: "ideas",
-    name: "Product ideas",
-    kind: "update",
-    takeaway: "Drafting a $289 headphone + case + cable bundle to lift AOV from $125.",
-  },
-  {
-    id: "store",
-    name: "Online store",
-    kind: "update",
-    takeaway: "Desk lamp page still says 5–7 days while ads say this week.",
-  },
-  {
-    id: "orders",
-    name: "Orders",
-    kind: "update",
-    takeaway: "#1078 and #1077 are paid and unfulfilled; #1075 still unpaid.",
-  },
-  {
-    id: "shop",
-    name: "Shop app",
-    kind: "update",
-    takeaway: "Shop converts at 1.6% vs 2.7% on the store — listing crops the headphone.",
-  },
-  {
-    id: "campaigns",
-    name: "Campaigns",
-    kind: "update",
-    takeaway: "Monday’s ads still promise the lamp this week; restock line is ready.",
-  },
-  {
-    id: "slack",
-    name: "Slackbot",
-    kind: "update",
-    takeaway: "#ops is on the three open orders; welcome email needs the “14 left” note.",
-  },
+/** Week trend paragraph for Chief’s opening — soft link trails the sentence. */
+export const chiefWeekIntro =
+  "This week through Wednesday you’re at $5,410 from 44 orders. Order count is ahead of the same stretch last week, but average order is soft at $123 — accessory-only carts from the sitewide 20% are still pulling it down. Today is $2,079 from 14 orders. ";
+
+export const chiefSummaries: ChiefSummary[] = [
+  { id: "ideas", name: "Product ideas", text: "Drafting a $289 headphone, case, and cable bundle to lift AOV from $125." },
+  { id: "store", name: "Online store", text: "Rewriting the desk lamp line that still says 5–7 days while ads say this week." },
+  { id: "orders", name: "Orders", text: "#1078 and #1077 are paid and unfulfilled; #1075 still unpaid." },
+  { id: "shop", name: "Shop app", text: "Fixing the listing crop that keeps Shop at 1.6% against 2.7% on the store." },
+  { id: "campaigns", name: "Campaigns", text: "Lining up Monday’s headphone ads; restock line is ready." },
+  { id: "slack", name: "Slackbot", text: "#ops is on the three open orders; welcome email needs the “14 left” note." },
+];
+
+export const chiefPriorities: ChiefPriority[] = [
+  { id: "reorder", label: "Reorder Studio ANC Headphones", tone: "primary" },
+  { id: "orders", label: "Clear paid unfulfilled orders", tone: "secondary" },
+  { id: "bundle", label: "Bundle the best sellers", tone: "secondary" },
+  { id: "campaign", label: "Build Monday’s campaign", tone: "secondary" },
 ];
 
 function activeThread(agentId: string): Block[] {
   if (agentId === "chief") {
     return [
       {
-        id: "c1",
-        type: "text",
-        role: "assistant",
-        text: "Here’s your briefing — one place to see what the team is watching.",
-        typed: true,
-      },
-      {
-        id: "c-briefing",
-        type: "briefing",
-        title: "Across your sidekicks",
-        subtitle: "Last 30 days · $48,393 · 386 orders · AOV $125",
-        items: chiefBriefing,
-      },
-      {
-        id: "c2",
-        type: "chips",
-        chips: [
-          { label: "What should I do first?", tone: "primary" },
-          { label: "Show the best sellers", tone: "secondary" },
-        ],
+        id: "c-opening",
+        type: "chief-opening",
+        weekLead: chiefWeekIntro,
+        weekLink: { label: "Take me to Orders", target: { kind: "preview", page: "orders" } },
+        weekTail: ".",
+        summariesTitle: "Sidekick summaries",
+        summaries: chiefSummaries,
+        prioritiesTitle: "Top priorities today",
+        prioritiesIntro:
+          "Reorder the headphones before Monday’s ads, clear the paid orders waiting on fulfillment, then lift AOV with a bundle and Monday’s campaign.",
+        priorities: chiefPriorities,
       },
     ];
   }
@@ -1319,8 +1341,8 @@ export function activeState(storeName = "My Store"): PrototypeState {
   const installed = catalog.filter((item) => isDefaultSidekick(item.id)).map((item) => ({
     ...item,
     installed: true,
-    preview: item.id === "chief" ? "Last 30 days: $48,393" : item.preview,
-    topic: item.id === "chief" ? "Last 30 days" : item.topic,
+    preview: item.id === "chief" ? "This week so far: $5,410 from 44 orders" : item.preview,
+    topic: item.id === "chief" ? "This week so far" : item.topic,
   }));
   const threads: Record<string, Block[]> = { sidekick: base.threads.sidekick };
   for (const item of installed) threads[item.id] = activeThread(item.id);
@@ -1334,7 +1356,7 @@ export function activeState(storeName = "My Store"): PrototypeState {
     conversations: { ...base.conversations, ...teamConversations(Date.now()) },
     preview: "home-active",
     chiefPhase: "working",
-    previewWide: false,
+    adminLayout: "sidebar",
     view: emptyView(),
     workspaces: { chief: homeFor("chief", "active") },
   };
@@ -1342,7 +1364,18 @@ export function activeState(storeName = "My Store"): PrototypeState {
 
 export function visibleAgents(state: PrototypeState) {
   const query = state.search.trim().toLowerCase();
-  return state.agents.filter((item) => item.installed && isNavSidekick(item.id) && (!query || item.name.toLowerCase().includes(query)));
+  return state.agents.filter(
+    (item) => item.installed && isNavSidekick(item.id, item) && (!query || item.name.toLowerCase().includes(query)),
+  );
+}
+
+export function hiddenAgents(state: PrototypeState) {
+  const query = state.search.trim().toLowerCase();
+  const fromState = state.agents.filter((item) => item.hidden && isListedSidekick(item.id));
+  const missing = catalog
+    .filter((item) => item.hidden && !state.agents.some((agent) => agent.id === item.id))
+    .map((item) => item);
+  return [...fromState, ...missing].filter((item) => !query || item.name.toLowerCase().includes(query));
 }
 
 function ensureInstalled(state: PrototypeState, sourceId: string) {
@@ -1372,7 +1405,7 @@ function showBestSellers(state: PrototypeState) {
     push(state, agentId, { id: id(state), type: "chips", chips: bestSellerChips });
   }
   state.preview = "products";
-  state.previewWide = true;
+  state.adminLayout = "expanded";
   state.view = { ...emptyView(), tab: "Best sellers" };
 }
 
@@ -1380,16 +1413,16 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
   for (const effect of effects) {
     if (effect.type === "navigate") {
       state.preview = effect.page;
-      state.previewWide = effect.wide ?? effect.page === "payments-setup";
+      applyAdminWide(state, effect.wide, effect.page === "payments-setup");
     } else if (effect.type === "focus") {
-      state.previewWide = effect.wide;
+      applyAdminWide(state, effect.wide);
     } else if (effect.type === "complete-step") {
       if (!state.completedSteps.includes(effect.step)) state.completedSteps = [...state.completedSteps, effect.step];
     } else if (effect.type === "business-type") {
       state.businessType = effect.value;
       state.paymentsStep = "identity";
       state.preview = "payments-setup";
-      state.previewWide = true;
+      state.adminLayout = "expanded";
       if (!state.completedSteps.includes(1)) state.completedSteps = [...state.completedSteps, 1];
     } else if (effect.type === "add-product") {
       const product: Product = {
@@ -1404,7 +1437,7 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
       state.products = [product, ...state.products];
       state.selectedProductId = product.id;
       state.preview = "product";
-      state.previewWide = effect.wide ?? false;
+      applyAdminWide(state, effect.wide);
       state.view = {
         ...state.view,
         recordId: product.id,
@@ -1453,7 +1486,7 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
       }
       patchAgent(state, "sidekick", { topic: "Review payments", preview: "Payments setup is about 10 minutes." });
       state.preview = "payments";
-      state.previewWide = false;
+      state.adminLayout = "sidebar";
       state.selectedAgentId = "sidekick";
       state.mode = "thread";
     } else if (effect.type === "artifact" && effect.name === "best-sellers") {
@@ -1466,7 +1499,7 @@ export function applyEffects(state: PrototypeState, effects: Effect[]) {
       state.theme = effect.name;
       state.lookbook = true;
       state.preview = "online-store";
-      state.previewWide = true;
+      state.adminLayout = "expanded";
       if (!state.cardsDone.includes("theme")) state.cardsDone.push("theme");
       patchAgent(state, "sidekick", { topic: effect.name, preview: `${effect.name} is the design.` });
     }
@@ -1666,7 +1699,7 @@ export function runChip(state: PrototypeState, label: string) {
   if (label === "Open the product") {
     push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
     state.preview = "product";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     push(state, agentId, { id: id(state), type: "text", role: "assistant", text: "Here’s the draft. You can still edit any field." });
     return;
   }
@@ -1689,7 +1722,7 @@ export function runChip(state: PrototypeState, label: string) {
   }
   if (label === "Set up Shopify Payments" || label === "Complete setup") {
     state.preview = "payments-setup";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     state.selectedAgentId = "sidekick";
     state.mode = "thread";
     return;
@@ -1708,7 +1741,7 @@ export function runChip(state: PrototypeState, label: string) {
     });
     patchAgent(state, "sidekick", { topic: "Choose a theme", preview: "Horizon is live. Compare themes." });
     state.preview = "online-store";
-    state.previewWide = false;
+    state.adminLayout = "sidebar";
     return;
   }
   if (label === "Set up domain" || label === "Set up domain →") {
@@ -1818,16 +1851,21 @@ export function runChip(state: PrototypeState, label: string) {
   if (label === "Show the live store") {
     state.scenario = "active";
     state.preview = "home-active";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     const missing = catalog.filter((item) => isDefaultSidekick(item.id) && !state.agents.some((agent) => agent.id === item.id && agent.installed));
     for (const item of missing) {
       state.agents.push({ ...item, installed: true });
       if (!state.threads[item.id]) state.threads[item.id] = activeThread(item.id);
     }
-    patchAgent(state, "chief", { preview: "Last 30 days: $48,393", topic: "Last 30 days" });
+    patchAgent(state, "chief", { preview: "This week so far: $5,410 from 44 orders", topic: "This week so far" });
     return;
   }
-  if (label === "What should I do next?" || label === "What should I do first?") {
+  if (
+    label === "What should I do next?" ||
+    label === "What should I do first?" ||
+    label === "Show top priorities" ||
+    label === "Other top priorities"
+  ) {
     push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
     push(state, "chief", {
       id: id(state),
@@ -1837,7 +1875,66 @@ export function runChip(state: PrototypeState, label: string) {
     });
     return;
   }
-  if (label === "Show the best sellers") {
+  if (label === "Open Orders" || label === "take me to Orders" || label === "Take me to Orders") {
+    state.preview = "orders";
+    state.adminLayout = "expanded";
+    return;
+  }
+  if (label === "Reorder Studio ANC Headphones") {
+    push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
+    push(state, "chief", {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "Fourteen units left won’t cover Monday’s ads, and the headphones are still $18,640 of the month. I’d place the reorder today, then keep the power bank behind a headphone in cart instead of the sitewide 20%.",
+    });
+    state.preview = "products";
+    state.adminLayout = "expanded";
+    state.view = { ...emptyView(), tab: "Best sellers" };
+    return;
+  }
+  if (label === "Clear paid unfulfilled orders") {
+    push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
+    push(state, "chief", {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "#1078 and #1077 are paid and still unfulfilled. #1075 hasn’t been paid. I opened Orders so you can clear the two that are waiting on packing.",
+    });
+    state.preview = "orders";
+    state.adminLayout = "expanded";
+    return;
+  }
+  if (label === "Bundle the best sellers") {
+    push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
+    push(state, "chief", {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "I’d bundle the Studio ANC Headphones with the earbuds case and a cable at $289. That lifts the $125 average order and keeps the power bank from being the whole cart. Product ideas already has a draft started.",
+    });
+    ensureInstalled(state, "ideas");
+    state.selectedAgentId = "ideas";
+    state.preview = "products";
+    state.adminLayout = "expanded";
+    state.view = emptyView();
+    return;
+  }
+  if (label === "Build Monday’s campaign" || label === "Build a campaign") {
+    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
+    push(state, agentId, {
+      id: id(state),
+      type: "text",
+      role: "assistant",
+      text: "I’d build Monday’s campaign around these three. Lead with the Studio ANC Headphones, then the power bank and the portable charger. Leave the desk lamp out until the page says it ships this week.",
+    });
+    ensureInstalled(state, "campaigns");
+    state.selectedAgentId = "campaigns";
+    state.preview = "campaigns";
+    state.adminLayout = "expanded";
+    return;
+  }
+  if (label === "Show the best sellers" || label === "Show bestsellers") {
     push(state, "chief", { id: id(state), type: "text", role: "user", text: label });
     push(state, "chief", {
       id: id(state),
@@ -1846,18 +1943,6 @@ export function runChip(state: PrototypeState, label: string) {
       text: bestSellerReply,
     });
     showBestSellers(state);
-    return;
-  }
-  if (label === "Build a campaign") {
-    push(state, agentId, { id: id(state), type: "text", role: "user", text: label });
-    push(state, agentId, {
-      id: id(state),
-      type: "text",
-      role: "assistant",
-      text: "I’d build Monday’s campaign around these three. Lead with the Studio ANC Headphones, then the power bank and the portable charger. Leave the desk lamp out until the page says it ships this week.",
-    });
-    state.preview = "campaigns";
-    state.previewWide = true;
     return;
   }
   if (label === "Bundle them") {
@@ -1869,7 +1954,7 @@ export function runChip(state: PrototypeState, label: string) {
       text: "I’d bundle the Studio ANC Headphones with the earbuds case and a cable at $289. That lifts the $125 average order and keeps the power bank from being the whole cart.",
     });
     state.preview = "products";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     state.view = emptyView();
     return;
   }
@@ -1882,7 +1967,7 @@ export function runChip(state: PrototypeState, label: string) {
       text: "The headphones convert when the case is in the first image. The lamp loses people on shipping: the page says 5–7 days and the ads say this week. I’d make the lamp say “ships this week” and put the $289 bundle next to the headphones.",
     });
     state.preview = "products";
-    state.previewWide = true;
+    state.adminLayout = "expanded";
     return;
   }
   if (label === "Confirm changes") {
@@ -2070,9 +2155,13 @@ export type Action =
   | { type: "toggle-purpose"; id: string }
   | { type: "add-catalog"; id: string }
   | { type: "create-agent"; name: string; purpose: string }
-  | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string }
+  | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string; attachOn: boolean; attachPage: PreviewId; attachWide: boolean }
+  | { type: "toggle-pin"; id: string }
+  | { type: "toggle-hide"; id: string }
+  | { type: "disconnect-sidekick"; id: string }
   | { type: "intro-seen" }
-  | { type: "preview"; page: PreviewId; wide?: boolean }
+  | { type: "preview"; page: PreviewId; wide?: boolean; layout?: AdminLayoutMode }
+  | { type: "admin-layout"; mode: AdminLayoutMode }
   | { type: "view"; patch: Partial<Omit<ViewState, "draft">> & { draft?: Record<string, string> } }
   | { type: "product"; id: string }
   | { type: "update-product"; id: string; patch: Partial<Product> }
@@ -2133,13 +2222,11 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
     case "select": {
       const installed = next.agents.some((item) => item.id === action.id && item.installed);
       if (!installed) {
-        if (!hiddenSidekicks.has(action.id)) return state;
-        const source = catalog.find((item) => item.id === action.id);
-        if (!source) return state;
-        const revealed = { ...source, installed: true, unread: 0 };
-        next.agents = next.agents.some((item) => item.id === action.id)
-          ? next.agents.map((item) => (item.id === action.id ? revealed : item))
-          : [...next.agents, revealed];
+        // Soft links and the switcher can land on any listed sidekick — install on select.
+        // Also covers revealing hidden catalog entries (pin/hide flow).
+        if (!isListedSidekick(action.id)) return state;
+        const added = ensureInstalled(next, action.id);
+        if (!added) return state;
         if (!next.threads[action.id]?.length) next.threads[action.id] = activeThread(action.id);
       }
       next.selectedAgentId = action.id;
@@ -2394,15 +2481,100 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
         persona: `You are ${name}, a Shopify sidekick. Purpose: ${purpose}.`,
         orbFrom: action.orbFrom,
         orbTo: action.orbTo,
+        attachOn: action.attachOn,
+        attachPage: action.attachPage,
+        attachWide: action.attachWide,
+      });
+      if (action.attachOn && next.selectedAgentId === action.id) {
+        const prior = next.workspaces[action.id];
+        next.workspaces = {
+          ...next.workspaces,
+          [action.id]: {
+            ...(prior ?? { ...emptyView(), page: action.attachPage, wide: action.attachWide }),
+            page: action.attachPage,
+            wide: action.attachWide,
+            draft: { ...(prior?.draft ?? {}) },
+          },
+        };
+        openPage(next, action.attachPage, action.attachWide);
+      }
+      return next;
+    }
+    case "toggle-pin": {
+      const current = next.agents.find((item) => item.id === action.id);
+      if (!current || !isListedSidekick(action.id)) return state;
+      const pinned = !current.pinned;
+      patchAgent(next, action.id, {
+        pinned,
+        hidden: pinned ? false : current.hidden,
+        group: pinned ? "favorites" : current.baseGroup === "favorites" ? "teams" : current.baseGroup,
       });
       return next;
     }
-    case "preview":
-      if (action.page === next.preview) {
-        next.previewWide = action.wide ?? action.page === "payments-setup";
+    case "toggle-hide": {
+      const current = next.agents.find((item) => item.id === action.id);
+      if (!current && hiddenSidekicks.has(action.id)) {
+        const source = catalog.find((item) => item.id === action.id);
+        if (!source) return state;
+        const revealed = { ...source, installed: true, hidden: false, pinned: false, unread: 0 };
+        next.agents = [...next.agents, revealed];
+        if (!next.threads[action.id]?.length) next.threads[action.id] = activeThread(action.id);
         return next;
       }
-      openPage(next, action.page, action.wide);
+      if (!current || !isListedSidekick(action.id)) return state;
+      const hidden = !current.hidden;
+      patchAgent(next, action.id, {
+        hidden,
+        pinned: hidden ? false : current.pinned,
+        group: hidden ? "hidden" : current.pinned ? "favorites" : current.baseGroup === "favorites" ? "teams" : current.baseGroup,
+        installed: true,
+      });
+      if (!next.threads[action.id]?.length) next.threads[action.id] = activeThread(action.id);
+      return next;
+    }
+    case "disconnect-sidekick": {
+      // Built-in Sidekick stays; never leave the roster empty.
+      if (action.id === "sidekick") return state;
+      const current = next.agents.find((item) => item.id === action.id);
+      if (!current?.installed) return state;
+      const others = next.agents.filter((item) => item.id !== action.id && item.installed);
+      if (others.length === 0) return state;
+      const custom = action.id.startsWith("custom-");
+      if (custom) {
+        next.agents = next.agents.filter((item) => item.id !== action.id);
+      } else {
+        patchAgent(next, action.id, {
+          installed: false,
+          hidden: false,
+          pinned: false,
+          unread: 0,
+          group: current.baseGroup === "hidden" ? "teams" : current.baseGroup,
+        });
+      }
+      if (action.id === "chief") next.chiefPhase = "absent";
+      if (next.selectedAgentId === action.id) {
+        const fallback =
+          others.find((item) => item.id === "chief") ??
+          others.find((item) => item.id === "sidekick") ??
+          others.find((item) => !item.hidden) ??
+          others[0];
+        next.selectedAgentId = fallback.id;
+        next.mode = "thread";
+        patchAgent(next, fallback.id, { unread: 0 });
+      }
+      next.searchOpen = false;
+      return next;
+    }
+    case "admin-layout":
+      next.adminLayout = action.mode;
+      return next;
+    case "preview":
+      if (action.page === next.preview) {
+        if (action.layout) next.adminLayout = action.layout;
+        else applyAdminWide(next, action.wide, action.page === "payments-setup");
+        return next;
+      }
+      openPage(next, action.page, action.wide, action.layout);
       return next;
     case "view":
       next.view = {
@@ -2415,7 +2587,7 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
     case "product":
       next.selectedProductId = action.id;
       next.preview = "product";
-      next.previewWide = false;
+      if (next.adminLayout !== "takeover") next.adminLayout = "sidebar";
       next.view = { ...next.view, recordId: action.id, scroll: 0 };
       return next;
     case "update-product":
@@ -2436,7 +2608,7 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
       next.products = [product, ...next.products];
       next.selectedProductId = product.id;
       next.preview = "product";
-      next.previewWide = false;
+      next.adminLayout = "sidebar";
       next.view = { ...emptyView(), query: next.view.query, tab: next.view.tab, sort: next.view.sort, recordId: product.id };
       return next;
     }
@@ -2501,7 +2673,7 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
       next.products = [product, ...next.products];
       next.selectedProductId = product.id;
       next.preview = "product";
-      next.previewWide = true;
+      next.adminLayout = "expanded";
       next.view = { ...emptyView(), recordId: product.id };
       next.workingAgentId = action.agentId;
       return next;
@@ -2529,7 +2701,7 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
         .map((block) => (block.type === "choices" && !block.replaced ? { ...block, settled: true } : block));
       if (next.preview === "product") {
         next.preview = "products";
-        next.previewWide = false;
+        next.adminLayout = "sidebar";
         next.view = emptyView();
       }
       push(next, action.agentId, {
@@ -2554,7 +2726,7 @@ function confirmProduct(state: PrototypeState, publish: boolean) {
     item.id === state.selectedProductId ? { ...item, status: publish ? "Active" : "Draft" } : item,
   );
   state.preview = "products";
-  state.previewWide = true;
+  state.adminLayout = "expanded";
   state.view = { ...emptyView() };
   state.workingAgentId = null;
   state.threads[agentId] = (state.threads[agentId] ?? []).filter((block) => block.type !== "status");
@@ -2571,13 +2743,14 @@ function confirmProduct(state: PrototypeState, publish: boolean) {
 }
 
 const freshActions = new Set<Action["type"]>(["scenario", "reset", "arrival", "boot-active", "logout", "sign-in"]);
-const restoringActions = new Set<Action["type"]>(["select", "add-catalog", "create-agent"]);
+const restoringActions = new Set<Action["type"]>(["select", "add-catalog", "create-agent", "disconnect-sidekick"]);
 
-function openPage(state: PrototypeState, page: PreviewId, wide?: boolean) {
+function openPage(state: PrototypeState, page: PreviewId, wide?: boolean, layout?: AdminLayoutMode) {
   if (sameDesk(state.preview, page)) state.view = { ...state.view, recordId: "", scroll: 0 };
   else state.view = emptyView();
   state.preview = page;
-  state.previewWide = wide ?? page === "payments-setup";
+  if (layout) state.adminLayout = layout;
+  else applyAdminWide(state, wide, page === "payments-setup");
 }
 
 function settleWorkspace(prev: PrototypeState, next: PrototypeState, action: Action): PrototypeState {
@@ -2587,7 +2760,8 @@ function settleWorkspace(prev: PrototypeState, next: PrototypeState, action: Act
     next.workspaces = { ...next.workspaces, [prev.selectedAgentId]: captureWorkspace(prev, live ?? prev.view.scroll) };
   }
   if (restoringActions.has(action.type)) {
-    applyWorkspace(next, next.selectedAgentId, next.scenario);
+    const selected = next.agents.find((item) => item.id === next.selectedAgentId);
+    applyWorkspace(next, next.selectedAgentId, next.scenario, selected);
     return next;
   }
   if (action.type !== "view" && next.preview !== prev.preview && !sameDesk(prev.preview, next.preview)) {
@@ -2628,6 +2802,9 @@ export function restoreWork(state: PrototypeState, saved: SavedWork): PrototypeS
     workspaces[id] = { ...emptyView(), ...workspace, draft: { ...(workspace.draft ?? {}) } };
   }
   const selected = agents.some((agent) => agent.id === saved.selectedAgentId && agent.installed) ? saved.selectedAgentId : state.selectedAgentId;
+  // Prefer the global shell layout; fall back to the selected desk’s legacy snapshot.
+  const rawLayout = saved.adminLayout ?? workspaces[selected]?.layout;
+  const savedLayout = rawLayout && (ADMIN_LAYOUT_MODES as readonly string[]).includes(rawLayout) ? rawLayout : undefined;
   const next: PrototypeState = {
     ...state,
     agents,
@@ -2637,8 +2814,10 @@ export function restoreWork(state: PrototypeState, saved: SavedWork): PrototypeS
     selectedAgentId: selected,
     seq: Math.max(state.seq, saved.seq || 0),
     view: emptyView(),
+    ...(savedLayout ? { adminLayout: savedLayout } : {}),
   };
-  applyWorkspace(next, selected, next.scenario);
+  const agent = next.agents.find((item) => item.id === selected);
+  applyWorkspace(next, selected, next.scenario, agent);
   return next;
 }
 
@@ -2671,7 +2850,7 @@ export function prototypeSnapshot(state: PrototypeState) {
     agentName: agent.name,
     persona: agent.persona,
     preview: state.preview,
-    previewWide: state.previewWide,
+    previewWide: isAdminWideLayout(state.adminLayout),
     arrival: state.arrival,
     businessType: state.businessType,
     paymentsStep: state.paymentsStep,

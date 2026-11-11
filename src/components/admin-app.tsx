@@ -33,7 +33,7 @@ import { segmentsOf, sourcesOf } from "@/lib/turn";
 import type { Chip, Product } from "@/lib/prototype";
 import { emptyWork, readWorkSnapshot, saveWork, subscribeWork } from "@/lib/workspace";
 import { useShellLayout } from "@/hooks/use-shell-layout";
-import { SHELL } from "@/lib/shell-layout";
+import { agentsRailModeFor, SHELL, type AdminLayoutMode } from "@/lib/shell-layout";
 
 const bootMs = 1500;
 
@@ -84,6 +84,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
       scenario: state.scenario,
       selectedAgentId: state.selectedAgentId,
       seq: state.seq,
+      adminLayout: state.adminLayout,
       workspaces: state.workspaces,
       products: state.products,
       agents: custom,
@@ -487,8 +488,36 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   const navOpen = sidebarOpen;
   const agentsDrawerVisible = agentsDrawer && agentsDrawerOpen;
   const adminSheetVisible = adminSheet && adminSheetOpen;
+  // Sheets ignore desktop layout modes; docked desktops honor sidebar / expanded / takeover.
+  const effectiveLayout: AdminLayoutMode = adminSheet
+    ? "sidebar"
+    : state.adminLayout === "takeover" && !layout.allowAdminTakeover
+      ? layout.allowAdminWide
+        ? "expanded"
+        : "sidebar"
+      : state.adminLayout === "expanded" && !layout.allowAdminWide
+        ? "sidebar"
+        : state.adminLayout;
+  const takeover = !adminSheet && effectiveLayout === "takeover" && panels.preview;
+  // A: sidekick · B: hybrid (full) · C: minimized rail while admin stays full.
+  const railMode = agentsRailModeFor(takeover ? "takeover" : effectiveLayout, navOpen);
   const dockedAdminWidth =
-    layout.allowAdminWide && state.previewWide ? SHELL.adminWide : Math.min(layout.adminWidth, SHELL.adminNarrow);
+    takeover
+      ? undefined
+      : effectiveLayout === "expanded" && layout.allowAdminWide
+        ? SHELL.adminWide
+        : Math.min(layout.adminWidth, SHELL.adminNarrow);
+
+  function setAdminLayout(mode: AdminLayoutMode) {
+    // Entering full expands the hybrid rail; leaving full restores sidekick focus.
+    if (mode === "takeover") setSidebarOpen(true);
+    dispatch({ type: "admin-layout", mode });
+  }
+
+  function viewSidekicks() {
+    setSidebarOpen(true);
+    setAdminLayout("sidebar");
+  }
 
   return (
     <OrbAudioProvider>
@@ -509,6 +538,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             state={state}
             presentation="rail"
             navOpen={navOpen}
+            railMode={railMode}
             onToggleNav={() => setSidebarOpen((open) => !open)}
             onSettings={() => dispatch({ type: "rail", id: "settings" })}
             onLogout={logout}
@@ -520,6 +550,10 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
             onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
             onDesignSystem={() => setDesign(true)}
+            onViewSidekicks={viewSidekicks}
+            onAdminOpen={(id) => dispatch({ type: "rail", id })}
+            onAdminGo={(page) => dispatch({ type: "preview", page, layout: "takeover" })}
+            onAdminSearch={(scope) => setPalette({ open: true, scope })}
           />
         ) : null}
         {agentsDrawer ? (
@@ -555,40 +589,56 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         <div
           aria-hidden
           className="rail-reveal my-3 shrink-0 bg-white/10"
-          style={{ width: showAgentRail && panels.nav ? 1 : 0, opacity: showAgentRail && panels.nav ? 1 : 0 }}
+          style={{
+            // Keep a hairline while the admin panel is docked beside chat; hide in full.
+            width: showAgentRail && panels.nav && !takeover ? 1 : 0,
+            opacity: showAgentRail && panels.nav && !takeover ? 1 : 0,
+          }}
         />
-        <div ref={chatRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <ChatColumn
-          state={state}
-          liveSegments={liveAgentId === agent.id ? liveSegments : null}
-          offline={offline}
-          busy={busy && liveAgentId === agent.id}
-          chrome={layout.chatChrome}
-          showAdminButton={adminSheet && panels.preview}
-          adminOpen={adminSheetVisible}
-          onOpenAgents={agentsDrawer ? () => setAgentsDrawerOpen(true) : undefined}
-          onOpenAdmin={adminSheet && panels.preview ? () => setAdminSheetOpen((open) => !open) : undefined}
-          onSwitch={(id) => dispatch({ type: "select", id })}
-          onAddAgent={() => dispatch({ type: "toggle-add" })}
-          locked={busy}
-          onChip={(label) => dispatch({ type: "chip", label })}
-          onSend={send}
-          onStop={stop}
-          onPurpose={(id) => dispatch({ type: "toggle-purpose", id })}
-          onStart={() => dispatch({ type: "chip", label: "Start working" })}
-          onAddCatalog={(id) => dispatch({ type: "add-catalog", id })}
-          onCreate={(name, purpose) => dispatch({ type: "create-agent", name, purpose })}
-          onEditAgent={(patch) => dispatch({ type: "edit-agent", ...patch })}
-          onConversations={(open) => dispatch({ type: "conversations", open })}
-          onNewChat={() => dispatch({ type: "new-chat" })}
-          onOpenConversation={(id) => dispatch({ type: "open-conversation", id })}
-          onDeleteConversation={(id) => dispatch({ type: "delete-conversation", id })}
-          onRate={(id, value) => dispatch({ type: "rate", id, value })}
-          onIntroduced={() => setRoom(true)}
-          onIntroFinished={() => dispatch({ type: "intro-seen" })}
-          onChoose={choose}
-          onBundle={bundleChoices}
-        />
+        <div
+          ref={chatRef}
+          data-shell-pane="chat"
+          // Stays parked under the admin cover during takeover (no flex-shrink);
+          // the panel overlays and reveals this pane instead of collapsing it.
+          className={`relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
+            takeover ? "pointer-events-none select-none" : ""
+          }`}
+          aria-hidden={takeover ? true : undefined}
+        >
+          <ChatColumn
+            state={state}
+            liveSegments={liveAgentId === agent.id ? liveSegments : null}
+            offline={offline}
+            busy={busy && liveAgentId === agent.id}
+            chrome={layout.chatChrome}
+            showAdminButton={adminSheet && panels.preview}
+            adminOpen={adminSheetVisible}
+            onOpenAgents={agentsDrawer ? () => setAgentsDrawerOpen(true) : undefined}
+            onOpenAdmin={adminSheet && panels.preview ? () => setAdminSheetOpen((open) => !open) : undefined}
+            onSwitch={(id) => dispatch({ type: "select", id })}
+            onAddAgent={() => dispatch({ type: "toggle-add" })}
+            locked={busy}
+            onChip={(label) => dispatch({ type: "chip", label })}
+            onSend={send}
+            onStop={stop}
+            onPurpose={(id) => dispatch({ type: "toggle-purpose", id })}
+            onStart={() => dispatch({ type: "chip", label: "Start working" })}
+            onAddCatalog={(id) => dispatch({ type: "add-catalog", id })}
+            onCreate={(name, purpose) => dispatch({ type: "create-agent", name, purpose })}
+            onEditAgent={(patch) => dispatch({ type: "edit-agent", ...patch })}
+            onTogglePin={(id) => dispatch({ type: "toggle-pin", id })}
+            onToggleHide={(id) => dispatch({ type: "toggle-hide", id })}
+            onDisconnectSidekick={(id) => dispatch({ type: "disconnect-sidekick", id })}
+            onConversations={(open) => dispatch({ type: "conversations", open })}
+            onNewChat={() => dispatch({ type: "new-chat" })}
+            onOpenConversation={(id) => dispatch({ type: "open-conversation", id })}
+            onDeleteConversation={(id) => dispatch({ type: "delete-conversation", id })}
+            onRate={(id, value) => dispatch({ type: "rate", id, value })}
+            onIntroduced={() => setRoom(true)}
+            onIntroFinished={() => dispatch({ type: "intro-seen" })}
+            onChoose={choose}
+            onBundle={bundleChoices}
+          />
         </div>
       <PreviewColumn
         present={panels.preview}
@@ -596,10 +646,26 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         sheetOpen={adminSheetVisible}
         sheetEdge={layout.adminSheetEdge}
         dockWidth={dockedAdminWidth}
+        takeover={takeover}
+        showLayoutControl={!adminSheet && panels.preview}
+        onLayout={setAdminLayout}
         onCloseSheet={() => setAdminSheetOpen(false)}
         state={state}
         onPreview={(page, wide) =>
-          dispatch({ type: "preview", page, wide: Boolean(wide) && layout.allowAdminWide })
+          dispatch({
+            type: "preview",
+            page,
+            // Keep takeover when the page stays "wide"; otherwise honor the boolean expand/collapse.
+            layout:
+              wide === undefined
+                ? undefined
+                : wide && layout.allowAdminWide
+                  ? effectiveLayout === "takeover"
+                    ? "takeover"
+                    : "expanded"
+                  : "sidebar",
+            wide: Boolean(wide) && layout.allowAdminWide,
+          })
         }
         onView={(patch) => dispatch({ type: "view", patch })}
         onChip={(label) => dispatch({ type: "chip", label })}

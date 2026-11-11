@@ -5,6 +5,24 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { nextSort, sortLabel, useWorkspaceView } from "@/components/workspace-view";
 import type { PreviewId } from "@/lib/admin-nav";
+import { ADMIN_DESKTOP_MAX, type AdminDensity, type AdminLayoutMode } from "@/lib/shell-layout";
+
+/** Content density for admin pages — compact (phone-width) or desktop (Full takeover). */
+const DensityCtx = createContext<AdminDensity>("compact");
+
+export function AdminDensityProvider({
+  density,
+  children,
+}: {
+  density: AdminDensity;
+  children: ReactNode;
+}) {
+  return <DensityCtx.Provider value={density}>{children}</DensityCtx.Provider>;
+}
+
+export function useAdminDensity(): AdminDensity {
+  return useContext(DensityCtx);
+}
 
 /** The right side of the panel's hamburger header. Pages portal status notes and actions into it. */
 const HeaderSlot = createContext<HTMLElement | null>(null);
@@ -88,12 +106,16 @@ export function TopBar({
       {more.length > 0 ? <MoreMenu items={more} /> : null}
     </>
   ) : null;
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
   const titleName = typeof title === "string" ? titleMotionName(title) : undefined;
   const parentMotion = parent ? titleMotionName(parent.label) : undefined;
   const parentName = parentMotion && parentMotion !== titleName ? parentMotion : undefined;
   const heading = (caret: boolean) => (
     <h2
-      className="flex min-w-0 items-center gap-1 text-[22px] font-semibold leading-8 tracking-[-0.44px] text-[#171817]"
+      className={`flex min-w-0 items-center gap-1 font-semibold tracking-[-0.44px] text-[#171817] ${
+        desktop ? "text-[20px] leading-7" : "text-[22px] leading-8"
+      }`}
       style={titleName ? { viewTransitionName: titleName, viewTransitionClass: "title-word" } : undefined}
     >
       <span className="min-w-0 truncate">{title}</span>
@@ -105,7 +127,10 @@ export function TopBar({
     </h2>
   );
   return (
-    <header className="px-6 pb-6 pt-5">
+    <header
+      className={desktop ? "mx-auto w-full px-8 pb-3.5 pt-4" : "px-6 pb-6 pt-5"}
+      style={desktop ? { maxWidth: ADMIN_DESKTOP_MAX } : undefined}
+    >
       <div className="flex min-w-0 flex-col">
         {back ? null : (
           <div className={`grid ${parent ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
@@ -269,9 +294,160 @@ export function useDismiss(open: boolean, ref: React.RefObject<HTMLElement | nul
   }, [open, ref]);
 }
 
-export function Body({ children, className = "" }: { children: ReactNode; className?: string }) {
+const layoutModeCopy: Record<AdminLayoutMode, { label: string }> = {
+  sidebar: { label: "Sidebar" },
+  expanded: { label: "Expanded" },
+  takeover: { label: "Full" },
+};
+
+const LAYOUT_MODES: AdminLayoutMode[] = ["sidebar", "expanded", "takeover"];
+const LAYOUT_IDLE_MS = 2800;
+const LAYOUT_SLOT = 32;
+
+/** Bottom-right hover pill: collapsed shows the current mode; hover expands to three glyphs. */
+export function AdminLayoutControl({
+  mode,
+  onChange,
+}: {
+  mode: AdminLayoutMode;
+  onChange: (mode: AdminLayoutMode) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const idleRef = useRef<number | null>(null);
+  const index = Math.max(0, LAYOUT_MODES.indexOf(mode));
+
+  function clearIdle() {
+    if (idleRef.current !== null) {
+      window.clearTimeout(idleRef.current);
+      idleRef.current = null;
+    }
+  }
+
+  function scheduleIdle() {
+    clearIdle();
+    idleRef.current = window.setTimeout(() => {
+      setOpen(false);
+      setPinned(false);
+      idleRef.current = null;
+    }, LAYOUT_IDLE_MS);
+  }
+
+  useEffect(() => () => clearIdle(), []);
+
+  function expand() {
+    setOpen(true);
+    if (pinned) scheduleIdle();
+    else clearIdle();
+  }
+
+  function collapseUnlessPinned() {
+    if (pinned) scheduleIdle();
+    else {
+      clearIdle();
+      setOpen(false);
+    }
+  }
+
+  function pick(next: AdminLayoutMode) {
+    onChange(next);
+    setPinned(true);
+    setOpen(true);
+    scheduleIdle();
+  }
+
   return (
-    <div className={`flex flex-col gap-4 px-6 pb-10 ${className}`} style={{ viewTransitionName: "admin-body" }}>
+    <div
+      className="pointer-events-auto absolute bottom-6 right-6 z-40"
+      onMouseEnter={expand}
+      onMouseLeave={collapseUnlessPinned}
+      onFocusCapture={expand}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) collapseUnlessPinned();
+      }}
+    >
+      <div
+        role="toolbar"
+        aria-label="Admin layout"
+        aria-orientation="horizontal"
+        className={`flex h-8 items-center overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.12)] transition-[width,border-radius] duration-300 ease-[cubic-bezier(0.2,0.8,0,1)] motion-reduce:transition-none ${
+          open ? "w-[96px] rounded-full" : "w-8 rounded-full"
+        }`}
+      >
+        <div
+          className="flex h-8 shrink-0 items-center will-change-transform motion-reduce:transition-none"
+          style={{
+            width: LAYOUT_SLOT * LAYOUT_MODES.length,
+            transform: open ? "translateX(0)" : `translateX(${-index * LAYOUT_SLOT}px)`,
+            transition: "transform 300ms cubic-bezier(0.2, 0.8, 0, 1)",
+          }}
+        >
+          {LAYOUT_MODES.map((item) => {
+            const on = item === mode;
+            const copy = layoutModeCopy[item];
+            return (
+              <button
+                key={item}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                aria-label={copy.label}
+                tabIndex={open || on ? 0 : -1}
+                onClick={() => pick(item)}
+                className={`press grid size-8 shrink-0 place-items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#005bd3] ${
+                  // Collapsed: always black current glyph. Open: selected dark, others muted.
+                  !open ? "text-black" : on ? "text-black" : "text-[#9a9a9a] hover:text-[#616161]"
+                }`}
+              >
+                <AdminLayoutGlyph mode={item} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const layoutGlyphPaths: Record<AdminLayoutMode, string> = {
+  sidebar:
+    "M11 1C13.2091 1 15 2.79086 15 5V11C15 13.14 13.3194 14.8879 11.2061 14.9951L11 15H5L4.79395 14.9951C2.7488 14.8913 1.10865 13.2512 1.00488 11.2061L1 11V5C1 2.79086 2.79086 1 5 1H11ZM5 2.5C3.61929 2.5 2.5 3.61929 2.5 5V11C2.5 12.3807 3.61929 13.5 5 13.5H11C12.3807 13.5 13.5 12.3807 13.5 11V5C13.5 3.61929 12.3807 2.5 11 2.5H5ZM11.25 4C11.6642 4 12 4.33579 12 4.75V11.25C12 11.6642 11.6642 12 11.25 12C10.8358 12 10.5 11.6642 10.5 11.25V4.75C10.5 4.33579 10.8358 4 11.25 4Z",
+  expanded:
+    "M11 1C13.2091 1 15 2.79086 15 5V11C15 13.14 13.3194 14.8879 11.2061 14.9951L11 15H5L4.79395 14.9951C2.7488 14.8913 1.10865 13.2512 1.00488 11.2061L1 11V5C1 2.79086 2.79086 1 5 1H11ZM5 2.5C3.61929 2.5 2.5 3.61929 2.5 5V11C2.5 12.3807 3.61929 13.5 5 13.5H11C12.3807 13.5 13.5 12.3807 13.5 11V5C13.5 3.61929 12.3807 2.5 11 2.5H5ZM11 4C11.5523 4 12 4.44772 12 5V11C12 11.5523 11.5523 12 11 12H9.5C8.94772 12 8.5 11.5523 8.5 11V5C8.5 4.44772 8.94772 4 9.5 4H11Z",
+  takeover:
+    "M11 1C13.2091 1 15 2.79086 15 5V11C15 13.14 13.3194 14.8879 11.2061 14.9951L11 15H5L4.79395 14.9951C2.7488 14.8913 1.10865 13.2512 1.00488 11.2061L1 11V5C1 2.79086 2.79086 1 5 1H11ZM5 2.5C3.61929 2.5 2.5 3.61929 2.5 5V11C2.5 12.3807 3.61929 13.5 5 13.5H11C12.3807 13.5 13.5 12.3807 13.5 11V5C13.5 3.61929 12.3807 2.5 11 2.5H5ZM11 4C11.5523 4 12 4.44772 12 5V11C12 11.5523 11.5523 12 11 12H6.5C5.94772 12 5.5 11.5523 5.5 11V5C5.5 4.44772 5.94772 4 6.5 4H11Z",
+};
+
+function AdminLayoutGlyph({ mode }: { mode: AdminLayoutMode }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden className="shrink-0" fill="currentColor">
+      <path d={layoutGlyphPaths[mode]} />
+    </svg>
+  );
+}
+
+/** Scrollable page body. Desktop density widens chrome; pass maxWidth for form pages (Payments). */
+export function Body({
+  children,
+  className = "",
+  maxWidth,
+}: {
+  children: ReactNode;
+  className?: string;
+  /** Override content max-width. Forms stay narrow even in Full. */
+  maxWidth?: number;
+}) {
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
+  const width = maxWidth ?? (desktop ? ADMIN_DESKTOP_MAX : undefined);
+  return (
+    <div
+      className={`flex flex-col gap-4 ${desktop ? "mx-auto w-full px-8 pb-12" : "px-6 pb-10"} ${className}`}
+      style={{
+        viewTransitionName: "admin-body",
+        ...(width != null ? { maxWidth: width } : {}),
+      }}
+    >
       {children}
     </div>
   );
@@ -471,13 +647,28 @@ export function Table({
   footer?: ReactNode;
   select?: boolean;
 }) {
-  const template = [select ? "28px" : null, ...columns.map((column) => (column.width ? `${column.width}px` : "minmax(140px,1fr)"))].filter(Boolean).join(" ");
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
+  const template = [
+    select ? "28px" : null,
+    ...columns.map((column) => {
+      if (desktop) {
+        if (!column.width) return "minmax(0,1fr)";
+        // Narrow utility cols stay fixed; wider content cols share remaining space.
+        if (column.width <= 96) return `${column.width}px`;
+        return `minmax(${Math.min(column.width, 140)}px,1fr)`;
+      }
+      return column.width ? `${column.width}px` : "minmax(140px,1fr)";
+    }),
+  ]
+    .filter(Boolean)
+    .join(" ");
   const min = (select ? 28 : 0) + columns.reduce((sum, column) => sum + (column.width ?? 140), 0) + 16;
   return (
     <Card flush>
       {toolbar}
-      <div className="overflow-x-auto [scrollbar-width:thin]">
-        <div style={{ minWidth: min }}>
+      <div className={desktop ? "overflow-x-visible" : "overflow-x-auto [scrollbar-width:thin]"}>
+        <div style={desktop ? { width: "100%" } : { minWidth: min }}>
           <div className="grid h-8 items-center gap-x-3 bg-[#f7f7f7] px-3 text-[12px] font-medium text-[#616161]" style={{ gridTemplateColumns: template }}>
             {select ? <s-checkbox accessibilityLabel="Select all" /> : null}
             {columns.map((column) => (

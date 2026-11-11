@@ -27,7 +27,57 @@ export const SHELL = {
   navExpanded: 248,
   adminNarrow: 393,
   adminWide: 584,
+  /** Thin conversation handle while admin is in takeover. */
+  chatTakeoverStrip: 56,
 } as const;
+
+/** Desktop docked admin width modes. Mobile/compact sheets ignore these. */
+export type AdminLayoutMode = "sidebar" | "expanded" | "takeover";
+
+export const ADMIN_LAYOUT_MODES: readonly AdminLayoutMode[] = ["sidebar", "expanded", "takeover"] as const;
+
+/**
+ * Left-rail adaptation — independent of admin panel width, but coupled in practice:
+ *
+ * | Rail mode   | When                         | Left rail chrome                                      |
+ * |-------------|------------------------------|-------------------------------------------------------|
+ * | sidekick    | Conversation (A)             | Agents roster, logo, plus, search, footer             |
+ * | hybrid      | Full admin takeover (B)      | Admin nav + condensed sidekick lead; logo+plus+search |
+ * | minimized   | Collapsed from full (C)      | Icon-only / narrow hybrid; admin stays large          |
+ *
+ * Transitions:
+ * - Entering takeover → hybrid (expanded labels).
+ * - Logo collapse while hybrid → minimized (admin stays takeover).
+ * - Logo expand while minimized → hybrid.
+ * - “View sidekicks” / leaving takeover → sidekick.
+ */
+export type AgentsRailMode = "sidekick" | "hybrid" | "minimized";
+
+export const AGENTS_RAIL_MODES: readonly AgentsRailMode[] = ["sidekick", "hybrid", "minimized"] as const;
+
+/** Content density inside the admin panel — driven by layout mode, not window width. */
+export type AdminDensity = "compact" | "desktop";
+
+export const ADMIN_DESKTOP_MAX = 1120;
+
+export function adminLayoutFromWide(wide: boolean | undefined, fallbackWide = false): AdminLayoutMode {
+  return (wide ?? fallbackWide) ? "expanded" : "sidebar";
+}
+
+export function isAdminWideLayout(mode: AdminLayoutMode): boolean {
+  return mode === "expanded" || mode === "takeover";
+}
+
+/** Full takeover uses desktop density; sidebar/expanded/sheets stay compact. */
+export function adminDensityForLayout(mode: AdminLayoutMode, sheet = false): AdminDensity {
+  return !sheet && mode === "takeover" ? "desktop" : "compact";
+}
+
+/** Resolve the left-rail adaptation from admin layout + collapse preference. */
+export function agentsRailModeFor(adminLayout: AdminLayoutMode, railExpanded: boolean): AgentsRailMode {
+  if (adminLayout !== "takeover") return "sidekick";
+  return railExpanded ? "hybrid" : "minimized";
+}
 
 export type ShellMode = "desktop-wide" | "desktop" | "compact" | "mobile" | "fold-open";
 
@@ -42,9 +92,11 @@ export type ShellLayout = {
   admin: AdminPresentation;
   /** Prefer the collapsed agent rail when the rail is in-flow. */
   preferNavCollapsed: boolean;
-  /** Allow the wide (584) admin panel. */
+  /** Allow the wide (584) admin panel and the layout-mode control. */
   allowAdminWide: boolean;
-  /** Admin panel width when docked. */
+  /** Allow the full-takeover admin layout (docked desktops only). */
+  allowAdminTakeover: boolean;
+  /** Admin panel width when docked in sidebar mode. */
   adminWidth: number;
   /** Chat should show a compact chrome (logo + admin affordance). */
   chatChrome: "desktop" | "compact" | "mobile";
@@ -71,7 +123,8 @@ export function resolveShellLayout({ width, spanning = false, coarsePointer = fa
       agents: "rail",
       admin: "docked",
       preferNavCollapsed: true,
-      allowAdminWide: false,
+      allowAdminWide: true,
+      allowAdminTakeover: true,
       adminWidth: Math.min(SHELL.adminNarrow, Math.round(width * 0.42)),
       chatChrome: "compact",
       adminSheetEdge: "end",
@@ -87,6 +140,7 @@ export function resolveShellLayout({ width, spanning = false, coarsePointer = fa
       admin: "sheet",
       preferNavCollapsed: true,
       allowAdminWide: false,
+      allowAdminTakeover: false,
       adminWidth: SHELL.adminNarrow,
       chatChrome: "mobile",
       adminSheetEdge: "bottom",
@@ -102,6 +156,7 @@ export function resolveShellLayout({ width, spanning = false, coarsePointer = fa
       admin: "sheet",
       preferNavCollapsed: true,
       allowAdminWide: false,
+      allowAdminTakeover: false,
       adminWidth: SHELL.adminNarrow,
       // Touch tablets prefer a bottom sheet; mouse-driven windows slide from the end.
       chatChrome: "compact",
@@ -117,7 +172,8 @@ export function resolveShellLayout({ width, spanning = false, coarsePointer = fa
       agents: "rail",
       admin: "docked",
       preferNavCollapsed: false,
-      allowAdminWide: false,
+      allowAdminWide: true,
+      allowAdminTakeover: true,
       adminWidth: SHELL.adminNarrow,
       chatChrome: "desktop",
       adminSheetEdge: "end",
@@ -132,6 +188,7 @@ export function resolveShellLayout({ width, spanning = false, coarsePointer = fa
     admin: "docked",
     preferNavCollapsed: false,
     allowAdminWide: true,
+    allowAdminTakeover: true,
     adminWidth: SHELL.adminWide,
     chatChrome: "desktop",
     adminSheetEdge: "end",

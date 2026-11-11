@@ -22,6 +22,7 @@ import {
   Toggle,
   HeaderExtras,
   TopBar,
+  useAdminDensity,
   type BarAction,
 } from "@/components/admin-ui";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
@@ -107,6 +108,8 @@ const orderRows = [
 
 function Orders({ state, nav }: Props) {
   const active = state.scenario === "active";
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
   const view = useWorkspaceView();
   const query = (view?.query ?? "").trim().toLowerCase();
   const tab = view?.tab || "All";
@@ -126,7 +129,7 @@ function Orders({ state, nav }: Props) {
     >
       {active ? (
         <>
-          <div className="grid grid-cols-2 gap-2">
+          <div className={desktop ? "grid grid-cols-4 gap-3" : "grid grid-cols-2 gap-2"}>
             <Kpi label="Orders" value="14" delta="↑ 8%" points={[3, 5, 4, 7, 6, 9, 8, 11]} />
             <Kpi label="Items ordered" value="23" delta="↑ 12%" points={[4, 6, 5, 8, 9, 10, 12, 13]} />
             <Kpi label="Orders fulfilled" value="9" points={[2, 3, 3, 5, 4, 6, 7, 9]} />
@@ -792,6 +795,8 @@ function Finance({ state, nav }: Props) {
 
 function Analytics({ state, nav }: Props) {
   const active = state.scenario === "active";
+  const density = useAdminDensity();
+  const desktop = density === "desktop";
   const breakdown = active
     ? [
         ["Gross sales", "$1,964.20"],
@@ -804,6 +809,32 @@ function Analytics({ state, nav }: Props) {
         ["Total sales", "$2,078.51"],
       ]
     : ["Gross sales", "Discounts", "Sales reversals", "Net sales", "Shipping charges", "Return fees", "Taxes", "Total sales"].map((label) => [label, "$0.00"]);
+  const salesOverTime = (
+    <Card className="flex flex-col gap-2">
+      <CardTitle dotted>Total sales over time</CardTitle>
+      <p className="text-[18px] font-semibold">{active ? "$2,078.51" : "$0.00"}</p>
+      <LineChart
+        series={active ? salesCurve : flat}
+        compare={active ? compareCurve : undefined}
+        ticks={active ? ["$0", "$1K", "$2K"] : ["$0", "$5", "$10"]}
+        labels={hours}
+        legend={["Nov 4, 2026", "Nov 3, 2026"]}
+      />
+    </Card>
+  );
+  const salesBreakdown = (
+    <Card className="flex flex-col gap-1">
+      <CardTitle dotted>Total sales breakdown</CardTitle>
+      {breakdown.map(([label, value], index) => (
+        <div key={label} className={`flex items-center justify-between rounded-md px-2 py-1.5 text-[12px] ${index % 2 ? "bg-[#f7f7f7]" : ""}`}>
+          <span className="text-[#005bd3]">{label}</span>
+          <span className="flex gap-3 font-semibold">
+            {value} <span className="font-normal text-[#8a8a8a]">—</span>
+          </span>
+        </div>
+      ))}
+    </Card>
+  );
   return (
     <>
       <HeaderExtras>
@@ -827,34 +858,23 @@ function Analytics({ state, nav }: Props) {
         </Chip>
         <Chip>USD $</Chip>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className={desktop ? "grid grid-cols-4 gap-3" : "grid grid-cols-2 gap-2"}>
         <Kpi label="Gross sales" value={active ? "$1,964.20" : "$0.00"} delta={active ? "↑ 24%" : undefined} points={active ? [2, 3, 3, 5, 4, 6, 7, 8] : undefined} />
         <Kpi label="Returning customer rate" value={active ? "31%" : "—"} points={active ? [3, 3, 4, 3, 4, 5, 4, 5] : undefined} />
         <Kpi label="Orders fulfilled" value={active ? "9" : "0"} points={active ? [1, 2, 2, 3, 4, 3, 5, 6] : undefined} />
         <Kpi label="Orders" value={active ? "14" : "0"} delta={active ? "↓ 2%" : undefined} points={active ? [4, 5, 3, 6, 5, 4, 6, 5] : undefined} />
       </div>
-      <Card className="flex flex-col gap-2">
-        <CardTitle dotted>Total sales over time</CardTitle>
-        <p className="text-[18px] font-semibold">{active ? "$2,078.51" : "$0.00"}</p>
-        <LineChart
-          series={active ? salesCurve : flat}
-          compare={active ? compareCurve : undefined}
-          ticks={active ? ["$0", "$1K", "$2K"] : ["$0", "$5", "$10"]}
-          labels={hours}
-          legend={["Nov 4, 2026", "Nov 3, 2026"]}
-        />
-      </Card>
-      <Card className="flex flex-col gap-1">
-        <CardTitle dotted>Total sales breakdown</CardTitle>
-        {breakdown.map(([label, value], index) => (
-          <div key={label} className={`flex items-center justify-between rounded-md px-2 py-1.5 text-[12px] ${index % 2 ? "bg-[#f7f7f7]" : ""}`}>
-            <span className="text-[#005bd3]">{label}</span>
-            <span className="flex gap-3 font-semibold">
-              {value} <span className="font-normal text-[#8a8a8a]">—</span>
-            </span>
-          </div>
-        ))}
-      </Card>
+      {desktop ? (
+        <div className="grid grid-cols-2 items-start gap-3">
+          {salesOverTime}
+          {salesBreakdown}
+        </div>
+      ) : (
+        <>
+          {salesOverTime}
+          {salesBreakdown}
+        </>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <Card className="flex h-32 flex-col">
           <CardTitle dotted>Total sales by sales channel</CardTitle>

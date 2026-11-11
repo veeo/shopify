@@ -487,6 +487,22 @@ html.vt-titles::view-transition-old(*):only-child {
   transition: width 300ms cubic-bezier(0.2, 0.8, 0, 1), opacity 200ms ease;
 }
 
+/* Full-mode: admin destinations rise in as sidekicks collapse upward. */
+.admin-rail-rise {
+  animation: admin-rail-rise 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes admin-rail-rise {
+  from {
+    opacity: 0;
+    transform: translateY(56px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Responsive shell overlays — agents drawer + admin sheet */
 .shell-scrim {
   animation: shell-scrim-in 180ms ease both;
@@ -545,7 +561,8 @@ html.vt-titles::view-transition-old(*):only-child {
   .shell-scrim,
   .shell-agents-drawer,
   .shell-admin-sheet-bottom,
-  .shell-admin-sheet-end {
+  .shell-admin-sheet-end,
+  .admin-rail-rise {
     animation: none;
   }
 }

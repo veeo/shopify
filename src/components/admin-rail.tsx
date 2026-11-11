@@ -1,65 +1,41 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { useDismiss } from "@/components/admin-ui";
+import { Orb } from "@/components/marks";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { channelNav, mainNav, navFor, type NavItem, type PreviewId } from "@/lib/admin-nav";
+import type { Agent } from "@/lib/prototype";
+import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 
 const channelIds = new Set(channelNav.map((item) => item.id));
 
-/** The admin sidebar, docked on the right of the prototype. Collapsed it's an icon rail with hover flyouts; expanded it shows labels and the active item's children inline. */
-export function AdminRail({
+/** Main admin destinations (Home → Apps) without search or footer chrome. */
+export function AdminNavSections({
   expanded,
   preview,
   onOpen,
   onGo,
-  onSearch,
-  onToggle,
-  embedded = false,
-  revealed = false,
+  onSearchApps,
 }: {
   expanded: boolean;
   preview: PreviewId;
   onOpen: (id: string) => void;
   onGo: (page: PreviewId) => void;
-  onSearch: (scope?: string) => void;
-  onToggle?: () => void;
-  /** Drawn inside the admin panel instead of the far-right rail. */
-  embedded?: boolean;
-  /** The sheet is open, so the groups can ease in. */
-  revealed?: boolean;
+  onSearchApps?: () => void;
 }) {
   const { id: active, child } = navFor(preview);
-  const [alerts, setAlerts] = useState(false);
-  const [read, setRead] = useState(false);
   const [channelsOpen, setChannelsOpen] = useState(true);
   const shared = { expanded, active, child, onOpen, onGo };
   return (
-    <nav
-      className={`relative flex h-full shrink-0 flex-col pb-3 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
-        embedded ? "w-full px-2 pt-[72px]" : expanded ? "w-[220px] px-2 pt-8" : "w-[52px] px-[10px] pt-8"
-      } ${embedded && revealed ? "menu-stagger" : ""}`}
-      aria-label="Shopify admin"
-    >
-      {expanded ? (
-        <button
-          type="button"
-          onClick={() => onSearch()}
-          className="fade-in mb-1 flex h-8 w-full items-center gap-2 rounded-[10px] bg-white/[0.08] px-2 text-[13px] text-[#b5b5b5] transition-colors hover:bg-white/[0.12] hover:text-white"
-        >
-          <PIcon name="Search" size={18} />
-          <span className="flex-1 text-left">Search</span>
-          <span className="text-[11px] text-[#8a8a8a]">Ctrl K</span>
-        </button>
-      ) : (
-        <RailButton label="Search" shortcut="Ctrl K" icon="Search" onClick={() => onSearch()} />
-      )}
-      <div className="mt-1.5 flex flex-col gap-0.5">
+    <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+      <div className="flex flex-col gap-0.5">
         {mainNav.map((item) => (
           <RailItem key={item.id} item={item} {...shared} />
         ))}
       </div>
-      <span className={`my-2 h-px bg-white/15 ${expanded ? "mx-2" : "mx-1.5"}`} />
+      <span className={`my-2 h-px shrink-0 bg-white/15 ${expanded ? "mx-2" : "mx-1.5"}`} />
       {expanded ? (
         <div className="flex flex-col gap-0.5">
           <button
@@ -78,46 +54,113 @@ export function AdminRail({
       ) : (
         <ChannelsItem active={active} onOpen={onOpen} />
       )}
-      <span className={`my-2 h-px bg-white/15 ${expanded ? "mx-2" : "mx-1.5"}`} />
+      <span className={`my-2 h-px shrink-0 bg-white/15 ${expanded ? "mx-2" : "mx-1.5"}`} />
       {expanded ? (
         <button
           type="button"
-          onClick={() => onSearch("Apps")}
+          onClick={() => onSearchApps?.()}
           className="flex h-7 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-[12px] font-medium text-[#a6a6a6] hover:text-white"
         >
           Apps
           <PIcon name="ChevronRight" size={14} />
         </button>
       ) : (
-        <RailButton label="Apps" icon="Apps" onClick={() => onSearch("Apps")} />
+        <RailButton label="Apps" icon="Apps" onClick={() => onSearchApps?.()} />
       )}
-      <div className="mt-auto flex flex-col gap-1">
-        {onToggle ? (
-          <RailButton
-            label={expanded ? "Collapse admin menu" : "Expand admin menu"}
-            icon="LayoutSidebarRight"
-            onClick={onToggle}
-            text={expanded ? "Collapse" : undefined}
-          />
-        ) : null}
-        <RailItem item={{ id: "settings", label: "Settings", icon: "Settings", page: "settings" }} {...shared} />
-        <span className="relative flex flex-col">
-          <RailButton
-            label="Alerts"
-            icon="Notification"
-            on={alerts}
-            onClick={() => setAlerts(!alerts)}
-            controls="alerts-menu"
-            text={expanded ? "Alerts" : undefined}
-          />
-          {read ? null : (
-            <span className="pointer-events-none absolute left-[22px] -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">1</span>
-          )}
-          {alerts ? (
-            <Alerts embedded={embedded} read={read} onRead={() => setRead(true)} onClose={() => setAlerts(false)} onOpen={() => onOpen("pos")} />
+    </div>
+  );
+}
+
+/** The admin sidebar, docked on the right of the prototype. Collapsed it's an icon rail with hover flyouts; expanded it shows labels and the active item's children inline. */
+export function AdminRail({
+  expanded,
+  preview,
+  onOpen,
+  onGo,
+  onSearch,
+  onToggle,
+  embedded = false,
+  revealed = false,
+  lead = null,
+  hideSearch = false,
+  hideFooter = false,
+}: {
+  expanded: boolean;
+  preview: PreviewId;
+  onOpen: (id: string) => void;
+  onGo: (page: PreviewId) => void;
+  onSearch: (scope?: string) => void;
+  onToggle?: () => void;
+  /** Drawn inside the admin panel instead of the far-right rail. */
+  embedded?: boolean;
+  /** The sheet is open, so the groups can ease in. */
+  revealed?: boolean;
+  /** Optional block above Search — used for the merged sidekick affordance in full layout. */
+  lead?: ReactNode;
+  hideSearch?: boolean;
+  hideFooter?: boolean;
+}) {
+  const { id: active, child } = navFor(preview);
+  const [alerts, setAlerts] = useState(false);
+  const [read, setRead] = useState(false);
+  const shared = { expanded, active, child, onOpen, onGo };
+  return (
+    <nav
+      className={`relative flex h-full shrink-0 flex-col pb-3 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
+        embedded ? "w-full px-2 pt-[72px]" : expanded ? "w-[220px] px-2 pt-6" : "w-[52px] px-[10px] pt-6"
+      } ${embedded && revealed ? "menu-stagger" : ""}`}
+      aria-label="Shopify admin"
+    >
+      {lead}
+      {hideSearch ? null : expanded ? (
+        <button
+          type="button"
+          onClick={() => onSearch()}
+          className="fade-in mb-1 flex h-8 w-full items-center gap-2 rounded-[10px] bg-white/[0.08] px-2 text-[13px] text-[#b5b5b5] transition-colors hover:bg-white/[0.12] hover:text-white"
+        >
+          <PIcon name="Search" size={18} />
+          <span className="flex-1 text-left">Search</span>
+          <span className="text-[11px] text-[#8a8a8a]">Ctrl K</span>
+        </button>
+      ) : (
+        <RailButton label="Search" shortcut="Ctrl K" icon="Search" onClick={() => onSearch()} />
+      )}
+      <AdminNavSections
+        expanded={expanded}
+        preview={preview}
+        onOpen={onOpen}
+        onGo={onGo}
+        onSearchApps={() => onSearch("Apps")}
+      />
+      {hideFooter ? null : (
+        <div className="mt-auto flex flex-col gap-1">
+          {onToggle ? (
+            <RailButton
+              label={expanded ? "Collapse admin menu" : "Expand admin menu"}
+              icon="LayoutSidebarRight"
+              onClick={onToggle}
+              text={expanded ? "Collapse" : undefined}
+            />
           ) : null}
-        </span>
-      </div>
+          <RailItem item={{ id: "settings", label: "Settings", icon: "Settings", page: "settings" }} {...shared} />
+          <span className="relative flex flex-col">
+            <RailButton
+              label="Alerts"
+              icon="Notification"
+              on={alerts}
+              onClick={() => setAlerts(!alerts)}
+              controls="alerts-menu"
+              text={expanded ? "Alerts" : undefined}
+            />
+            {read ? null : (
+              <span className="pointer-events-none absolute left-[22px] -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">1</span>
+            )}
+            {alerts ? (
+              <Alerts embedded={embedded} read={read} onRead={() => setRead(true)} onClose={() => setAlerts(false)} onOpen={() => onOpen("pos")} />
+            ) : null}
+          </span>
+        </div>
+      )}
     </nav>
   );
 }
@@ -125,6 +168,45 @@ export function AdminRail({
 export function initials(name: string) {
   const words = name.trim().split(/\s+/).filter(Boolean);
   return ((words[0]?.[0] ?? "M") + (words[1]?.[0] ?? words[0]?.[1] ?? "S")).toUpperCase();
+}
+
+/** Collapsed sidekick roster entry at the top of the merged full-layout rail. */
+export function SidekickLead({
+  agent,
+  expanded,
+  onView,
+}: {
+  agent: Agent;
+  expanded: boolean;
+  onView: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`View sidekicks — ${agent.name}`}
+      onClick={onView}
+      className={`press press-row mb-3 flex w-full min-w-0 items-center text-left transition-[background-color,box-shadow] duration-300 hover:bg-white/[0.06] active:bg-white/10 ${
+        expanded ? "h-12 gap-2 rounded-full py-2 pl-2 pr-2" : "h-8 justify-center rounded-full px-0"
+      }`}
+    >
+      <span className="relative grid size-[31px] shrink-0 place-items-center rounded-full">
+        <Orb
+          id={agent.orb}
+          agentId={agent.id}
+          size={ORB_SIZE.nav}
+          colorFrom={agent.orbFrom}
+          colorTo={agent.orbTo}
+          presence="rest"
+        />
+      </span>
+      {expanded ? (
+        <span className="min-w-0 flex-1 overflow-hidden">
+          <span className="block truncate text-[13px] font-semibold leading-[1.3] tracking-[-0.13px] text-white">{agent.name}</span>
+          <span className="block truncate text-[12px] leading-4 text-[#8e8f8b]">View sidekicks</span>
+        </span>
+      ) : null}
+    </button>
+  );
 }
 
 function ItemIcon({ item, on }: { item: NavItem; on: boolean }) {
@@ -299,28 +381,90 @@ function RailButton({
   );
 }
 
-function Alerts({
+const alertsShell =
+  "pop-in z-50 rounded-2xl bg-white text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)]";
+
+/** Alerts list. Pass `anchorRef` to portal + collision-place above the trigger (flips if needed). */
+export function Alerts({
   read,
   onRead,
   onClose,
   onOpen,
   embedded = false,
+  className = "",
+  anchorRef,
 }: {
   read: boolean;
   onRead: () => void;
   onClose: () => void;
   onOpen: () => void;
   embedded?: boolean;
+  className?: string;
+  /** When set, menu portals to `document.body` and stays inside the viewport. */
+  anchorRef?: RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [place, setPlace] = useState<{ top: number; left: number; width: number; origin: string } | null>(null);
   useDismiss(true, ref, onClose);
-  return (
+
+  useLayoutEffect(() => {
+    if (!anchorRef) return;
+    const gap = 8;
+    const pad = 12;
+    const width = 300;
+
+    function update() {
+      const anchor = anchorRef!.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const menuH = ref.current?.offsetHeight ?? 220;
+      const spaceAbove = rect.top - pad;
+      const spaceBelow = window.innerHeight - rect.bottom - pad;
+      const openUp = spaceAbove >= Math.min(menuH, 160) || spaceAbove >= spaceBelow;
+      let top = openUp ? rect.top - gap - menuH : rect.bottom + gap;
+      top = Math.max(pad, Math.min(top, window.innerHeight - pad - menuH));
+      // Prefer growing away from the nearer viewport edge (left rail → open rightward).
+      const preferLeft = rect.left + width / 2 < window.innerWidth / 2;
+      let left = preferLeft ? rect.left : rect.right - width;
+      left = Math.max(pad, Math.min(left, window.innerWidth - pad - width));
+      const originX = preferLeft ? "left" : "right";
+      setPlace({
+        top,
+        left,
+        width,
+        origin: `${openUp ? "bottom" : "top"} ${originX}`,
+      });
+    }
+
+    update();
+    const frame = window.requestAnimationFrame(update);
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [anchorRef]);
+
+  const body = (
     <div
       ref={ref}
       id="alerts-menu"
-      className={`pop-in absolute z-50 origin-bottom-right rounded-2xl bg-white text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)] ${
-        embedded ? "bottom-full left-0 right-0 mb-1" : "bottom-0 right-[calc(100%+8px)] w-[300px]"
-      }`}
+      role="dialog"
+      aria-label="Alerts"
+      className={`${alertsShell} ${
+        anchorRef
+          ? "fixed w-[300px]"
+          : `absolute origin-bottom-right ${embedded ? "bottom-full left-0 right-0 mb-1" : "bottom-0 right-[calc(100%+8px)] w-[300px]"}`
+      } ${className}`}
+      style={
+        anchorRef && place
+          ? { top: place.top, left: place.left, width: place.width, transformOrigin: place.origin }
+          : anchorRef
+            ? { visibility: "hidden", top: 0, left: 0 }
+            : undefined
+      }
     >
       <div className="flex items-center gap-1 px-3 pb-1.5 pt-3">
         <span className="flex-1 text-[13px] font-semibold">Alerts</span>
@@ -351,6 +495,11 @@ function Alerts({
       <p className="border-t border-[#ebebeb] py-3 text-center text-[12px] text-[#616161]">No more alerts</p>
     </div>
   );
+
+  if (anchorRef && typeof document !== "undefined") {
+    return createPortal(body, document.body);
+  }
+  return body;
 }
 
 const menuShell =
