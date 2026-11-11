@@ -163,9 +163,11 @@ export function PreviewColumn({
       };
     }
 
-    // Leave cover: shrink to docked while still overlaid, then drop overlay.
+    // Leave cover: shrink panel + slot to the destination docked width while
+    // still overlaid (chat reflows under the panel), then drop the overlay.
     if (overlayRef.current) {
       seenTakeover.current = false;
+      setSlotWidth(dockedWidth);
       setPanelWidth(dockedWidth);
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const timer = window.setTimeout(() => {
@@ -606,7 +608,7 @@ export function PreviewColumn({
   return (
     <div
       data-shell-pane={overlay ? "admin-slot" : undefined}
-      className={`relative h-full shrink-0 ${overlay ? "" : "panel-settle"}`}
+      className="panel-settle relative h-full shrink-0"
       style={{ width: overlay ? slotWidth : panelWidth }}
     >
       <aside
