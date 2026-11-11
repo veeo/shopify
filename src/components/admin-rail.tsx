@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { circleButton, useDismiss } from "@/components/admin-ui";
+import { useDismiss } from "@/components/admin-ui";
 import { Orb } from "@/components/marks";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
 import { channelNav, mainNav, navFor, type NavItem, type PreviewId } from "@/lib/admin-nav";
@@ -381,54 +381,6 @@ function RailButton({
   );
 }
 
-/** Bottom alerts + settings on the white admin panel — sidebar, expanded, and full. */
-export function AdminChromeActions({
-  onSettings,
-  onAlertOpen,
-}: {
-  onSettings: () => void;
-  onAlertOpen: () => void;
-}) {
-  const [alerts, setAlerts] = useState(false);
-  const [read, setRead] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-
-  return (
-    <div className="pointer-events-auto flex items-center gap-1.5">
-      <span className="relative">
-        <button
-          ref={triggerRef}
-          type="button"
-          aria-label="Alerts"
-          aria-expanded={alerts}
-          aria-controls="alerts-menu"
-          onClick={() => setAlerts((open) => !open)}
-          className={`${circleButton} ${alerts ? "bg-[#f1f1f1]" : ""}`}
-        >
-          <PIcon name="Notification" size={20} />
-        </button>
-        {read ? null : (
-          <span className="pointer-events-none absolute -right-0.5 -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">
-            1
-          </span>
-        )}
-        {alerts ? (
-          <Alerts
-            anchorRef={triggerRef}
-            read={read}
-            onRead={() => setRead(true)}
-            onClose={() => setAlerts(false)}
-            onOpen={onAlertOpen}
-          />
-        ) : null}
-      </span>
-      <button type="button" aria-label="Settings" onClick={onSettings} className={circleButton}>
-        <PIcon name="Settings" size={20} />
-      </button>
-    </div>
-  );
-}
-
 const alertsShell =
   "pop-in z-50 rounded-2xl bg-white text-[#303030] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.3)]";
 
@@ -471,13 +423,16 @@ export function Alerts({
       const openUp = spaceAbove >= Math.min(menuH, 160) || spaceAbove >= spaceBelow;
       let top = openUp ? rect.top - gap - menuH : rect.bottom + gap;
       top = Math.max(pad, Math.min(top, window.innerHeight - pad - menuH));
-      let left = rect.right - width;
+      // Prefer growing away from the nearer viewport edge (left rail → open rightward).
+      const preferLeft = rect.left + width / 2 < window.innerWidth / 2;
+      let left = preferLeft ? rect.left : rect.right - width;
       left = Math.max(pad, Math.min(left, window.innerWidth - pad - width));
+      const originX = preferLeft ? "left" : "right";
       setPlace({
         top,
         left,
         width,
-        origin: openUp ? "bottom right" : "top right",
+        origin: `${openUp ? "bottom" : "top"} ${originX}`,
       });
     }
 

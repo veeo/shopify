@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AccountMenu, AdminNavSections, initials, SidekickLead, StoreMenu } from "@/components/admin-rail";
+import { AccountMenu, AdminNavSections, Alerts, initials, SidekickLead, StoreMenu } from "@/components/admin-rail";
 import { IconButton, Orb, ShopifyMark } from "@/components/marks";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Tip } from "@/components/chat-column";
@@ -74,6 +74,9 @@ export function AgentNav({
   const agents = visibleAgents(state);
   const lead = selectedAgent(state);
   const [menu, setMenu] = useState<"account" | "store" | null>(null);
+  const [alerts, setAlerts] = useState(false);
+  const [alertsRead, setAlertsRead] = useState(false);
+  const alertsRef = useRef<HTMLSpanElement>(null);
   const [hiddenOpen, setHiddenOpen] = useState(false);
   const [mergePhase, setMergePhase] = useState<MergePhase>(merged ? "admin" : "agents");
   const query = state.search.trim().toLowerCase();
@@ -104,6 +107,7 @@ export function AgentNav({
       return;
     }
     setMergePhase("agents");
+    setAlerts(false);
   }, [merged]); // eslint-disable-line react-hooks/exhaustive-deps -- phase machine driven by merged edge
 
   useEffect(() => {
@@ -527,6 +531,45 @@ export function AgentNav({
                 />
               ) : null}
             </span>
+          </span>
+          <span
+            className={`relative flex items-center gap-1.5 ${
+              collapsed ? "mt-2 flex-col" : "ml-auto pr-1"
+            }`}
+          >
+            <span ref={alertsRef} className="relative">
+              <IconButton
+                label="Alerts"
+                active={alerts}
+                controls="alerts-menu"
+                onClick={() => setAlerts((open) => !open)}
+              >
+                <PIcon name="Notification" size={20} />
+              </IconButton>
+              {alertsRead ? null : (
+                <span className="pointer-events-none absolute -right-0.5 -top-0.5 grid size-3.5 place-items-center rounded-full bg-[#e51c00] text-[9px] font-bold text-white">
+                  1
+                </span>
+              )}
+              {alerts ? (
+                <Alerts
+                  anchorRef={alertsRef}
+                  read={alertsRead}
+                  onRead={() => setAlertsRead(true)}
+                  onClose={() => setAlerts(false)}
+                  onOpen={() => onAdminOpen?.("pos")}
+                />
+              ) : null}
+            </span>
+            <IconButton
+              label="Settings"
+              onClick={() => {
+                if (onAdminOpen) onAdminOpen("settings");
+                else onSettings();
+              }}
+            >
+              <PIcon name="Settings" size={20} />
+            </IconButton>
           </span>
         </div>
       </div>

@@ -4,7 +4,6 @@ import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type
 import { flushSync } from "react-dom";
 import { AdminMenu } from "@/components/admin-menu";
 import { AdminPage, type PageNav } from "@/components/admin-pages";
-import { AdminChromeActions } from "@/components/admin-rail";
 import {
   AdminDensityProvider,
   AdminLayoutControl,
@@ -507,18 +506,13 @@ export function PreviewColumn({
             </div>
           </div>
         ) : null}
-        {!sheet ? (
+        {showLayoutControl && onLayout && !sheet && !takeover ? (
           <div
             aria-hidden
             className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-28 bg-gradient-to-t from-white via-white/85 to-transparent"
           />
         ) : null}
-        {!sheet ? (
-          <div className="pointer-events-none absolute bottom-6 right-6 z-40 flex items-center gap-2">
-            <AdminChromeActions onSettings={() => onRail("settings")} onAlertOpen={() => onRail("pos")} />
-            {showLayoutControl && onLayout ? <AdminLayoutControl mode={layoutMode} onChange={onLayout} /> : null}
-          </div>
-        ) : null}
+        {showLayoutControl && onLayout && !sheet ? <AdminLayoutControl mode={layoutMode} onChange={onLayout} /> : null}
       </HeaderSlotProvider>
       </WorkspaceViewProvider>
       </AdminDensityProvider>
