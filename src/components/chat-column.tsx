@@ -1778,12 +1778,25 @@ function isAnswer(list: Block[], index: number) {
   return false;
 }
 
-function SoftLink({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+function SoftLink({
+  children,
+  onClick,
+  underlined = true,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  /** Agent-name links in Sidekick summaries stay soft (clickable) but drop the underline. */
+  underlined?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline p-0 text-inherit underline decoration-dotted decoration-[#8e8f8b] underline-offset-[3px] transition-[text-decoration-color] hover:decoration-white/70"
+      className={
+        underlined
+          ? "inline p-0 text-inherit underline decoration-dotted decoration-[#8e8f8b] underline-offset-[3px] transition-[text-decoration-color] hover:decoration-white/70"
+          : "inline p-0 text-inherit transition-opacity hover:opacity-80"
+      }
     >
       {children}
     </button>
@@ -1900,8 +1913,10 @@ function BlockView({
             {block.summaries.map((item, index) => (
               <span key={item.id}>
                 {index > 0 ? " " : null}
-                <SoftLink onClick={() => onSwitch(item.id)}>{item.name}</SoftLink>
-                {` — ${item.text}`}
+                <SoftLink underlined={false} onClick={() => onSwitch(item.id)}>
+                  {item.name}
+                </SoftLink>
+                {`: ${item.text}`}
               </span>
             ))}
           </p>
