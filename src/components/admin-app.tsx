@@ -628,6 +628,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onEditAgent={(patch) => dispatch({ type: "edit-agent", ...patch })}
             onTogglePin={(id) => dispatch({ type: "toggle-pin", id })}
             onToggleHide={(id) => dispatch({ type: "toggle-hide", id })}
+            onDisconnectSidekick={(id) => dispatch({ type: "disconnect-sidekick", id })}
             onConversations={(open) => dispatch({ type: "conversations", open })}
             onNewChat={() => dispatch({ type: "new-chat" })}
             onOpenConversation={(id) => dispatch({ type: "open-conversation", id })}

@@ -61,6 +61,7 @@ export function ChatColumn({
   onEditAgent,
   onTogglePin,
   onToggleHide,
+  onDisconnectSidekick,
   onConversations,
   onNewChat,
   onOpenConversation,
@@ -105,6 +106,7 @@ export function ChatColumn({
   }) => void;
   onTogglePin: (id: string) => void;
   onToggleHide: (id: string) => void;
+  onDisconnectSidekick: (id: string) => void;
   onConversations: (open: boolean) => void;
   onNewChat: () => void;
   onOpenConversation: (id: string) => void;
@@ -250,9 +252,17 @@ export function ChatColumn({
             <EditSidekick
               key={agent.id}
               agent={agent}
+              canDisconnect={
+                agent.id !== "sidekick" &&
+                state.agents.some((item) => item.id !== agent.id && item.installed)
+              }
               onClose={() => setEditing(false)}
               onSave={(patch) => {
                 onEditAgent({ id: agent.id, ...patch });
+                setEditing(false);
+              }}
+              onDisconnect={() => {
+                onDisconnectSidekick(agent.id);
                 setEditing(false);
               }}
             />
@@ -1603,10 +1613,13 @@ const attachPageChoices: { page: PreviewId; label: string; wide?: boolean }[] = 
 
 function EditSidekick({
   agent,
+  canDisconnect,
   onClose,
   onSave,
+  onDisconnect,
 }: {
   agent: Agent;
+  canDisconnect: boolean;
   onClose: () => void;
   onSave: (patch: {
     name: string;
@@ -1619,6 +1632,7 @@ function EditSidekick({
     attachPage: PreviewId;
     attachWide: boolean;
   }) => void;
+  onDisconnect: () => void;
 }) {
   const [name, setName] = useState(agent.name);
   const [purpose, setPurpose] = useState(agent.purpose);
@@ -1756,13 +1770,26 @@ function EditSidekick({
             </label>
           ) : null}
         </div>
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="press rounded-full px-3 py-1.5 text-[13px] text-[#c4c4c4] hover:bg-white/10 hover:text-white">
-            Cancel
-          </button>
-          <button type="submit" className="press rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-black hover:bg-[#eee]">
-            Save
-          </button>
+        <div className="flex items-center justify-between gap-2">
+          {canDisconnect ? (
+            <button
+              type="button"
+              onClick={onDisconnect}
+              className="press rounded-full px-3 py-1.5 text-[13px] text-[#ff8a80] hover:bg-[#4a1f1b]/60 hover:text-[#ffb4ad]"
+            >
+              {agent.baseGroup === "teams" || agent.group === "teams" ? "Disconnect" : "Remove sidekick"}
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="press rounded-full px-3 py-1.5 text-[13px] text-[#c4c4c4] hover:bg-white/10 hover:text-white">
+              Cancel
+            </button>
+            <button type="submit" className="press rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-black hover:bg-[#eee]">
+              Save
+            </button>
+          </div>
         </div>
       </form>
     </div>,

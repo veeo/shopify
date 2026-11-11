@@ -2158,6 +2158,7 @@ export type Action =
   | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string; attachOn: boolean; attachPage: PreviewId; attachWide: boolean }
   | { type: "toggle-pin"; id: string }
   | { type: "toggle-hide"; id: string }
+  | { type: "disconnect-sidekick"; id: string }
   | { type: "intro-seen" }
   | { type: "preview"; page: PreviewId; wide?: boolean; layout?: AdminLayoutMode }
   | { type: "admin-layout"; mode: AdminLayoutMode }
@@ -2531,6 +2532,39 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
       if (!next.threads[action.id]?.length) next.threads[action.id] = activeThread(action.id);
       return next;
     }
+    case "disconnect-sidekick": {
+      // Built-in Sidekick stays; never leave the roster empty.
+      if (action.id === "sidekick") return state;
+      const current = next.agents.find((item) => item.id === action.id);
+      if (!current?.installed) return state;
+      const others = next.agents.filter((item) => item.id !== action.id && item.installed);
+      if (others.length === 0) return state;
+      const custom = action.id.startsWith("custom-");
+      if (custom) {
+        next.agents = next.agents.filter((item) => item.id !== action.id);
+      } else {
+        patchAgent(next, action.id, {
+          installed: false,
+          hidden: false,
+          pinned: false,
+          unread: 0,
+          group: current.baseGroup === "hidden" ? "teams" : current.baseGroup,
+        });
+      }
+      if (action.id === "chief") next.chiefPhase = "absent";
+      if (next.selectedAgentId === action.id) {
+        const fallback =
+          others.find((item) => item.id === "chief") ??
+          others.find((item) => item.id === "sidekick") ??
+          others.find((item) => !item.hidden) ??
+          others[0];
+        next.selectedAgentId = fallback.id;
+        next.mode = "thread";
+        patchAgent(next, fallback.id, { unread: 0 });
+      }
+      next.searchOpen = false;
+      return next;
+    }
     case "admin-layout":
       next.adminLayout = action.mode;
       return next;
@@ -2709,7 +2743,7 @@ function confirmProduct(state: PrototypeState, publish: boolean) {
 }
 
 const freshActions = new Set<Action["type"]>(["scenario", "reset", "arrival", "boot-active", "logout", "sign-in"]);
-const restoringActions = new Set<Action["type"]>(["select", "add-catalog", "create-agent"]);
+const restoringActions = new Set<Action["type"]>(["select", "add-catalog", "create-agent", "disconnect-sidekick"]);
 
 function openPage(state: PrototypeState, page: PreviewId, wide?: boolean, layout?: AdminLayoutMode) {
   if (sameDesk(state.preview, page)) state.view = { ...state.view, recordId: "", scroll: 0 };
