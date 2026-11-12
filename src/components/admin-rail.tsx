@@ -11,15 +11,26 @@ import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 
 const channelIds = new Set(channelNav.map((item) => item.id));
 
+/** Circle hover / selected — matches sidekick collapsed orbs. */
+const circleIdle =
+  "rounded-full text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a]";
+const circleOn = "rounded-full bg-white/[0.1] text-white shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]";
+/** Expanded rows: same rounded-full treatment as sidekick roster rows. */
+const rowIdle = "rounded-full text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white";
+const rowOn = "rounded-full bg-[#2f2f2f] font-semibold text-white";
+
 /** Main admin destinations (Home → Apps) without search or footer chrome. */
 export function AdminNavSections({
   expanded,
+  labels = expanded,
   preview,
   onOpen,
   onGo,
   onSearchApps,
 }: {
   expanded: boolean;
+  /** When false, hide/clip labels while width may still be animating. */
+  labels?: boolean;
   preview: PreviewId;
   onOpen: (id: string) => void;
   onGo: (page: PreviewId) => void;
@@ -27,24 +38,29 @@ export function AdminNavSections({
 }) {
   const { id: active, child } = navFor(preview);
   const [channelsOpen, setChannelsOpen] = useState(true);
-  const shared = { expanded, active, child, onOpen, onGo };
+  const shared = { expanded, labels, active, child, onOpen, onGo };
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
-      <div className="flex flex-col gap-0.5">
+    <div
+      className={`flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto ${
+        expanded ? "" : "items-center"
+      }`}
+    >
+      <div className={`flex flex-col ${expanded ? "gap-0.5" : "items-center gap-2"}`}>
         {mainNav.map((item) => (
           <RailItem key={item.id} item={item} {...shared} />
         ))}
       </div>
-      <span className={`my-2 h-px shrink-0 bg-white/15 ${expanded ? "mx-2" : "mx-1.5"}`} />
       {expanded ? (
-        <div className="flex flex-col gap-0.5">
+        <div className="mt-1 flex flex-col gap-0.5">
           <button
             type="button"
             aria-expanded={channelsOpen}
             onClick={() => setChannelsOpen((open) => !open)}
-            className="flex h-7 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-[12px] font-medium text-[#a6a6a6] hover:text-white"
+            className="flex h-7 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[12px] font-medium text-[#a6a6a6] hover:text-white"
           >
-            Sales channels
+            <span className="rail-label" data-show={labels ? "true" : "false"}>
+              Sales channels
+            </span>
             <span className={`transition-transform duration-150 ${channelsOpen ? "rotate-90" : ""}`}>
               <PIcon name="ChevronRight" size={14} />
             </span>
@@ -52,20 +68,25 @@ export function AdminNavSections({
           {channelsOpen ? channelNav.map((item) => <RailItem key={item.id} item={item} {...shared} />) : null}
         </div>
       ) : (
-        <ChannelsItem active={active} onOpen={onOpen} />
+        <div className="mt-2 flex flex-col items-center gap-2">
+          <ChannelsItem active={active} onOpen={onOpen} />
+        </div>
       )}
-      <span className={`my-2 h-px shrink-0 bg-white/15 ${expanded ? "mx-2" : "mx-1.5"}`} />
       {expanded ? (
         <button
           type="button"
           onClick={() => onSearchApps?.()}
-          className="flex h-7 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-[12px] font-medium text-[#a6a6a6] hover:text-white"
+          className="mt-1 flex h-7 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[12px] font-medium text-[#a6a6a6] hover:text-white"
         >
-          Apps
+          <span className="rail-label" data-show={labels ? "true" : "false"}>
+            Apps
+          </span>
           <PIcon name="ChevronRight" size={14} />
         </button>
       ) : (
-        <RailButton label="Apps" icon="Apps" onClick={() => onSearchApps?.()} />
+        <div className="mt-2 flex flex-col items-center">
+          <RailButton label="Apps" icon="Apps" onClick={() => onSearchApps?.()} />
+        </div>
       )}
     </div>
   );
@@ -103,7 +124,7 @@ export function AdminRail({
   const { id: active, child } = navFor(preview);
   const [alerts, setAlerts] = useState(false);
   const [read, setRead] = useState(false);
-  const shared = { expanded, active, child, onOpen, onGo };
+  const shared = { expanded, labels: expanded, active, child, onOpen, onGo };
   return (
     <nav
       className={`relative flex h-full shrink-0 flex-col pb-3 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
@@ -116,7 +137,7 @@ export function AdminRail({
         <button
           type="button"
           onClick={() => onSearch()}
-          className="fade-in mb-1 flex h-8 w-full items-center gap-2 rounded-[10px] bg-white/[0.08] px-2 text-[13px] text-[#b5b5b5] transition-colors hover:bg-white/[0.12] hover:text-white"
+          className="fade-in mb-1 flex h-8 w-full items-center gap-2 rounded-full bg-white/[0.08] px-2 text-[13px] text-[#b5b5b5] transition-colors hover:bg-white/[0.12] hover:text-white"
         >
           <PIcon name="Search" size={18} />
           <span className="flex-1 text-left">Search</span>
@@ -174,23 +195,27 @@ export function initials(name: string) {
 export function SidekickLead({
   agent,
   expanded,
+  labels = expanded,
   onView,
 }: {
   agent: Agent;
   expanded: boolean;
+  labels?: boolean;
   onView: () => void;
 }) {
-  // Match admin nav rows: h-8, 20px icon slot, rounded-[10px] px-1.5.
   return (
     <button
       type="button"
+      data-flip={`agent-${agent.id}`}
       aria-label={`View sidekicks — ${agent.name}`}
       onClick={onView}
-      className={`press relative flex h-8 w-full items-center gap-2 overflow-hidden rounded-[10px] px-1.5 text-[13px] font-semibold text-white hover:bg-white/[0.08] ${
-        expanded ? "" : "justify-center px-0"
-      }`}
+      className={
+        expanded
+          ? `press press-row flex h-8 w-full items-center gap-2 overflow-hidden px-1.5 text-[13px] font-semibold text-white ${rowIdle}`
+          : `press mx-auto grid size-8 place-items-center ${circleIdle} hover:text-white`
+      }
     >
-      <span className="relative grid size-5 shrink-0 place-items-center rounded-full">
+      <span className="relative grid size-5 shrink-0 place-items-center rounded-full" data-flip={`agent-orb-${agent.id}`}>
         <Orb
           id={agent.orb}
           agentId={agent.id}
@@ -200,7 +225,11 @@ export function SidekickLead({
           presence="rest"
         />
       </span>
-      {expanded ? <span className="min-w-0 flex-1 truncate text-left">{agent.name}</span> : null}
+      {expanded ? (
+        <span className="rail-label min-w-0 flex-1 text-left" data-show={labels ? "true" : "false"}>
+          {agent.name}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -223,25 +252,29 @@ export function ConversationStatusIcon({ status }: { status: "idle" | "done" | "
 /** Condensed recent chats under the hybrid lead. */
 export function SidekickRecentChats({
   expanded,
+  labels = expanded,
   items,
   onOpen,
 }: {
   expanded: boolean;
+  labels?: boolean;
   items: { id: string; title: string; status: "idle" | "done" | "working" }[];
   onOpen: (id: string) => void;
 }) {
   if (!expanded || items.length === 0) return null;
   return (
-    <ul className="mb-2 flex flex-col gap-0.5" aria-label="Recent conversations">
+    <ul className="flex flex-col gap-0.5" aria-label="Recent conversations">
       {items.map((item) => (
         <li key={item.id}>
           <button
             type="button"
             onClick={() => onOpen(item.id)}
-            className="press flex h-7 w-full items-center gap-2 overflow-hidden rounded-lg px-1.5 text-left text-[12px] text-[#a6a6a6] hover:bg-white/[0.08] hover:text-white"
+            className={`press flex h-7 w-full items-center gap-2 overflow-hidden px-1.5 text-left text-[12px] ${rowIdle}`}
           >
             <ConversationStatusIcon status={item.status} />
-            <span className="min-w-0 flex-1 truncate">{item.title}</span>
+            <span className="rail-label min-w-0 flex-1" data-show={labels ? "true" : "false"}>
+              {item.title}
+            </span>
           </button>
         </li>
       ))}
@@ -267,6 +300,7 @@ const flyoutRow = "flex items-center gap-2 whitespace-nowrap rounded-lg px-2 py-
 function RailItem({
   item,
   expanded,
+  labels = expanded,
   active,
   child,
   onOpen,
@@ -274,6 +308,7 @@ function RailItem({
 }: {
   item: NavItem;
   expanded: boolean;
+  labels?: boolean;
   active: string;
   child: PreviewId | null;
   onOpen: (id: string) => void;
@@ -281,21 +316,31 @@ function RailItem({
 }) {
   const on = active === item.id;
   const kids = item.children?.filter((entry) => entry.page !== item.page) ?? [];
+  const selected = on && (!child || !expanded);
   return (
-    <div className="group relative flex flex-col">
+    <div className={`group relative flex flex-col ${expanded ? "" : "items-center"}`}>
       <button
         type="button"
+        data-flip={`nav-${item.id}`}
         aria-label={expanded ? undefined : item.label}
-        aria-current={on && !child ? "page" : undefined}
+        aria-current={selected ? "page" : undefined}
         onClick={() => onOpen(item.id)}
-        className={`press relative flex h-8 w-full items-center gap-2 overflow-hidden rounded-[10px] px-1.5 text-[13px] ${
-          on && (!child || !expanded) ? "bg-[#303030] text-white" : "text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white"
-        } ${on && expanded ? "font-semibold text-white" : ""}`}
+        className={
+          expanded
+            ? `press relative flex h-8 w-full items-center gap-2 overflow-hidden px-1.5 text-[13px] ${
+                selected || (on && expanded) ? rowOn : rowIdle
+              }`
+            : `press relative grid size-8 place-items-center ${selected ? circleOn : circleIdle}`
+        }
       >
         <ItemIcon item={item} on={on} />
-        <span className={`truncate whitespace-nowrap transition-opacity duration-200 ${expanded ? "opacity-100" : "opacity-0"}`}>{item.label}</span>
-        {item.dot ? (
-          <span className={`absolute size-1.5 rounded-full bg-[#b5b5b5] ${expanded ? "right-3 top-1/2 -translate-y-1/2" : "right-1 top-1"}`} title="Pin to your navigation" />
+        {expanded ? (
+          <span className="rail-label" data-show={labels ? "true" : "false"}>
+            {item.label}
+          </span>
+        ) : null}
+        {item.dot && expanded ? (
+          <span className="absolute right-3 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-[#b5b5b5]" title="Pin to your navigation" />
         ) : null}
         {expanded && on && item.channel ? (
           <span className="ml-auto text-[#b5b5b5]">
@@ -311,11 +356,13 @@ function RailItem({
               type="button"
               aria-current={child === entry.page ? "page" : undefined}
               onClick={() => onGo(entry.page)}
-              className={`h-7 truncate whitespace-nowrap rounded-lg pl-8 pr-2 text-left text-[13px] ${
-                child === entry.page ? "bg-[#303030] font-medium text-white" : "text-[#a6a6a6] hover:bg-white/[0.08] hover:text-white"
+              className={`h-7 truncate whitespace-nowrap rounded-full pl-8 pr-2 text-left text-[13px] ${
+                child === entry.page ? "bg-[#2f2f2f] font-medium text-white" : "text-[#a6a6a6] hover:bg-white/[0.08] hover:text-white"
               }`}
             >
-              {entry.label}
+              <span className="rail-label" data-show={labels ? "true" : "false"}>
+                {entry.label}
+              </span>
             </button>
           ))}
         </div>
@@ -354,13 +401,13 @@ function ChannelsItem({ active, onOpen }: { active: string; onOpen: (id: string)
   const on = channelIds.has(active);
   const shown = more ? channelNav : channelNav.filter((item) => item.id !== "shop");
   return (
-    <div className="group relative flex flex-col" onMouseLeave={() => setMore(false)}>
+    <div className="group relative flex flex-col items-center" onMouseLeave={() => setMore(false)}>
       <button
         type="button"
         aria-label="Sales channels"
         aria-current={on ? "page" : undefined}
         onClick={() => onOpen(on ? active : "online-store")}
-        className={`press flex h-8 w-full items-center rounded-[10px] px-1.5 ${on ? "bg-[#303030] text-white" : "text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white"}`}
+        className={`press grid size-8 place-items-center ${on ? circleOn : circleIdle}`}
       >
         <PIcon name="Channels" size={20} />
       </button>
@@ -401,7 +448,7 @@ function RailButton({
   controls?: string;
 }) {
   return (
-    <span className="group relative flex">
+    <span className="group relative flex justify-center">
       <button
         type="button"
         aria-label={label}
@@ -409,8 +456,8 @@ function RailButton({
         aria-current={on && !controls ? "page" : undefined}
         aria-expanded={controls ? on : undefined}
         onClick={onClick}
-        className={`press flex h-8 items-center gap-2 rounded-[10px] px-1.5 text-[13px] ${text ? "w-full" : "w-8"} ${
-          on ? "bg-[#303030] text-white" : "text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white"
+        className={`press flex items-center gap-2 px-1.5 text-[13px] ${text ? "h-8 w-full" : "size-8 justify-center"} ${
+          on ? (text ? rowOn : circleOn) : text ? rowIdle : circleIdle
         }`}
       >
         <PIcon name={icon} size={20} />
