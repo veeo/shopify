@@ -8,10 +8,10 @@ import { Orb, ShopifyMark } from "@/components/marks";
 const LOAD_PASSWORD = "sidekick";
 /** Today's order count from the Chief brief. */
 const WAITING_ORDERS = 14;
-/** Bar has settled under the loading copy; start revealing the app. */
-const REVEAL_MS = 1480;
+/** Fill has eased to full; start revealing the app. */
+const REVEAL_MS = 3000;
 /** Overlay fade finishes. The same bar never hands off to a second boot progress. */
-const DONE_MS = 1840;
+const DONE_MS = 3360;
 
 /**
  * Full-screen lock on every fresh document load. Admission lives in React state,
@@ -132,7 +132,7 @@ function PasswordGate({
             </p>
           </div>
         </div>
-        <div className={`gate-travel relative mt-6 h-10 ${opening ? "is-rising" : ""}`}>
+        <div className="gate-travel relative mt-6 h-10">
           <div
             data-opening={opening ? "" : undefined}
             className={`gate-field gate-morph absolute inset-x-0 top-1/2 -translate-y-1/2 overflow-hidden ${
