@@ -6,10 +6,12 @@ import { Orb, ShopifyMark } from "@/components/marks";
 
 /** Case-sensitive. Held only in this module — never written to storage. */
 const LOAD_PASSWORD = "sidekick";
-/** Bar is under the orb and the status has settled; start revealing the app. */
-const REVEAL_MS = 2300;
+/** Today's order count from the Chief brief. */
+const WAITING_ORDERS = 14;
+/** Bar has settled under the loading copy; start revealing the app. */
+const REVEAL_MS = 1480;
 /** Overlay fade finishes. The same bar never hands off to a second boot progress. */
-const DONE_MS = 2680;
+const DONE_MS = 1840;
 
 /**
  * Full-screen lock on every fresh document load. Admission lives in React state,
@@ -114,13 +116,28 @@ function PasswordGate({
           </div>
         </div>
 
-        <div className={`gate-fade mt-6 ${opening ? "pointer-events-none opacity-0" : "opacity-100"}`}>
-          <h1 className="text-center text-[20px] font-semibold leading-6 tracking-[-0.3px]">Enter password</h1>
-          <p className="mt-1.5 text-center text-[13px] leading-5 text-[#8e8f8b]">This preview stays locked until you continue.</p>
-          <label htmlFor="load-password" className="mt-6 block text-[12px] font-medium leading-4 text-[#c9c9c9]">
-            Password
-          </label>
+        <div className="relative mt-6">
+          <div className={`gate-fade ${opening ? "pointer-events-none opacity-0" : "opacity-100"}`} aria-hidden={opening}>
+            <h1 className="text-center text-[20px] font-semibold leading-6 tracking-[-0.3px]">Enter password</h1>
+            <p className="mt-1.5 text-center text-[13px] leading-5 text-[#8e8f8b]">This preview stays locked until you continue.</p>
+          </div>
+          <div
+            className={`gate-fade pointer-events-none absolute inset-0 ${opening ? "opacity-100" : "opacity-0"}`}
+            aria-hidden={!opening}
+            aria-live="polite"
+          >
+            <h1 className="text-center text-[20px] font-semibold leading-6 tracking-[-0.3px]">Loading your experience</h1>
+            <p className="mt-1.5 text-center text-[13px] leading-5 text-[#c9c9c9]">
+              You have {WAITING_ORDERS} orders waiting at My Store.
+            </p>
+          </div>
         </div>
+        <label
+          htmlFor="load-password"
+          className={`gate-fade mt-6 block text-[12px] font-medium leading-4 text-[#c9c9c9] ${opening ? "opacity-0" : "opacity-100"}`}
+        >
+          Password
+        </label>
 
         <div className={`gate-travel relative mt-1.5 h-10 ${opening ? "is-rising" : ""}`}>
           <div
@@ -155,10 +172,6 @@ function PasswordGate({
             <span aria-hidden="true" className="gate-field-bar pointer-events-none absolute inset-0 bg-white" />
           </div>
         </div>
-
-        <p className="gate-status pointer-events-none absolute inset-x-0 top-[86px] text-center text-[13px] leading-5 text-[#c9c9c9]" aria-live="polite">
-          {opening ? "Loading your experience" : ""}
-        </p>
 
         {error && !opening ? (
           <p id={errorId} role="alert" className="mt-2 text-[13px] leading-5 text-[#ff8a80]">

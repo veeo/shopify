@@ -723,21 +723,21 @@ html.vt-titles::view-transition-old(*):only-child {
 
 .gate-crossfade {
   grid-area: 1 / 1;
-  transition: opacity 1000ms ease-in-out;
+  transition: opacity 680ms ease-in-out;
   will-change: opacity;
 }
 
-/* The field compresses into its own track, then that same track rises under the orb. */
+/* The field compresses and rises in the same motion, settling just under the loading copy. */
 .gate-morph {
   transition:
-    height 1000ms ease-in-out,
-    border-radius 1000ms ease-in-out,
-    background-color 1000ms ease-in-out,
-    box-shadow 1000ms ease-in-out;
+    height 520ms cubic-bezier(0.2, 0.8, 0, 1),
+    border-radius 520ms cubic-bezier(0.2, 0.8, 0, 1),
+    background-color 520ms cubic-bezier(0.2, 0.8, 0, 1),
+    box-shadow 520ms cubic-bezier(0.2, 0.8, 0, 1);
 }
 
 .gate-travel.is-rising {
-  animation: gate-bar-rise 680ms cubic-bezier(0.2, 0.8, 0, 1) 980ms forwards;
+  animation: gate-bar-rise 520ms cubic-bezier(0.22, 0.85, 0.28, 1) 70ms forwards;
 }
 
 @keyframes gate-bar-rise {
@@ -745,12 +745,12 @@ html.vt-titles::view-transition-old(*):only-child {
     transform: translateY(0);
   }
   to {
-    transform: translateY(-122px);
+    transform: translateY(var(--gate-rise, -56px));
   }
 }
 
 .gate-fade {
-  transition: opacity 700ms ease-in-out;
+  transition: opacity 380ms ease-in-out;
 }
 
 .gate-field-bar {
@@ -762,7 +762,7 @@ html.vt-titles::view-transition-old(*):only-child {
 
 .gate-field[data-opening] .gate-field-bar {
   opacity: 1;
-  animation: gate-fill 2500ms linear forwards;
+  animation: gate-fill 1600ms linear forwards;
 }
 
 @keyframes gate-fill {
@@ -771,23 +771,6 @@ html.vt-titles::view-transition-old(*):only-child {
   }
   to {
     transform: scaleX(1);
-  }
-}
-
-.gate-status {
-  opacity: 0;
-}
-
-.gate-column[data-opening="true"] .gate-status {
-  animation: gate-status-in 420ms ease-in-out 1620ms forwards;
-}
-
-@keyframes gate-status-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
   }
 }
 
@@ -807,8 +790,7 @@ html.vt-titles::view-transition-old(*):only-child {
   }
 
   .gate-travel.is-rising,
-  .gate-field[data-opening] .gate-field-bar,
-  .gate-column[data-opening="true"] .gate-status {
+  .gate-field[data-opening] .gate-field-bar {
     animation: none;
   }
 }
