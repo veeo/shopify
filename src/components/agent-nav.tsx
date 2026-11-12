@@ -53,6 +53,7 @@ export function AgentNav({
   onSettings,
   onLogout,
   onDesignSystem,
+  onViewSidekicks,
   onAdminOpen,
   onAdminGo,
   onAdminSearch,
@@ -81,6 +82,8 @@ export function AgentNav({
   onQuery: (query: string) => void;
   onScenario: (scenario: "setup" | "active") => void;
   onDesignSystem: () => void;
+  /** Lead row returns to the sidekick sidebar; the chevron opens the switcher. */
+  onViewSidekicks?: () => void;
   onAdminOpen?: (id: string) => void;
   onAdminGo?: (page: PreviewId) => void;
   onAdminSearch?: (scope?: string) => void;
@@ -297,24 +300,8 @@ export function AgentNav({
         type="button"
         data-flip={`agent-${item.id}`}
         aria-current={selectedRow ? "page" : undefined}
-        aria-label={
-          narrow
-            ? item.name
-            : leadMorph
-              ? `Switch sidekick, current: ${item.name}`
-              : undefined
-        }
-        aria-haspopup={leadMorph && !narrow ? "menu" : undefined}
-        aria-expanded={leadMorph && !narrow ? switchOpen : undefined}
-        aria-controls={leadMorph && !narrow ? "sidekick-switcher" : undefined}
-        onClick={
-          leadMorph
-            ? () => {
-                if (narrow) return;
-                setSwitchOpen((open) => !open);
-              }
-            : () => pick(item.id)
-        }
+        aria-label={narrow ? item.name : leadMorph ? `View sidekicks — ${item.name}` : undefined}
+        onClick={leadMorph ? () => onViewSidekicks?.() : () => pick(item.id)}
         onMouseEnter={() => setHotId(item.id)}
         onMouseLeave={() => setHotId((current) => (current === item.id ? null : current))}
         className={
@@ -329,9 +316,7 @@ export function AgentNav({
             : leadMorph
               ? `press press-row relative flex h-8 w-full min-w-0 items-center gap-2 rounded-full py-0 pl-1.5 ${
                   opts?.leadSlot ? "pr-8" : "pr-1.5"
-                } text-left transition-[background-color,box-shadow] duration-300 hover:bg-white/[0.08] ${
-                  switchOpen ? "bg-white/[0.08]" : ""
-                }`
+                } text-left transition-[background-color,box-shadow] duration-300 hover:bg-white/[0.08]`
               : `press press-row relative flex h-12 w-full min-w-0 items-center gap-2 rounded-full py-2 pl-2 pr-2 text-left transition-[background-color,box-shadow] duration-300 ${
                   selectedRow ? "btn-dark pr-4" : "hover:bg-white/[0.06] active:bg-white/10"
                 }`
@@ -447,19 +432,30 @@ export function AgentNav({
           {button}
           {!narrow ? (
             <>
-              <span
-                aria-hidden
-                className={`pointer-events-none absolute right-1.5 top-1/2 z-10 flex h-4 w-3 -translate-y-1/2 flex-col items-center justify-center text-[#8e8f8b] ${
-                  switchOpen ? "text-white" : ""
+              <button
+                type="button"
+                aria-label="Switch sidekick"
+                aria-haspopup="menu"
+                aria-expanded={switchOpen}
+                aria-controls="sidekick-switcher"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setSwitchOpen((open) => !open);
+                }}
+                className={`press absolute right-0.5 top-1/2 z-10 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-[#8e8f8b] transition-colors hover:bg-white/[0.1] hover:text-white ${
+                  switchOpen ? "bg-white/[0.08] text-white" : ""
                 }`}
               >
-                <span className="flex h-2.5 w-3 items-end justify-center overflow-hidden">
-                  <PIcon name="ChevronUp" size={12} />
+                <span aria-hidden className="flex h-4 w-3 flex-col items-center justify-center">
+                  <span className="flex h-2.5 w-3 items-end justify-center overflow-hidden">
+                    <PIcon name="ChevronUp" size={12} />
+                  </span>
+                  <span className="flex h-2.5 w-3 items-start justify-center overflow-hidden">
+                    <PIcon name="ChevronDown" size={12} />
+                  </span>
                 </span>
-                <span className="flex h-2.5 w-3 items-start justify-center overflow-hidden">
-                  <PIcon name="ChevronDown" size={12} />
-                </span>
-              </span>
+              </button>
               {switchOpen ? (
                 <SidekickSwitcher
                   state={state}

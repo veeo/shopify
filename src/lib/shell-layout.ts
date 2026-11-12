@@ -49,7 +49,7 @@ export const ADMIN_LAYOUT_MODES: readonly AdminLayoutMode[] = ["sidebar", "expan
  * - Entering takeover → hybrid (expanded labels).
  * - Logo collapse while hybrid → minimized (admin stays takeover).
  * - Logo expand while minimized → hybrid.
- * - Leaving takeover (layout control) → sidekick.
+ * - “View sidekicks” / leaving takeover → sidekick.
  */
 export type AgentsRailMode = "sidekick" | "hybrid" | "minimized";
 

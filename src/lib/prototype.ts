@@ -7,7 +7,7 @@ export type { AdminLayoutMode };
 
 /** Programmatic wide opens become expanded, but keep an active takeover until the merchant leaves it. */
 function applyAdminWide(state: { adminLayout: AdminLayoutMode }, wide: boolean | undefined, fallbackWide = false) {
-  // Full mode is only left by an explicit admin-layout action.
+  // Full mode is only left by an explicit admin-layout action (or View sidekicks).
   if (state.adminLayout === "takeover") return;
   state.adminLayout = adminLayoutFromWide(wide, fallbackWide);
 }
