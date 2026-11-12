@@ -1,5 +1,5 @@
 import type { PreviewId } from "@/lib/admin-nav";
-import { isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
+import { adminLayoutFromWide, isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
 
 /** Filters, the open record, and the draft sitting on top of the admin page. */
 export type ViewState = {
@@ -122,8 +122,12 @@ export function applyWorkspace<P extends EditableProduct>(
   state.workspaces = { ...state.workspaces, [agentId]: workspace };
   const productMissing = workspace.page === "product" && !state.products.some((item) => item.id === workspace.recordId);
   state.preview = productMissing ? "products" : workspace.page;
-  // Keep the merchant’s chosen admin size (sidebar / expanded / takeover) across
-  // sidekick switches — panel layout is a shell preference, not per-agent.
+  // Attach + expanded opens wide admin; otherwise prefer sidebar when landing on a sidekick.
+  // Tight viewports still clamp expanded down in the shell. Takeover stays until the merchant leaves it.
+  if (state.adminLayout !== "takeover") {
+    const wantWide = Boolean(attach?.attachOn && attach.attachWide);
+    state.adminLayout = adminLayoutFromWide(wantWide);
+  }
   state.view = {
     query: workspace.query,
     tab: workspace.tab || "All",
@@ -177,7 +181,7 @@ export type SavedWork = {
   scenario: WorkspaceScenario;
   selectedAgentId: string;
   seq: number;
-  /** Global admin panel size; sticky across sidekick switches. */
+  /** Last admin panel size; reload ignores this in favor of sidebar / attachWide. */
   adminLayout?: AdminLayoutMode;
   workspaces: Record<string, Workspace>;
   products: SavedProduct[];

@@ -1,7 +1,7 @@
 import { channelNav, findNav, mainNav, navFor, pageMeta, previewPages, settingsNav, type PreviewId } from "@/lib/admin-nav";
 import type { ChoiceCard, ChoiceMode } from "@/lib/choices";
 import { applyWorkspace, captureWorkspace, emptyView, homeFor, readLiveScroll, sameDesk, sidekickHomes, type SavedWork, type ViewState, type Workspace } from "@/lib/workspace";
-import { ADMIN_LAYOUT_MODES, adminLayoutFromWide, isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
+import { adminLayoutFromWide, isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
 
 export type { AdminLayoutMode };
 
@@ -1181,8 +1181,8 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
             ],
     },
     preview: "home-setup",
-    // Roomy desktops floor to expanded; tight viewports clamp down in the shell.
-    adminLayout: "expanded",
+    // Fresh loads prefer sidebar; attachWide on the selected sidekick can expand.
+    adminLayout: "sidebar",
     view: emptyView(),
     workspaces: { sidekick: homeFor("sidekick", "setup") },
     mode: "thread",
@@ -1351,8 +1351,8 @@ export function activeState(storeName = "My Store"): PrototypeState {
     conversations: { ...base.conversations, ...teamConversations(Date.now()) },
     preview: "home-active",
     chiefPhase: "working",
-    // Roomy desktops floor to expanded; tight viewports clamp down in the shell.
-    adminLayout: "expanded",
+    // Fresh loads prefer sidebar; attachWide on the selected sidekick can expand.
+    adminLayout: "sidebar",
     view: emptyView(),
     workspaces: { chief: homeFor("chief", "active") },
   };
@@ -2533,18 +2533,22 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
         attachPage: action.attachPage,
         attachWide: action.attachWide,
       });
-      if (action.attachOn && next.selectedAgentId === action.id) {
-        const prior = next.workspaces[action.id];
-        next.workspaces = {
-          ...next.workspaces,
-          [action.id]: {
-            ...(prior ?? { ...emptyView(), page: action.attachPage, wide: action.attachWide }),
-            page: action.attachPage,
-            wide: action.attachWide,
-            draft: { ...(prior?.draft ?? {}) },
-          },
-        };
-        openPage(next, action.attachPage, action.attachWide);
+      if (next.selectedAgentId === action.id) {
+        if (action.attachOn) {
+          const prior = next.workspaces[action.id];
+          next.workspaces = {
+            ...next.workspaces,
+            [action.id]: {
+              ...(prior ?? { ...emptyView(), page: action.attachPage, wide: action.attachWide }),
+              page: action.attachPage,
+              wide: action.attachWide,
+              draft: { ...(prior?.draft ?? {}) },
+            },
+          };
+          openPage(next, action.attachPage, action.attachWide);
+        } else if (next.adminLayout !== "takeover") {
+          next.adminLayout = "sidebar";
+        }
       }
       return next;
     }
@@ -2855,9 +2859,7 @@ export function restoreWork(state: PrototypeState, saved: SavedWork): PrototypeS
   }
   // Refresh behaves like a fresh login: open on Chief with its opening animation.
   const selected = state.selectedAgentId;
-  // Prefer the global shell layout; fall back to the selected desk’s legacy snapshot.
-  const rawLayout = saved.adminLayout ?? workspaces[selected]?.layout;
-  const savedLayout = rawLayout && (ADMIN_LAYOUT_MODES as readonly string[]).includes(rawLayout) ? rawLayout : undefined;
+  // Ignore sticky layout from disk — reload starts sidebar unless attachWide says expanded.
   const next: PrototypeState = {
     ...state,
     agents,
@@ -2867,7 +2869,7 @@ export function restoreWork(state: PrototypeState, saved: SavedWork): PrototypeS
     selectedAgentId: selected,
     seq: Math.max(state.seq, saved.seq || 0),
     view: emptyView(),
-    ...(savedLayout ? { adminLayout: savedLayout } : {}),
+    adminLayout: "sidebar",
   };
   const agent = next.agents.find((item) => item.id === selected);
   applyWorkspace(next, selected, next.scenario, agent);

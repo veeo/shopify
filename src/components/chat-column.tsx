@@ -1653,10 +1653,10 @@ function EditSidekick({
   const [colorTo, setColorTo] = useState(agent.orbTo ?? starting.to);
   const [attachOn, setAttachOn] = useState(agent.attachOn);
   const [attachPage, setAttachPage] = useState<PreviewId>(agent.attachPage);
+  const [attachWide, setAttachWide] = useState(agent.attachWide);
   const voice = isVoiceOrb(orb);
   const combos = voice ? colorCombosFor(orb) : [];
   const field = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white outline-none placeholder:text-[#8e8f8b] focus:border-white/30";
-  const attachWide = attachPageChoices.find((item) => item.page === attachPage)?.wide ?? agent.attachWide;
   return createPortal(
     <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" role="presentation" onMouseDown={onClose}>
       <form
@@ -1764,20 +1764,41 @@ function EditSidekick({
             <MenuSwitch on={attachOn} />
           </button>
           {attachOn ? (
-            <label className="flex flex-col gap-1.5 text-[12px] text-[#8e8f8b]">
-              Admin page
-              <select
-                value={attachPage}
-                onChange={(event) => setAttachPage(event.target.value as PreviewId)}
-                className={`${field} appearance-none`}
+            <>
+              <label className="flex flex-col gap-1.5 text-[12px] text-[#8e8f8b]">
+                Admin page
+                <select
+                  value={attachPage}
+                  onChange={(event) => {
+                    const page = event.target.value as PreviewId;
+                    setAttachPage(page);
+                    const suggested = attachPageChoices.find((item) => item.page === page)?.wide;
+                    if (suggested !== undefined) setAttachWide(Boolean(suggested));
+                  }}
+                  className={`${field} appearance-none`}
+                >
+                  {attachPageChoices.map((item) => (
+                    <option key={item.page} value={item.page}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={attachWide}
+                onClick={() => setAttachWide((on) => !on)}
+                className="press flex w-full items-center gap-2.5 text-left text-[13px] text-white"
               >
-                {attachPageChoices.map((item) => (
-                  <option key={item.page} value={item.page}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <PIcon name="LayoutColumns3" size={18} />
+                <span className="flex-1">
+                  <span className="block">Open expanded</span>
+                  <span className="block text-[12px] font-normal text-[#8e8f8b]">Use the wider admin panel when selecting {agent.name}</span>
+                </span>
+                <MenuSwitch on={attachWide} />
+              </button>
+            </>
           ) : null}
         </div>
         <div className="flex items-center justify-between gap-2">
