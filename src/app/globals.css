@@ -712,6 +712,46 @@ html.vt-titles::view-transition-old(*):only-child {
   animation: sk-bar 1400ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards;
 }
 
+/* Password gate: logo and orb share one slot and crossfade together. */
+.gate-crossfade {
+  grid-area: 1 / 1;
+  transition: opacity 1100ms ease-in-out;
+  will-change: opacity;
+}
+
+/* The field compresses into its own track. Height is the only motion, so it stays centered. */
+.gate-morph {
+  transition:
+    height 1100ms ease-in-out,
+    border-radius 1100ms ease-in-out,
+    background-color 1100ms ease-in-out,
+    box-shadow 1100ms ease-in-out;
+}
+
+.gate-fade {
+  transition: opacity 800ms ease-in-out;
+}
+
+.gate-field-bar {
+  transform: scaleX(0.08);
+  transform-origin: left center;
+  opacity: 0;
+  transition: opacity 700ms ease-in-out;
+}
+
+.gate-field[data-opening] .gate-field-bar {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gate-crossfade,
+  .gate-morph,
+  .gate-fade,
+  .gate-field-bar {
+    transition: none;
+  }
+}
+
 @keyframes sk-dot {
   0%,
   80%,
