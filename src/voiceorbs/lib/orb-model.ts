@@ -23,9 +23,10 @@ export const ORB_LOOK: Record<OrbPresence, OrbLook> = {
   rest: { intensity: 0.16, speed: 0.35, glow: 0.1, scale: 1, enter: 5 },
   hover: { intensity: 0.16, speed: 0.35, glow: 0.1, scale: 1, enter: 5 },
   selected: { intensity: 0.16, speed: 0.35, glow: 0.1, scale: 1, enter: 5 },
-  listening: { intensity: 0.7, speed: 1, glow: 0.18, scale: 1, enter: 14 },
-  thinking: { intensity: 0.4, speed: 0.6, glow: 0.12, scale: 1, enter: 8 },
-  speaking: { intensity: 0.78, speed: 1.1, glow: 0.2, scale: 1, enter: 14 },
+  // Voice reactions warp past the circle — draw smaller so motion stays inside the slot.
+  listening: { intensity: 0.5, speed: 0.8, glow: 0.14, scale: 0.84, enter: 12 },
+  thinking: { intensity: 0.32, speed: 0.5, glow: 0.12, scale: 0.9, enter: 8 },
+  speaking: { intensity: 0.55, speed: 0.9, glow: 0.15, scale: 0.82, enter: 12 },
   reduced: { intensity: 0.04, speed: 0, glow: 0.06, scale: 1, enter: 8 },
 };
 

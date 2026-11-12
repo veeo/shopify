@@ -191,7 +191,7 @@ export function VoiceMode({
         type="button"
         aria-label={phase === "speaking" ? "Interrupt" : phase === "listening" ? "Send now" : "Voice"}
         onClick={tapOrb}
-        className="press relative grid size-14 shrink-0 place-items-center rounded-full"
+        className="press relative grid size-14 shrink-0 place-items-center overflow-visible rounded-full"
       >
         <Orb id={agent.orb} agentId={agent.id} size={48} presence="selected" colorFrom={agent.orbFrom} colorTo={agent.orbTo} />
       </button>
