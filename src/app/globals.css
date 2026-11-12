@@ -712,43 +712,104 @@ html.vt-titles::view-transition-old(*):only-child {
   animation: sk-bar 1400ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards;
 }
 
-/* Password gate: logo and orb share one slot and crossfade together. */
+/* Password gate: logo and orb share one slot and crossfade together. The orb itself never moves. */
+.gate-shell {
+  transition: opacity 320ms ease;
+}
+
+.gate-shell.is-exit {
+  opacity: 0;
+}
+
 .gate-crossfade {
   grid-area: 1 / 1;
-  transition: opacity 1100ms ease-in-out;
+  transition: opacity 1000ms ease-in-out;
   will-change: opacity;
 }
 
-/* The field compresses into its own track. Height is the only motion, so it stays centered. */
+/* The field compresses into its own track, then that same track rises under the orb. */
 .gate-morph {
   transition:
-    height 1100ms ease-in-out,
-    border-radius 1100ms ease-in-out,
-    background-color 1100ms ease-in-out,
-    box-shadow 1100ms ease-in-out;
+    height 1000ms ease-in-out,
+    border-radius 1000ms ease-in-out,
+    background-color 1000ms ease-in-out,
+    box-shadow 1000ms ease-in-out;
+}
+
+.gate-travel.is-rising {
+  animation: gate-bar-rise 680ms cubic-bezier(0.2, 0.8, 0, 1) 980ms forwards;
+}
+
+@keyframes gate-bar-rise {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-122px);
+  }
 }
 
 .gate-fade {
-  transition: opacity 800ms ease-in-out;
+  transition: opacity 700ms ease-in-out;
 }
 
 .gate-field-bar {
   transform: scaleX(0.08);
   transform-origin: left center;
   opacity: 0;
-  transition: opacity 700ms ease-in-out;
+  transition: opacity 600ms ease-in-out;
 }
 
 .gate-field[data-opening] .gate-field-bar {
   opacity: 1;
+  animation: gate-fill 2500ms linear forwards;
+}
+
+@keyframes gate-fill {
+  from {
+    transform: scaleX(0.08);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.gate-status {
+  opacity: 0;
+}
+
+.gate-column[data-opening="true"] .gate-status {
+  animation: gate-status-in 420ms ease-in-out 1620ms forwards;
+}
+
+@keyframes gate-status-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Polaris primary stays the component; its own height token is raised to the large button size. */
+.gate-continue {
+  --p-height-700-6e076: 2.75rem;
+  --p-font-size-button-label-6e076: 0.875rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .gate-crossfade,
   .gate-morph,
   .gate-fade,
-  .gate-field-bar {
+  .gate-field-bar,
+  .gate-shell {
     transition: none;
+  }
+
+  .gate-travel.is-rising,
+  .gate-field[data-opening] .gate-field-bar,
+  .gate-column[data-opening="true"] .gate-status {
+    animation: none;
   }
 }
 
