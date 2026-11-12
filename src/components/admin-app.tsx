@@ -553,8 +553,6 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onSearch={() => dispatch({ type: "toggle-search" })}
             onQuery={(query) => dispatch({ type: "search", query })}
             onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
-            onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
-            onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
             onDesignSystem={() => setDesign(true)}
             onViewSidekicks={viewSidekicks}
             onAdminOpen={(id) => dispatch({ type: "rail", id })}
@@ -584,8 +582,6 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onSearch={() => dispatch({ type: "toggle-search" })}
             onQuery={(query) => dispatch({ type: "search", query })}
             onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
-            onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
-            onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
             onDesignSystem={() => {
               setAgentsDrawerOpen(false);
               setDesign(true);

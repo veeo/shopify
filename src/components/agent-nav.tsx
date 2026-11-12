@@ -37,8 +37,6 @@ export function AgentNav({
   onSearch,
   onQuery,
   onScenario,
-  onArrival,
-  onMenuStyle,
   onSettings,
   onLogout,
   onDesignSystem,
@@ -69,8 +67,6 @@ export function AgentNav({
   onSearch: () => void;
   onQuery: (query: string) => void;
   onScenario: (scenario: "setup" | "active") => void;
-  onArrival: (arrival: "tasks" | "sidekick") => void;
-  onMenuStyle: (style: "push" | "drop") => void;
   onDesignSystem: () => void;
   onViewSidekicks?: () => void;
   onAdminOpen?: (id: string) => void;
@@ -492,18 +488,11 @@ export function AgentNav({
                 <AccountMenu
                   storeName={state.storeName}
                   scenario={state.scenario}
-                  arrival={state.arrival}
-                  menuStyle={state.menuStyle}
                   className={collapsed ? "bottom-0 left-[calc(100%+10px)] origin-bottom-left" : "bottom-[calc(100%+8px)] left-0 origin-bottom-left"}
                   onClose={() => setMenu(null)}
                   onSettings={onSettings}
                   onLogout={onLogout}
                   onScenario={onScenario}
-                  onArrival={(arrival) => {
-                    setMenu(null);
-                    onArrival(arrival);
-                  }}
-                  onMenuStyle={onMenuStyle}
                   onDesignSystem={() => {
                     setMenu(null);
                     onDesignSystem();

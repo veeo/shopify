@@ -543,36 +543,29 @@ export function StoreMenu({
   );
 }
 
-/** The merchant's account: the store, help, the design system, prototype controls, and log out. */
+/** The merchant's account: the store, help, the design system, and log out. */
 export function AccountMenu({
   storeName,
   scenario,
-  arrival,
-  menuStyle,
   className,
   onClose,
   onSettings,
   onLogout,
   onScenario,
-  onArrival,
-  onMenuStyle,
   onDesignSystem,
 }: {
   storeName: string;
   scenario: "setup" | "active";
-  arrival: "tasks" | "sidekick";
-  menuStyle: "push" | "drop";
   className: string;
   onClose: () => void;
   onSettings: () => void;
   onLogout: () => void;
   onScenario: (scenario: "setup" | "active") => void;
-  onArrival: (arrival: "tasks" | "sidekick") => void;
-  onMenuStyle: (style: "push" | "drop") => void;
   onDesignSystem: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(true, ref, onClose);
+  const activeStore = scenario === "active";
   return (
     <div ref={ref} id="account-menu" className={`${menuShell} ${className}`}>
       <button
@@ -617,37 +610,25 @@ export function AccountMenu({
         <span className="min-w-0 flex-1">Design system</span>
         <PIcon name="ChevronRight" size={16} />
       </button>
-      <span className={menuDivider} />
-      <p className="px-2 pb-1 pt-1.5 text-[12px] font-medium text-[#616161]">Prototype</p>
-      <MenuChoice
-        label="Store"
-        value={scenario}
-        options={[
-          ["setup", "New store"],
-          ["active", "Active store"],
-        ]}
-        onChange={onScenario}
-      />
-      {scenario === "setup" ? (
-        <MenuChoice
-          label="Opening"
-          value={arrival}
-          options={[
-            ["tasks", "Tasks"],
-            ["sidekick", "Sidekick"],
-          ]}
-          onChange={onArrival}
-        />
-      ) : null}
-      <MenuChoice
-        label="Navigation"
-        value={menuStyle}
-        options={[
-          ["push", "Push down"],
-          ["drop", "Dropdown"],
-        ]}
-        onChange={onMenuStyle}
-      />
+      <button
+        type="button"
+        role="switch"
+        aria-checked={activeStore}
+        onClick={() => onScenario(activeStore ? "setup" : "active")}
+        className={menuItem}
+      >
+        <span className="grid size-5 place-items-center">
+          <PIcon name="Store" size={16} />
+        </span>
+        <span className="min-w-0 flex-1">Active store</span>
+        <span className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${activeStore ? "bg-[#303030]" : "bg-[#d4d4d4]"}`}>
+          <span
+            className={`absolute top-0.5 size-3 rounded-full bg-white shadow transition-[left] duration-150 ${
+              activeStore ? "left-[14px]" : "left-0.5"
+            }`}
+          />
+        </span>
+      </button>
       <span className={menuDivider} />
       <button
         type="button"
@@ -662,40 +643,6 @@ export function AccountMenu({
         </span>
         Log out
       </button>
-    </div>
-  );
-}
-
-function MenuChoice<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: readonly (readonly [T, string])[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="px-1.5 py-1">
-      <p className="px-1.5 pb-1 text-[12px] text-[#616161]">{label}</p>
-      <div role="group" aria-label={label} className="grid grid-cols-2 gap-0.5 rounded-[10px] bg-[#f1f1f1] p-0.5">
-        {options.map(([option, text]) => {
-          const on = value === option;
-          return (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={on}
-              onClick={() => onChange(option)}
-              className={`h-8 rounded-lg px-2 text-[13px] ${on ? "bg-white font-medium text-[#171817] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.08)]" : "text-[#303030] hover:bg-white/70"}`}
-            >
-              {text}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }

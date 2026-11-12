@@ -1163,7 +1163,7 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
     storeName,
     scenario: "setup",
     arrival,
-    menuStyle: "push",
+    menuStyle: "drop",
     agents: [kick],
     selectedAgentId: "sidekick",
     threads: {
