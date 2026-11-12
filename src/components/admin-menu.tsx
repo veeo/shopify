@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
-import { channelNav, findNav, mainNav, navFor, settingsNav, type NavChild, type PreviewId } from "@/lib/admin-nav";
+import { channelNav, findNav, mainNav, navFor, navIconSize, settingsNav, type NavChild, type PreviewId } from "@/lib/admin-nav";
 
 /** The admin navigation, drawn on white inside the preview panel. */
 const settingsChildren: NavChild[] = [{ label: "General", page: "settings-general" }, ...settingsNav.map((row) => ({ label: row.label, page: row.page }))];
@@ -155,9 +155,9 @@ function Row({
         on ? "bg-[#f1f1f1] font-medium text-[#171817]" : section ? "font-medium text-[#171817] hover:bg-[#f6f6f6]" : "hover:bg-[#f6f6f6]"
       }`}
     >
-      {/* Same plain 20px icon treatment for main nav and sales channels — no gray chip. */}
+      {/* Same 20px slot for main nav and sales channels — no gray chip. Full-bleed marks scale down to the Home/Orders ink size. */}
       <span className="grid size-5 shrink-0 place-items-center">
-        <PIcon name={icon} size={20} />
+        <PIcon name={icon} size={navIconSize(icon)} />
       </span>
       <span className="truncate">{label}</span>
     </button>

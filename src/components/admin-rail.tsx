@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useDismiss } from "@/components/admin-ui";
 import { Orb } from "@/components/marks";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
-import { channelNav, mainNav, navFor, type NavItem, type PreviewId } from "@/lib/admin-nav";
+import { channelNav, mainNav, navFor, navIconSize, type NavItem, type PreviewId } from "@/lib/admin-nav";
 import type { Agent } from "@/lib/prototype";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 
@@ -304,10 +304,10 @@ export function SidekickRecentChats({
 }
 
 function ItemIcon({ item }: { item: NavItem; on: boolean }) {
-  // Same 20px icons for channels and main nav — no gray chip behind sales channels.
+  // Same 20px slot for channels and main nav — no gray chip. Full-bleed channel marks scale down so the ink matches Home/Orders.
   return (
     <span className="grid size-5 shrink-0 place-items-center">
-      <PIcon name={item.icon} size={20} />
+      <PIcon name={item.icon} size={navIconSize(item.icon)} />
     </span>
   );
 }

@@ -180,6 +180,21 @@ export const mainNav: NavItem[] = [
   },
 ];
 
+/**
+ * Sales-channel marks that fill their artboard (or skip the usual 20px icon padding)
+ * read larger than Home/Orders at the same box. These widths keep the ink near that
+ * ~12px line-icon extent, still centered in the shared 20px slot. Online Store already matches.
+ */
+const channelIconSize: Partial<Record<PolarisIconName, number>> = {
+  AgenticStorefront: 13,
+  PointOfSale: 12.5,
+  LogoShop: 15.5,
+};
+
+export function navIconSize(icon: PolarisIconName) {
+  return channelIconSize[icon] ?? 20;
+}
+
 export const channelNav: NavItem[] = [
   {
     id: "online-store",
