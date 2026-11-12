@@ -423,45 +423,34 @@ export function PreviewColumn({
               <PIcon name="ChevronLeft" size={20} />
             </button>
           ) : showChromeMenu ? (
-            <span className="relative z-40 size-8 shrink-0">
+            <span className="relative z-40 shrink-0">
+              <button
+                type="button"
+                aria-label={menu ? "Close admin menu" : "Open admin menu"}
+                aria-expanded={menu}
+                aria-controls="admin-menu"
+                onClick={() => setMenuOpen(!menu, true)}
+                className={circleButton}
+              >
+                <span className="relative grid size-5 place-items-center">
+                  <span className={`absolute transition-all duration-200 ${menu ? "scale-75 rotate-90 opacity-0" : "opacity-100"}`}>
+                    <PIcon name="Menu" size={20} />
+                  </span>
+                  <span className={`absolute transition-all duration-200 ${menu ? "opacity-100" : "-rotate-90 scale-75 opacity-0"}`}>
+                    <PIcon name="X" size={20} />
+                  </span>
+                </span>
+              </button>
               {menu && dropMenu ? (
                 <div
                   id="admin-menu"
                   role="menu"
                   aria-label="Admin menu"
-                  className="pop-in absolute left-0 top-0 z-30 flex max-h-[min(720px,calc(100dvh-64px))] w-60 origin-top-left flex-col overflow-y-auto rounded-xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.14)] [scrollbar-width:none]"
+                  className="pop-in absolute left-0 top-full z-30 mt-1 flex max-h-[min(720px,calc(100dvh-64px))] w-56 origin-top-left flex-col overflow-y-auto rounded-xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.14)] [scrollbar-width:none]"
                 >
-                  <button
-                    type="button"
-                    aria-label="Close admin menu"
-                    aria-expanded={true}
-                    aria-controls="admin-menu"
-                    onClick={() => setMenuOpen(false, true)}
-                    className="press mb-0.5 grid size-8 shrink-0 place-items-center self-start rounded-lg text-[#303030] hover:bg-[#f6f6f6]"
-                  >
-                    <PIcon name="X" size={20} />
-                  </button>
                   <AdminMenu {...menuProps} />
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  aria-label={menu ? "Close admin menu" : "Open admin menu"}
-                  aria-expanded={menu}
-                  aria-controls="admin-menu"
-                  onClick={() => setMenuOpen(!menu, true)}
-                  className={circleButton}
-                >
-                  <span className="relative grid size-5 place-items-center">
-                    <span className={`absolute transition-all duration-200 ${menu ? "scale-75 rotate-90 opacity-0" : "opacity-100"}`}>
-                      <PIcon name="Menu" size={20} />
-                    </span>
-                    <span className={`absolute transition-all duration-200 ${menu ? "opacity-100" : "-rotate-90 scale-75 opacity-0"}`}>
-                      <PIcon name="X" size={20} />
-                    </span>
-                  </span>
-                </button>
-              )}
+              ) : null}
             </span>
           ) : null}
           {sheet ? (
