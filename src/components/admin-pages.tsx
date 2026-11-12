@@ -1233,7 +1233,6 @@ function Shop({ nav }: Props) {
   return (
     <Shell page="shop" nav={nav} more={[{ label: "Settings", onClick: () => nav.go("shop-settings") }]}>
       <Card className="flex flex-col gap-2">
-        <img src="/assets/admin/shop-eligibility.png" alt="" className="h-14 w-auto self-end object-contain" />
         <span className="flex flex-wrap items-center gap-1.5 text-[13px] font-semibold">
           Your store isn’t currently eligible to sell on Shop <Badge tone="caution">Action required</Badge>
         </span>
@@ -1261,7 +1260,6 @@ function Shop({ nav }: Props) {
         </div>
       </Card>
       <Card className="flex flex-col gap-2">
-        <img src="/assets/admin/shop-posts.png" alt="" className="h-16 w-auto self-end rounded-lg object-contain" />
         <CardTitle>Extend your reach with Posts</CardTitle>
         <Muted>Sync videos from Instagram or create something new. Get your posts in front of shoppers already browsing to buy on your store and Shop’s feed.</Muted>
         <span className="flex gap-2">
