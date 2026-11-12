@@ -449,16 +449,11 @@ export function AgentNav({
             <>
               <span
                 aria-hidden
-                className={`pointer-events-none absolute right-1.5 top-1/2 z-10 flex h-4 w-3 -translate-y-1/2 flex-col items-center justify-center text-[#8e8f8b] ${
-                  switchOpen ? "text-white" : ""
+                className={`pointer-events-none absolute right-1.5 top-1/2 z-10 grid size-4 -translate-y-1/2 place-items-center text-[#8e8f8b] transition-transform duration-200 ${
+                  switchOpen ? "rotate-180 text-white" : ""
                 }`}
               >
-                <span className="flex h-2.5 w-3 items-end justify-center overflow-hidden">
-                  <PIcon name="ChevronUp" size={12} />
-                </span>
-                <span className="flex h-2.5 w-3 items-start justify-center overflow-hidden">
-                  <PIcon name="ChevronDown" size={12} />
-                </span>
+                <PIcon name="ChevronDown" size={16} />
               </span>
               {switchOpen ? (
                 <SidekickSwitcher
@@ -470,7 +465,7 @@ export function AgentNav({
                     setSwitchOpen(false);
                     onAdd();
                   }}
-                  className="left-0 top-[calc(100%+6px)] z-40 w-64 origin-top-left p-1.5"
+                  className="left-0 right-0 top-[calc(100%+6px)] z-40 w-full origin-top-left p-1.5"
                 />
               ) : null}
             </>
