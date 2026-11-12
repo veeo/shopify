@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { AdminApp } from "@/components/admin-app";
 import { Orb, ShopifyMark } from "@/components/marks";
 
@@ -12,6 +12,16 @@ const WAITING_ORDERS = 14;
 const REVEAL_MS = 3000;
 /** Overlay fade finishes. The same bar never hands off to a second boot progress. */
 const DONE_MS = 3360;
+
+/** Neon / lime bag paints for the load-gate mark only. Side is a darker sibling of the front. */
+const BAG_PALETTE = [
+  { front: "#C8FF00", side: "#8FBF00" },
+  { front: "#39FF14", side: "#1FA80C" },
+  { front: "#D4FF1A", side: "#A0C400" },
+  { front: "#A3FF12", side: "#6DB800" },
+  { front: "#7CFF2B", side: "#4CB814" },
+] as const;
+const BAG_DEFAULT = { front: "#FFFFFF", side: "#C3C3C3" };
 
 /**
  * Full-screen lock on every fresh document load. Admission lives in React state,
@@ -45,11 +55,18 @@ function PasswordGate({
   const [value, setValue] = useState("");
   const [error, setError] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [bagTone, setBagTone] = useState(-1);
+  const [bagPressing, setBagPressing] = useState(false);
   const field = useRef<HTMLInputElement>(null);
   const errorId = useId();
   const reveal = useRef(onReveal);
   const done = useRef(onDone);
   const lock = useRef(false);
+  const bagColors = bagTone < 0 ? BAG_DEFAULT : BAG_PALETTE[bagTone];
+  const bagStyle = {
+    "--gate-bag-front": bagColors.front,
+    "--gate-bag-side": bagColors.side,
+  } as CSSProperties;
 
   useEffect(() => {
     reveal.current = onReveal;
@@ -91,6 +108,19 @@ function PasswordGate({
     unlock();
   }
 
+  function pokeBag() {
+    if (opening) return;
+    setBagTone((tone) => (tone + 1) % BAG_PALETTE.length);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setBagPressing(false);
+      return;
+    }
+    setBagPressing(false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setBagPressing(true));
+    });
+  }
+
   return (
     <div
       data-load-gate
@@ -108,8 +138,18 @@ function PasswordGate({
         data-opening={opening ? "true" : "false"}
       >
         <div className="gate-mark relative mx-auto grid h-14 w-14 place-items-center">
-          <div className={`gate-crossfade ${opening ? "opacity-0" : "opacity-100"}`}>
-            <ShopifyMark className="h-8 w-[29px]" />
+          <div className={`gate-crossfade ${opening ? "pointer-events-none opacity-0" : "opacity-100"}`}>
+            <button
+              type="button"
+              className={`gate-bag ${bagPressing ? "is-pressing" : ""}`}
+              style={bagStyle}
+              aria-label="Shopify bag"
+              disabled={opening}
+              onClick={pokeBag}
+              onAnimationEnd={() => setBagPressing(false)}
+            >
+              <ShopifyMark className="h-8 w-[29px]" />
+            </button>
           </div>
           <div className={`gate-crossfade pointer-events-none ${opening ? "opacity-100" : "opacity-0"}`} aria-hidden="true">
             <Orb id="chief" size={56} />
