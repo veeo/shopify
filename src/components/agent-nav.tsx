@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AccountMenu, AdminNavSections, Alerts, initials, SidekickRecentChats, StoreMenu } from "@/components/admin-rail";
+import { useDismiss } from "@/components/admin-ui";
 import { IconButton, Orb, ShopifyMark } from "@/components/marks";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Tip } from "@/components/chat-column";
@@ -10,6 +11,7 @@ import type { PreviewId } from "@/lib/admin-nav";
 import type { AgentsRailMode } from "@/lib/shell-layout";
 import {
   hiddenAgents,
+  isNavSidekick,
   railGroup,
   recentAgentConversations,
   selectedAgent,
@@ -95,6 +97,9 @@ export function AgentNav({
   const [alertsRead, setAlertsRead] = useState(false);
   const alertsRef = useRef<HTMLSpanElement>(null);
   const [hiddenOpen, setHiddenOpen] = useState(false);
+  const [switchOpen, setSwitchOpen] = useState(false);
+  const leadSwitchRef = useRef<HTMLDivElement>(null);
+  useDismiss(switchOpen, leadSwitchRef, () => setSwitchOpen(false));
   const adminRail = railMode === "hybrid" || railMode === "minimized";
   const [mergePhase, setMergePhase] = useState<MergePhase>(adminRail ? "admin" : "agents");
   const query = state.search.trim().toLowerCase();
@@ -177,6 +182,18 @@ export function AgentNav({
     onSelect(id);
     if (drawer) onCloseDrawer?.();
   }
+
+  /** Hybrid lead switcher — stays in full/hybrid when applyWorkspace keeps takeover. */
+  function switchLead(id: string) {
+    setSwitchOpen(false);
+    if (id === lead.id) return;
+    onSelect(id);
+    if (drawer) onCloseDrawer?.();
+  }
+
+  useEffect(() => {
+    if (!adminRail || widthCollapsed) setSwitchOpen(false);
+  }, [adminRail, widthCollapsed]);
   const visibleGroups = groups
     .map((group) => ({
       ...group,
@@ -206,7 +223,10 @@ export function AgentNav({
   }, [revealing]);
   const curtain = !present || revealing;
 
-  // FLIP: icons keep their place while width / merge layout rearranges.
+  // FLIP only across sidekick↔hybrid merge. Width collapse already CSS-transitions;
+  // FLIP'ing that same move left residual translates on the lead (group thrash).
+  // collapsing→admin shares one epoch so the lead isn't re-FLIP'd after settle.
+  const flipEpoch = mergePhase === "agents" ? "agents" : "merged";
   useLayoutEffect(() => {
     const root = navRef.current;
     if (!root) return;
@@ -222,7 +242,11 @@ export function AgentNav({
     }
     skipSlide.current = false;
     const nodes = [...root.querySelectorAll<HTMLElement>("[data-flip]")];
-    for (const node of nodes) node.getAnimations().forEach((animation) => animation.cancel());
+    for (const node of nodes) {
+      node.getAnimations().forEach((animation) => animation.cancel());
+      // Drop any stuck inline translate from a prior interrupted FLIP.
+      if (node.style.transform) node.style.removeProperty("transform");
+    }
     for (const node of nodes) {
       const id = node.dataset.flip;
       if (!id) continue;
@@ -232,16 +256,38 @@ export function AgentNav({
         const dx = prev.left - box.left;
         const dy = prev.top - box.top;
         if (Math.hypot(dx, dy) > 1) {
-          node.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }], {
+          const prevTransition = node.style.transition;
+          // .press transitions transform — disable so WAAPI can't leave a residual.
+          node.style.transition = "none";
+          const anim = node.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }], {
             duration: 420,
             easing: ease,
+            fill: "none",
           });
+          const clear = () => {
+            node.style.removeProperty("transform");
+            node.style.transition = prevTransition;
+          };
+          anim.finished.then(clear).catch(clear);
         }
       }
       placed.current.set(id, { left: box.left, top: box.top });
     }
     return () => window.clearTimeout(timer);
-  }, [widthCollapsed, mergePhase, showLabels]);
+  }, [flipEpoch]);
+
+  // Keep placed map in sync when width/labels change without FLIP'ing (avoids a stale
+  // delta the next time merge runs).
+  useLayoutEffect(() => {
+    const root = navRef.current;
+    if (!root || root.getBoundingClientRect().width < 8) return;
+    for (const node of root.querySelectorAll<HTMLElement>("[data-flip]")) {
+      const id = node.dataset.flip;
+      if (!id) continue;
+      const box = node.getBoundingClientRect();
+      placed.current.set(id, { left: box.left, top: box.top });
+    }
+  }, [widthCollapsed, showLabels]);
 
   function agentRow(item: Agent, opts?: { leadSlot?: boolean }) {
     const selectedRow = item.id === state.selectedAgentId && state.mode === "thread";
@@ -249,10 +295,9 @@ export function AgentNav({
     const collapsingAway = merging && !isLead;
     const leadMorph = Boolean(opts?.leadSlot) || (merging && isLead);
     const narrow = widthCollapsed;
-    // Keep Orb at nav diameter forever; CSS-scale into the lead slot so WebGL never remounts.
-    // leadScaled gates the shrink so the first paint after a slot move stays at nav size.
-    const orbSlot = leadMorph && leadScaled ? ORB_SIZE.palette : ORB_SIZE.nav;
-    const orbScale = orbSlot / ORB_SIZE.nav;
+    // Lead keeps a fixed size-5 icon box (same as Home/Orders). Orb stays at nav
+    // WebGL size and CSS-scales inside — never resize the box, so it can't sit low.
+    const orbScale = leadMorph && leadScaled ? ORB_SIZE.palette / ORB_SIZE.nav : 1;
     const button = (
       <button
         type="button"
@@ -272,7 +317,9 @@ export function AgentNav({
                     : "hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a] active:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#bdbdbd]"
                 }`
             : leadMorph
-              ? `press press-row relative flex h-8 w-full min-w-0 items-center gap-2 rounded-full px-1.5 text-left transition-[background-color,box-shadow,height,padding] duration-300 hover:bg-white/[0.08]`
+              ? `press press-row relative flex h-8 w-full min-w-0 items-center gap-2 rounded-full py-0 pl-1.5 ${
+                  opts?.leadSlot ? "pr-8" : "pr-1.5"
+                } text-left transition-[background-color,box-shadow] duration-300 hover:bg-white/[0.08]`
               : `press press-row relative flex h-12 w-full min-w-0 items-center gap-2 rounded-full py-2 pl-2 pr-2 text-left transition-[background-color,box-shadow] duration-300 ${
                   selectedRow ? "btn-dark pr-4" : "hover:bg-white/[0.06] active:bg-white/10"
                 }`
@@ -291,43 +338,69 @@ export function AgentNav({
                 pointerEvents: "none",
                 transition: `opacity 240ms ease, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
               }
-            : {
-                opacity: 1,
-                transform: "scale(1)",
-                maxHeight: leadMorph ? 40 : 56,
-                transition: `opacity 240ms ease, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
-              }
+            : leadMorph
+              ? {
+                  // No inline transform — avoids fighting FLIP / .press and leaving a residual offset.
+                  opacity: 1,
+                  maxHeight: 32,
+                  transition: `opacity 240ms ease, max-height ${mergeEase}`,
+                }
+              : {
+                  opacity: 1,
+                  transform: "scale(1)",
+                  maxHeight: 56,
+                  transition: `opacity 240ms ease, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
+                }
         }
       >
         <span
-          className="relative grid shrink-0 place-items-center overflow-visible rounded-full"
-          data-flip={`agent-orb-${item.id}`}
-          style={{
-            width: orbSlot,
-            height: orbSlot,
-            transition: `width ${mergeEase}, height ${mergeEase}`,
-          }}
+          className={
+            leadMorph
+              ? "relative grid size-5 shrink-0 place-items-center overflow-visible rounded-full"
+              : "relative grid shrink-0 place-items-center overflow-visible rounded-full"
+          }
+          data-flip={leadMorph ? undefined : `agent-orb-${item.id}`}
+          style={
+            leadMorph
+              ? undefined
+              : {
+                  width: ORB_SIZE.nav,
+                  height: ORB_SIZE.nav,
+                }
+          }
         >
-          <span
-            className="grid place-items-center"
-            style={{
-              width: ORB_SIZE.nav,
-              height: ORB_SIZE.nav,
-              transform: `scale(${orbScale})`,
-              transformOrigin: "center center",
-              transition: `transform ${mergeEase}`,
-            }}
-          >
+          {leadMorph ? (
+            <span
+              className="pointer-events-none absolute left-1/2 top-1/2 grid place-items-center"
+              style={{
+                width: ORB_SIZE.nav,
+                height: ORB_SIZE.nav,
+                transform: `translate(-50%, -50%) scale(${orbScale})`,
+                transformOrigin: "center center",
+                transition: `transform ${mergeEase}`,
+              }}
+            >
+              <Orb
+                id={item.orb}
+                agentId={item.id}
+                size={ORB_SIZE.nav}
+                colorFrom={item.orbFrom}
+                colorTo={item.orbTo}
+                presence="selected"
+                hot={hotId === item.id}
+              />
+            </span>
+          ) : (
             <Orb
               id={item.orb}
               agentId={item.id}
               size={ORB_SIZE.nav}
               colorFrom={item.orbFrom}
               colorTo={item.orbTo}
-              presence={selectedRow || leadMorph ? "selected" : "rest"}
+              presence={selectedRow ? "selected" : "rest"}
               hot={hotId === item.id}
             />
-          </span>
+          )}
           {narrow && !leadMorph && item.unread > 0 ? (
             <span className="absolute -right-1.5 -top-1.5 z-10 grid size-4 place-items-center rounded-full bg-[#5631f4] text-[10px] font-medium text-white ring-2 ring-[#0c0d0c]">
               {item.unread}
@@ -355,8 +428,46 @@ export function AgentNav({
     );
     if (opts?.leadSlot) {
       return (
-        <div key={`lead-${item.id}`} className={narrow ? "flex w-full justify-center" : "w-full"}>
+        <div
+          key={`lead-${item.id}`}
+          ref={leadSwitchRef}
+          className={narrow ? "flex w-full justify-center" : "relative w-full"}
+        >
           {button}
+          {!narrow ? (
+            <>
+              <button
+                type="button"
+                aria-label="Switch sidekick"
+                aria-haspopup="menu"
+                aria-expanded={switchOpen}
+                aria-controls="hybrid-sidekick-switcher"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setSwitchOpen((open) => !open);
+                }}
+                className={`press absolute right-0.5 top-1/2 z-10 grid size-7 -translate-y-1/2 place-items-center rounded-full text-[#8e8f8b] transition-colors hover:bg-white/[0.1] hover:text-white ${
+                  switchOpen ? "bg-white/[0.08] text-white" : ""
+                }`}
+              >
+                <span className={`grid place-items-center transition-transform duration-200 ${switchOpen ? "rotate-180" : ""}`}>
+                  <PIcon name="ChevronDown" size={16} />
+                </span>
+              </button>
+              {switchOpen ? (
+                <HybridLeadSwitcher
+                  state={state}
+                  current={lead.id}
+                  onPick={switchLead}
+                  onAdd={() => {
+                    setSwitchOpen(false);
+                    onAdd();
+                  }}
+                />
+              ) : null}
+            </>
+          ) : null}
         </div>
       );
     }
@@ -478,12 +589,19 @@ export function AgentNav({
             >
               <div className={`mb-6 flex w-full shrink-0 flex-col ${narrow ? "items-center gap-0.5" : "gap-0.5"}`}>
                 {agentRow(lead, { leadSlot: true })}
+                {/* Keep the chats block mounted; collapse height instead of unmount so the group doesn't jump. */}
                 <div
-                  className={mergePhase === "collapsing" ? "admin-rail-rise w-full" : "w-full"}
-                  style={mergePhase === "admin" ? { opacity: 1, transform: "none" } : undefined}
+                  className={`w-full overflow-hidden ${mergePhase === "collapsing" && !narrow ? "admin-rail-rise" : ""}`}
+                  style={{
+                    maxHeight: narrow ? 0 : 120,
+                    opacity: narrow ? 0 : undefined,
+                    transform: mergePhase === "admin" ? "none" : undefined,
+                    pointerEvents: narrow ? "none" : undefined,
+                    transition: `max-height ${mergeEase}, opacity 200ms ease`,
+                  }}
                 >
                   <SidekickRecentChats
-                    expanded={!narrow}
+                    expanded
                     labels={showLabels}
                     items={recentChats}
                     onOpen={(id) => onOpenConversation?.(id)}
@@ -702,6 +820,65 @@ export function AgentNav({
     <div className="shell-agents-layer fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label="Sidekicks">
       <button type="button" className="shell-scrim absolute inset-0 bg-black/50" aria-label="Close sidekicks" onClick={() => onCloseDrawer?.()} />
       <div className="absolute inset-y-0 left-0 flex">{body}</div>
+    </div>
+  );
+}
+
+/** Compact switcher under the hybrid lead — mirrors the composer SidekickSwitcher. */
+function HybridLeadSwitcher({
+  state,
+  current,
+  onPick,
+  onAdd,
+}: {
+  state: PrototypeState;
+  current: string;
+  onPick: (id: string) => void;
+  onAdd: () => void;
+}) {
+  const agents = state.agents.filter((item) => item.installed && isNavSidekick(item.id, item));
+  return (
+    <div
+      id="hybrid-sidekick-switcher"
+      role="menu"
+      aria-label="Switch sidekick"
+      className="pop-in absolute left-0 top-[calc(100%+6px)] z-40 flex w-64 origin-top-left flex-col rounded-xl border border-white/10 bg-[#1a1a1a] p-1.5 text-white shadow-[0_16px_40px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)]"
+    >
+      <p className="px-2 pb-1 pt-1.5 text-[12px] text-[#8e8f8b]">Switch sidekick</p>
+      <div className="scroll-thin flex max-h-72 flex-col overflow-y-auto">
+        {agents.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="menuitem"
+            aria-current={item.id === current ? "true" : undefined}
+            onClick={(event) => {
+              event.stopPropagation();
+              onPick(item.id);
+            }}
+            className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] hover:bg-white/[0.07]"
+          >
+            <Orb id={item.orb} agentId={item.id} size={ORB_SIZE.menu} colorFrom={item.orbFrom} colorTo={item.orbTo} />
+            <span className="min-w-0 flex-1 truncate">{item.name}</span>
+            {item.id === current ? <PIcon name="Check" size={16} /> : null}
+          </button>
+        ))}
+      </div>
+      <div className="my-1 h-px bg-white/10" />
+      <button
+        type="button"
+        role="menuitem"
+        onClick={(event) => {
+          event.stopPropagation();
+          onAdd();
+        }}
+        className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] text-[#c4c4c4] hover:bg-white/[0.07] hover:text-white"
+      >
+        <span className="grid size-6 place-items-center rounded-full border border-dashed border-white/20">
+          <PIcon name="Plus" size={16} />
+        </span>
+        Add a sidekick
+      </button>
     </div>
   );
 }

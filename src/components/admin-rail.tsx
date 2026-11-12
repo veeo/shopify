@@ -223,16 +223,14 @@ export function SidekickLead({
           : `press mx-auto grid size-8 place-items-center ${circleIdle} hover:text-white`
       }
     >
-      <span
-        className="relative grid size-5 shrink-0 place-items-center overflow-visible rounded-full"
-        data-flip={`agent-orb-${agent.id}`}
-      >
+      {/* Fixed size-5 box matches Home/Orders; absolute center so scale never sits the orb low. */}
+      <span className="relative grid size-5 shrink-0 place-items-center overflow-visible rounded-full">
         <span
-          className="grid place-items-center"
+          className="pointer-events-none absolute left-1/2 top-1/2 grid place-items-center"
           style={{
             width: render,
             height: render,
-            transform: `scale(${scale})`,
+            transform: `translate(-50%, -50%) scale(${scale})`,
             transformOrigin: "center center",
             transition: orbFromNav ? "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)" : undefined,
           }}
