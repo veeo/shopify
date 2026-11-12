@@ -199,12 +199,18 @@ export function SidekickLead({
   expanded,
   labels = expanded,
   onView,
+  /** Keep Orb at nav diameter and CSS-scale into the lead slot — avoids remount flicker. */
+  orbFromNav = false,
 }: {
   agent: Agent;
   expanded: boolean;
   labels?: boolean;
   onView: () => void;
+  orbFromNav?: boolean;
 }) {
+  const slot = ORB_SIZE.palette;
+  const render = orbFromNav ? ORB_SIZE.nav : slot;
+  const scale = slot / render;
   return (
     <button
       type="button"
@@ -217,15 +223,29 @@ export function SidekickLead({
           : `press mx-auto grid size-8 place-items-center ${circleIdle} hover:text-white`
       }
     >
-      <span className="relative grid size-5 shrink-0 place-items-center rounded-full" data-flip={`agent-orb-${agent.id}`}>
-        <Orb
-          id={agent.orb}
-          agentId={agent.id}
-          size={ORB_SIZE.palette}
-          colorFrom={agent.orbFrom}
-          colorTo={agent.orbTo}
-          presence="rest"
-        />
+      <span
+        className="relative grid size-5 shrink-0 place-items-center overflow-visible rounded-full"
+        data-flip={`agent-orb-${agent.id}`}
+      >
+        <span
+          className="grid place-items-center"
+          style={{
+            width: render,
+            height: render,
+            transform: `scale(${scale})`,
+            transformOrigin: "center center",
+            transition: orbFromNav ? "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)" : undefined,
+          }}
+        >
+          <Orb
+            id={agent.orb}
+            agentId={agent.id}
+            size={render}
+            colorFrom={agent.orbFrom}
+            colorTo={agent.orbTo}
+            presence="rest"
+          />
+        </span>
       </span>
       {expanded ? (
         <span className="rail-label min-w-0 flex-1 text-left" data-show={labels ? "true" : "false"}>
@@ -239,19 +259,15 @@ export function SidekickLead({
 /** ~8×8 status glyphs for hybrid recent conversations. */
 export function ConversationStatusIcon({ status }: { status: "idle" | "done" | "working" }) {
   if (status === "working") {
-    return (
-      <span className="grid size-2 shrink-0 place-items-center" aria-hidden>
-        <span className="hybrid-status-spin size-2 rounded-full border-[1.5px] border-white border-t-transparent" />
-      </span>
-    );
+    return <span className="hybrid-status-spin size-2 rounded-full border-[1.5px] border-white border-t-transparent" aria-hidden />;
   }
   if (status === "done") {
-    return <span className="size-2 shrink-0 rounded-full border-[1.5px] border-white bg-white" aria-hidden />;
+    return <span className="size-2 rounded-full border-[1.5px] border-white bg-white" aria-hidden />;
   }
-  return <span className="size-2 shrink-0 rounded-full border-[1.5px] border-[#8e8f8b] bg-transparent" aria-hidden />;
+  return <span className="size-2 rounded-full border-[1.5px] border-[#8e8f8b] bg-transparent" aria-hidden />;
 }
 
-/** Condensed recent chats under the hybrid lead. */
+/** Condensed recent chats under the hybrid lead — 32px rows aligned with admin nav. */
 export function SidekickRecentChats({
   expanded,
   labels = expanded,
@@ -271,10 +287,13 @@ export function SidekickRecentChats({
           <button
             type="button"
             onClick={() => onOpen(item.id)}
-            className={`press flex h-7 w-full items-center gap-2 overflow-hidden px-1.5 text-left text-[12px] ${rowIdle}`}
+            className={`press flex h-8 w-full items-center gap-2 overflow-hidden px-1.5 text-left text-[13px] ${rowIdle}`}
           >
-            <ConversationStatusIcon status={item.status} />
-            <span className="rail-label min-w-0 flex-1" data-show={labels ? "true" : "false"}>
+            {/* size-5 matches Home/Orders icon box; 8×8 circle stays centered inside */}
+            <span className="grid size-5 shrink-0 place-items-center">
+              <ConversationStatusIcon status={item.status} />
+            </span>
+            <span className="rail-label min-w-0 flex-1 truncate" data-show={labels ? "true" : "false"}>
               {item.title}
             </span>
           </button>
@@ -284,13 +303,10 @@ export function SidekickRecentChats({
   );
 }
 
-function ItemIcon({ item, on }: { item: NavItem; on: boolean }) {
-  return item.channel ? (
-    <span className={`grid size-[18px] shrink-0 place-items-center rounded-[5px] ${on ? "bg-white text-[#303030]" : "bg-white/15 text-white"}`}>
-      <PIcon name={item.icon} size={16} />
-    </span>
-  ) : (
-    <span className="shrink-0">
+function ItemIcon({ item }: { item: NavItem; on: boolean }) {
+  // Same 20px icons for channels and main nav — no gray chip behind sales channels.
+  return (
+    <span className="grid size-5 shrink-0 place-items-center">
       <PIcon name={item.icon} size={20} />
     </span>
   );

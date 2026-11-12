@@ -137,7 +137,6 @@ function Row({
   label,
   on,
   section,
-  channel,
   onClick,
 }: {
   icon: PolarisIconName;
@@ -156,13 +155,10 @@ function Row({
         on ? "bg-[#f1f1f1] font-medium text-[#171817]" : section ? "font-medium text-[#171817] hover:bg-[#f6f6f6]" : "hover:bg-[#f6f6f6]"
       }`}
     >
-      {channel ? (
-        <span className={`grid size-5 shrink-0 place-items-center rounded-[5px] ${on ? "bg-[#303030] text-white" : "bg-[#f1f1f1] text-[#303030]"}`}>
-          <PIcon name={icon} size={20} />
-        </span>
-      ) : (
+      {/* Same plain 20px icon treatment for main nav and sales channels — no gray chip. */}
+      <span className="grid size-5 shrink-0 place-items-center">
         <PIcon name={icon} size={20} />
-      )}
+      </span>
       <span className="truncate">{label}</span>
     </button>
   );

@@ -429,7 +429,7 @@ export function PreviewColumn({
                   id="admin-menu"
                   role="menu"
                   aria-label="Admin menu"
-                  className="pop-in absolute left-0 top-0 z-30 flex max-h-[min(520px,calc(100dvh-96px))] w-56 origin-top-left flex-col overflow-hidden rounded-xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.14)]"
+                  className="pop-in absolute left-0 top-0 z-30 flex max-h-[min(720px,calc(100dvh-64px))] w-60 origin-top-left flex-col overflow-y-auto rounded-xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.14)] [scrollbar-width:none]"
                 >
                   <button
                     type="button"
@@ -441,9 +441,7 @@ export function PreviewColumn({
                   >
                     <PIcon name="X" size={20} />
                   </button>
-                  <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none]">
-                    <AdminMenu {...menuProps} />
-                  </div>
+                  <AdminMenu {...menuProps} />
                 </div>
               ) : (
                 <button

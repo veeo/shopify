@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AccountMenu, AdminNavSections, Alerts, initials, SidekickLead, SidekickRecentChats, StoreMenu } from "@/components/admin-rail";
+import { AccountMenu, AdminNavSections, Alerts, initials, SidekickRecentChats, StoreMenu } from "@/components/admin-rail";
 import { IconButton, Orb, ShopifyMark } from "@/components/marks";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Tip } from "@/components/chat-column";
@@ -115,8 +115,10 @@ export function AgentNav({
   // Drawers always show the expanded roster. Hybrid/minimized use navOpen for width.
   const collapsed = drawer ? false : !navOpen;
   const merging = mergePhase === "collapsing" || mergePhase === "admin";
-  const showAdmin = mergePhase === "collapsing" || mergePhase === "admin";
   const showAgents = mergePhase !== "admin";
+  // Defer the CSS shrink one frame so a newly-mounted lead slot paints at nav size first,
+  // then eases to the palette size — avoids a popped-small / remount flash.
+  const [leadScaled, setLeadScaled] = useState(adminRail);
 
   // Collapse: fade labels first, then shrink width. Expand: grow width, then fade labels in.
   const [widthCollapsed, setWidthCollapsed] = useState(collapsed);
@@ -139,8 +141,27 @@ export function AgentNav({
       return;
     }
     setMergePhase("agents");
+    setLeadScaled(false);
     setAlerts(false);
   }, [adminRail]); // eslint-disable-line react-hooks/exhaustive-deps -- phase machine driven by rail mode edge
+
+  useLayoutEffect(() => {
+    if (mergePhase !== "collapsing") {
+      if (mergePhase === "admin") setLeadScaled(true);
+      if (mergePhase === "agents") setLeadScaled(false);
+      return;
+    }
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setLeadScaled(true);
+      return;
+    }
+    setLeadScaled(false);
+    const raf = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setLeadScaled(true));
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [mergePhase]);
 
   useEffect(() => {
     if (mergePhase !== "collapsing") return;
@@ -226,9 +247,12 @@ export function AgentNav({
     const selectedRow = item.id === state.selectedAgentId && state.mode === "thread";
     const isLead = item.id === lead.id;
     const collapsingAway = merging && !isLead;
-    const leadMorph = merging && isLead;
+    const leadMorph = Boolean(opts?.leadSlot) || (merging && isLead);
     const narrow = widthCollapsed;
-    const orbSize = leadMorph ? ORB_SIZE.palette : ORB_SIZE.nav;
+    // Keep Orb at nav diameter forever; CSS-scale into the lead slot so WebGL never remounts.
+    // leadScaled gates the shrink so the first paint after a slot move stays at nav size.
+    const orbSlot = leadMorph && leadScaled ? ORB_SIZE.palette : ORB_SIZE.nav;
+    const orbScale = orbSlot / ORB_SIZE.nav;
     const button = (
       <button
         type="button"
@@ -240,15 +264,15 @@ export function AgentNav({
         onMouseLeave={() => setHotId((current) => (current === item.id ? null : current))}
         className={
           narrow
-            ? `press relative grid size-[31px] place-items-center rounded-full ${
-                selectedRow
-                  ? "shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]"
-                  : "hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a] active:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#bdbdbd]"
-              }`
-            : leadMorph
-              ? `press press-row relative flex h-8 w-full min-w-0 items-center gap-2 rounded-full px-1.5 text-left transition-[background-color,box-shadow,height,padding] duration-300 ${
-                  selectedRow || leadMorph ? "btn-dark" : "hover:bg-white/[0.06] active:bg-white/10"
+            ? leadMorph
+              ? `press relative mx-auto grid size-8 place-items-center rounded-full text-white hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a]`
+              : `press relative grid size-[31px] place-items-center rounded-full ${
+                  selectedRow
+                    ? "shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]"
+                    : "hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a] active:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#bdbdbd]"
                 }`
+            : leadMorph
+              ? `press press-row relative flex h-8 w-full min-w-0 items-center gap-2 rounded-full px-1.5 text-left transition-[background-color,box-shadow,height,padding] duration-300 hover:bg-white/[0.08]`
               : `press press-row relative flex h-12 w-full min-w-0 items-center gap-2 rounded-full py-2 pl-2 pr-2 text-left transition-[background-color,box-shadow] duration-300 ${
                   selectedRow ? "btn-dark pr-4" : "hover:bg-white/[0.06] active:bg-white/10"
                 }`
@@ -276,20 +300,35 @@ export function AgentNav({
         }
       >
         <span
-          className={`relative grid shrink-0 place-items-center rounded-full ${leadMorph ? "size-5" : "size-[31px]"}`}
+          className="relative grid shrink-0 place-items-center overflow-visible rounded-full"
           data-flip={`agent-orb-${item.id}`}
-          style={{ transition: `width 300ms ${ease}, height 300ms ${ease}` }}
+          style={{
+            width: orbSlot,
+            height: orbSlot,
+            transition: `width ${mergeEase}, height ${mergeEase}`,
+          }}
         >
-          <Orb
-            id={item.orb}
-            agentId={item.id}
-            size={orbSize}
-            colorFrom={item.orbFrom}
-            colorTo={item.orbTo}
-            presence={selectedRow || leadMorph ? "selected" : "rest"}
-            hot={hotId === item.id}
-          />
-          {narrow && item.unread > 0 ? (
+          <span
+            className="grid place-items-center"
+            style={{
+              width: ORB_SIZE.nav,
+              height: ORB_SIZE.nav,
+              transform: `scale(${orbScale})`,
+              transformOrigin: "center center",
+              transition: `transform ${mergeEase}`,
+            }}
+          >
+            <Orb
+              id={item.orb}
+              agentId={item.id}
+              size={ORB_SIZE.nav}
+              colorFrom={item.orbFrom}
+              colorTo={item.orbTo}
+              presence={selectedRow || leadMorph ? "selected" : "rest"}
+              hot={hotId === item.id}
+            />
+          </span>
+          {narrow && !leadMorph && item.unread > 0 ? (
             <span className="absolute -right-1.5 -top-1.5 z-10 grid size-4 place-items-center rounded-full bg-[#5631f4] text-[10px] font-medium text-white ring-2 ring-[#0c0d0c]">
               {item.unread}
             </span>
@@ -316,9 +355,9 @@ export function AgentNav({
     );
     if (opts?.leadSlot) {
       return (
-        <span key={`lead-${item.id}`} className={narrow ? "flex justify-center" : "contents"}>
+        <div key={`lead-${item.id}`} className={narrow ? "flex w-full justify-center" : "w-full"}>
           {button}
-        </span>
+        </div>
       );
     }
     return narrow ? (
@@ -431,45 +470,78 @@ export function AgentNav({
         ) : null}
 
         <div className="relative flex min-h-0 flex-1 flex-col">
+          {merging ? (
+            // Lead mounts once for collapsing→admin (no SidekickLead swap). Recent + admin
+            // share the same reveal timing. Orb stays at nav WebGL size and CSS-scales down.
+            <div
+              className={`relative z-20 flex min-h-0 flex-1 flex-col ${narrow ? "items-center" : "px-0.5"}`}
+            >
+              <div className={`mb-6 flex w-full shrink-0 flex-col ${narrow ? "items-center gap-0.5" : "gap-0.5"}`}>
+                {agentRow(lead, { leadSlot: true })}
+                <div
+                  className={mergePhase === "collapsing" ? "admin-rail-rise w-full" : "w-full"}
+                  style={mergePhase === "admin" ? { opacity: 1, transform: "none" } : undefined}
+                >
+                  <SidekickRecentChats
+                    expanded={!narrow}
+                    labels={showLabels}
+                    items={recentChats}
+                    onOpen={(id) => onOpenConversation?.(id)}
+                  />
+                </div>
+              </div>
+              <div
+                className={`flex min-h-0 w-full flex-1 flex-col ${narrow ? "items-center" : ""} ${
+                  mergePhase === "collapsing" ? "admin-rail-rise" : ""
+                }`}
+                style={mergePhase === "admin" ? { opacity: 1, transform: "none" } : undefined}
+              >
+                <AdminNavSections
+                  expanded={!narrow}
+                  labels={showLabels}
+                  preview={state.preview}
+                  onOpen={(id) => onAdminOpen?.(id)}
+                  onGo={(page) => onAdminGo?.(page)}
+                  onSearchApps={() => onAdminSearch?.("Apps")}
+                />
+              </div>
+            </div>
+          ) : null}
+
           {showAgents ? (
             <div
               className={`scroll-thin relative z-10 flex min-h-0 flex-1 flex-col ${
                 narrow ? "items-center pt-6 [scrollbar-gutter:stable_both-edges]" : "gap-4"
-              } ${sliding ? "overflow-visible" : "overflow-x-hidden overflow-y-auto"}`}
-              style={{ pointerEvents: merging ? "none" : undefined }}
+              } ${sliding ? "overflow-visible" : "overflow-x-hidden overflow-y-auto"} ${
+                merging ? "pointer-events-none absolute inset-0" : ""
+              }`}
+              style={
+                merging
+                  ? {
+                      opacity: 0,
+                      transition: `opacity 220ms ease`,
+                    }
+                  : undefined
+              }
             >
-              {merging ? (
-                <div className={narrow ? "flex justify-center" : "mb-0"}>
-                  {agentRow(lead, { leadSlot: true })}
-                </div>
-              ) : null}
               {visibleGroups.map((group, index) => {
                 const hidden = group.id === "hidden";
                 const open = !hidden || hiddenOpen;
+                // Lead is rendered in the hybrid slot while merging — omit it here.
                 const items = merging ? group.items.filter((item) => item.id !== lead.id) : group.items;
-                const fadeGroup = merging || items.length === 0;
                 if (merging && items.length === 0 && !hidden) return null;
                 return (
                   <div
                     key={group.id}
                     className={narrow ? "" : "flex min-w-0 flex-col gap-2"}
                     style={
-                      fadeGroup && merging
+                      merging
                         ? {
                             opacity: 0,
                             transform: "translateY(-6px)",
-                            maxHeight: 0,
-                            overflow: "hidden",
-                            marginTop: 0,
-                            marginBottom: 0,
-                            pointerEvents: "none",
-                            transition: `opacity 240ms ease, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}`,
+                            transition: `opacity 220ms ease, transform ${mergeEase}`,
                           }
-                        : {
-                            opacity: 1,
-                            transform: "translateY(0)",
-                            transition: `opacity 240ms ease, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}`,
-                          }
+                        : undefined
                     }
                   >
                     {narrow && index > 0 && !hidden ? <div className="mx-auto mb-6 mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
@@ -485,7 +557,6 @@ export function AgentNav({
                             ? "press mx-auto mb-6 mt-6 grid h-6 w-8 place-items-center"
                             : "press flex h-8 w-full items-center gap-1.5 rounded-full px-2.5 text-left hover:bg-white/[0.06]"
                         }
-                        style={merging ? { opacity: 0, pointerEvents: "none" } : undefined}
                       >
                         {narrow ? (
                           <span className={`h-px w-8 ${hiddenOpen ? "bg-white/40" : "bg-white/15"}`} />
@@ -500,7 +571,7 @@ export function AgentNav({
                         )}
                       </button>
                     ) : !narrow && group.label ? (
-                      <div className="flex h-8 items-center gap-1.5 px-2.5" style={merging ? { opacity: 0 } : undefined}>
+                      <div className="flex h-8 items-center gap-1.5 px-2.5">
                         <span className="rail-label shrink-0 text-[13px] leading-4 tracking-[-0.13px] text-[#7d7f7c]" data-show={showLabels ? "true" : "false"}>
                           {group.label}
                         </span>
@@ -519,44 +590,6 @@ export function AgentNav({
                   </div>
                 );
               })}
-            </div>
-          ) : null}
-
-          {showAdmin ? (
-            <div
-              className={`z-20 flex min-h-0 w-full flex-col ${narrow ? "items-center" : "px-0.5"} ${
-                mergePhase === "admin" ? "relative flex-1" : "pointer-events-none absolute inset-0"
-              }`}
-            >
-              {mergePhase === "admin" ? (
-                <div className={`mb-6 flex w-full shrink-0 flex-col ${narrow ? "items-center gap-2" : "gap-0.5"}`}>
-                  <SidekickLead agent={lead} expanded={!narrow} labels={showLabels} onView={() => onViewSidekicks?.()} />
-                  <SidekickRecentChats
-                    expanded={!narrow}
-                    labels={showLabels}
-                    items={recentChats}
-                    onOpen={(id) => onOpenConversation?.(id)}
-                  />
-                </div>
-              ) : (
-                // Keep the morphing lead uncovered; only the admin destinations fade in below.
-                <div className="mb-6 h-8 w-full shrink-0" aria-hidden />
-              )}
-              <div
-                className={`flex min-h-0 w-full flex-1 flex-col ${narrow ? "items-center" : ""} ${
-                  mergePhase === "collapsing" ? "admin-rail-rise" : ""
-                }`}
-                style={mergePhase === "admin" ? { opacity: 1, transform: "none" } : undefined}
-              >
-                <AdminNavSections
-                  expanded={!narrow}
-                  labels={showLabels}
-                  preview={state.preview}
-                  onOpen={(id) => onAdminOpen?.(id)}
-                  onGo={(page) => onAdminGo?.(page)}
-                  onSearchApps={() => onAdminSearch?.("Apps")}
-                />
-              </div>
             </div>
           ) : null}
         </div>
