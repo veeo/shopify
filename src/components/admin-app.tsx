@@ -5,6 +5,7 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn, clearTypedOnce } from "@/components/chat-column";
+import { HybridChatModal } from "@/components/hybrid-chat-modal";
 import { Orb } from "@/components/marks";
 import { OrbAudioProvider } from "@/components/orb-audio";
 import { DesignSystem } from "@/components/design-system";
@@ -50,6 +51,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   const [adminSheetOpen, setAdminSheetOpen] = useState(false);
   const [palette, setPalette] = useState<{ open: boolean; scope?: string }>({ open: false });
   const [design, setDesign] = useState(false);
+  const [hybridChatOpen, setHybridChatOpen] = useState(false);
   const layout = useShellLayout();
   // The turn being streamed. Cleared in the same update that commits its reply, so the live view and
   // the committed message swap in one render instead of leaving a blank frame between them.
@@ -517,12 +519,25 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   function setAdminLayout(mode: AdminLayoutMode) {
     // Entering full expands the hybrid rail; leaving full restores sidekick focus.
     if (mode === "takeover") setSidebarOpen(true);
+    if (mode !== "takeover") setHybridChatOpen(false);
     dispatch({ type: "admin-layout", mode });
   }
 
+  // Attach → full also lands in hybrid with labels (not the minimized icon rail).
+  useEffect(() => {
+    if (state.adminLayout === "takeover") setSidebarOpen(true);
+    else setHybridChatOpen(false);
+  }, [state.adminLayout]);
+
   function viewSidekicks() {
+    setHybridChatOpen(false);
     setSidebarOpen(true);
     setAdminLayout("sidebar");
+  }
+
+  function openHybridConversation(id: string) {
+    if (id !== "current") dispatch({ type: "open-conversation", id });
+    setHybridChatOpen(true);
   }
 
   return (
@@ -558,6 +573,19 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onAdminOpen={(id) => dispatch({ type: "rail", id })}
             onAdminGo={(page) => dispatch({ type: "preview", page, layout: "takeover" })}
             onAdminSearch={(scope) => setPalette({ open: true, scope })}
+            onOpenConversation={openHybridConversation}
+          />
+        ) : null}
+        {hybridChatOpen && takeover ? (
+          <HybridChatModal
+            state={state}
+            liveSegments={liveAgentId === agent.id ? liveSegments : null}
+            busy={busy && liveAgentId === agent.id}
+            locked={busy}
+            offline={offline}
+            onClose={() => setHybridChatOpen(false)}
+            onSend={send}
+            onStop={stop}
           />
         ) : null}
         {agentsDrawer ? (

@@ -1,14 +1,23 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AccountMenu, AdminNavSections, Alerts, initials, SidekickLead, StoreMenu } from "@/components/admin-rail";
+import { AccountMenu, AdminNavSections, Alerts, initials, SidekickLead, SidekickRecentChats, StoreMenu } from "@/components/admin-rail";
 import { IconButton, Orb, ShopifyMark } from "@/components/marks";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Tip } from "@/components/chat-column";
 import { PIcon } from "@/components/polaris-icon";
 import type { PreviewId } from "@/lib/admin-nav";
 import type { AgentsRailMode } from "@/lib/shell-layout";
-import { hiddenAgents, railGroup, selectedAgent, visibleAgents, type Agent, type AgentGroup, type PrototypeState } from "@/lib/prototype";
+import {
+  hiddenAgents,
+  railGroup,
+  recentAgentConversations,
+  selectedAgent,
+  visibleAgents,
+  type Agent,
+  type AgentGroup,
+  type PrototypeState,
+} from "@/lib/prototype";
 
 const groups: { id: AgentGroup; label: string | null }[] = [
   { id: "favorites", label: null },
@@ -19,7 +28,7 @@ const groups: { id: AgentGroup; label: string | null }[] = [
 ];
 
 const move = "420ms cubic-bezier(0.22, 1, 0.36, 1)";
-const mergeEase = "480ms cubic-bezier(0.22, 1, 0.36, 1)";
+const mergeEase = "300ms ease";
 
 type MergePhase = "agents" | "collapsing" | "admin";
 
@@ -44,6 +53,7 @@ export function AgentNav({
   onAdminOpen,
   onAdminGo,
   onAdminSearch,
+  onOpenConversation,
 }: {
   state: PrototypeState;
   navOpen: boolean;
@@ -72,6 +82,7 @@ export function AgentNav({
   onAdminOpen?: (id: string) => void;
   onAdminGo?: (page: PreviewId) => void;
   onAdminSearch?: (scope?: string) => void;
+  onOpenConversation?: (id: string) => void;
 }) {
   const agents = visibleAgents(state);
   const lead = selectedAgent(state);
@@ -115,9 +126,11 @@ export function AgentNav({
   useEffect(() => {
     if (mergePhase !== "collapsing") return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const timer = window.setTimeout(() => setMergePhase("admin"), reduce ? 0 : 520);
+    const timer = window.setTimeout(() => setMergePhase("admin"), reduce ? 0 : 280);
     return () => window.clearTimeout(timer);
   }, [mergePhase]);
+
+  const recentChats = recentAgentConversations(state, lead.id, 3);
 
   function pick(id: string) {
     if (adminRail) return;
@@ -190,12 +203,13 @@ export function AgentNav({
       placed.current.set(id, { left: box.left, top: box.top });
     }
     return () => window.clearTimeout(timer);
-  }, [collapsed]);
+  }, [collapsed, mergePhase]);
 
-  function agentRow(item: Agent, stackIndex: number) {
+  function agentRow(item: Agent, _stackIndex: number) {
     const selectedRow = item.id === state.selectedAgentId && state.mode === "thread";
     const isLead = item.id === lead.id;
     const collapsingAway = merging && !isLead;
+    // Lead stays visible and slides toward the hybrid slot; others fade out.
     const button = (
       <button
         type="button"
@@ -212,16 +226,14 @@ export function AgentNav({
                   ? "shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]"
                   : "hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a] active:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#bdbdbd]"
               }`
-            : `press press-row relative flex h-12 w-full min-w-0 items-center gap-2 rounded-full py-2 pl-2 pr-2 text-left transition-[background-color,box-shadow] duration-300 ${
+            : `press press-row relative flex h-12 w-full min-w-0 items-center gap-2 rounded-full py-2 pl-2 pr-2 text-left transition-[background-color,box-shadow,opacity] duration-300 ${
                 selectedRow || (merging && isLead) ? "btn-dark pr-4" : "hover:bg-white/[0.06] active:bg-white/10"
               }`
         }
         style={
           collapsingAway
             ? {
-                // Sweep upward into the lead; farther rows travel farther.
                 opacity: 0,
-                transform: `translateY(${-28 - stackIndex * 36}px) scale(0.82)`,
                 maxHeight: 0,
                 marginTop: 0,
                 marginBottom: 0,
@@ -229,12 +241,12 @@ export function AgentNav({
                 paddingBottom: 0,
                 overflow: "hidden",
                 pointerEvents: "none",
-                transition: `opacity ${mergeEase}, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
+                transition: `opacity 200ms ease, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
               }
             : {
                 opacity: 1,
-                transform: "translateY(0) scale(1)",
-                transition: `opacity ${mergeEase}, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
+                maxHeight: 56,
+                transition: `opacity 200ms ease, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
               }
         }
       >
@@ -259,9 +271,9 @@ export function AgentNav({
             <span className="block truncate whitespace-nowrap text-[13px] font-semibold leading-[1.3] tracking-[-0.13px] text-white">
               {item.name}
             </span>
-            <span className="block truncate whitespace-nowrap text-[12px] leading-4 text-[#8e8f8b]">
-              {merging && isLead ? "View sidekicks" : item.preview}
-            </span>
+            {merging && isLead ? null : (
+              <span className="block truncate whitespace-nowrap text-[12px] leading-4 text-[#8e8f8b]">{item.preview}</span>
+            )}
           </span>
         )}
         {!collapsed && item.unread > 0 && !(merging && isLead) ? (
@@ -382,19 +394,31 @@ export function AgentNav({
               className={`scroll-thin relative z-10 flex min-h-0 flex-1 flex-col ${
                 collapsed ? "pt-6 [scrollbar-gutter:stable_both-edges]" : "gap-4"
               } ${sliding ? "overflow-visible" : "overflow-x-hidden overflow-y-auto"}`}
-              style={{ transition: `opacity ${mergeEase}` }}
+              style={{ pointerEvents: merging ? "none" : undefined }}
             >
               {visibleGroups.map((group, index) => {
                 const hidden = group.id === "hidden";
                 const open = !hidden || hiddenOpen;
+                const hasLead = group.items.some((item) => item.id === lead.id);
+                const fadeGroup = merging && !hasLead;
                 return (
                   <div
                     key={group.id}
                     className={collapsed ? "" : "flex min-w-0 flex-col gap-2"}
                     style={
-                      merging && !group.items.some((item) => item.id === lead.id)
-                        ? { opacity: 0, maxHeight: 0, overflow: "hidden", transition: `opacity ${mergeEase}, max-height ${mergeEase}` }
-                        : undefined
+                      fadeGroup
+                        ? {
+                            opacity: 0,
+                            maxHeight: 0,
+                            overflow: "hidden",
+                            marginTop: 0,
+                            marginBottom: 0,
+                            transition: `opacity 200ms ease, max-height ${mergeEase}, margin ${mergeEase}`,
+                          }
+                        : {
+                            opacity: 1,
+                            transition: `opacity 200ms ease, max-height ${mergeEase}, margin ${mergeEase}`,
+                          }
                     }
                   >
                     {collapsed && index > 0 && !hidden ? <div className="mx-auto mb-6 mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
@@ -425,7 +449,7 @@ export function AgentNav({
                     ) : !collapsed && group.label ? (
                       <div
                         className="flex h-8 items-center gap-1.5 px-2.5"
-                        style={merging ? { opacity: 0, transition: `opacity ${mergeEase}` } : undefined}
+                        style={merging ? { opacity: 0, transition: `opacity 200ms ease` } : undefined}
                       >
                         <span className="shrink-0 whitespace-nowrap text-[13px] leading-4 tracking-[-0.13px] text-[#7d7f7c]">{group.label}</span>
                         <span className="h-px min-w-2 flex-1 bg-white/10" />
@@ -448,15 +472,21 @@ export function AgentNav({
 
           {showAdmin ? (
             <div
-              className={`admin-rail-rise z-20 flex min-h-0 flex-col px-0.5 ${
-                mergePhase === "admin" ? "relative flex-1" : "pointer-events-none absolute inset-0"
+              className={`z-20 flex min-h-0 flex-col px-0.5 ${
+                mergePhase === "admin" ? "admin-rail-rise relative flex-1" : "pointer-events-none absolute inset-0 opacity-0"
               }`}
             >
               {mergePhase === "admin" ? (
-                <SidekickLead agent={lead} expanded={!collapsed} onView={() => onViewSidekicks?.()} />
+                <div className="mb-2 flex shrink-0 flex-col gap-0.5">
+                  <SidekickLead agent={lead} expanded={!collapsed} onView={() => onViewSidekicks?.()} />
+                  <SidekickRecentChats
+                    expanded={!collapsed}
+                    items={recentChats}
+                    onOpen={(id) => onOpenConversation?.(id)}
+                  />
+                </div>
               ) : (
-                // Spacer matching the lead so rising nav lands under it.
-                <div className={`mb-3 shrink-0 ${collapsed ? "h-8" : "h-12"}`} aria-hidden />
+                <div className="mb-2 shrink-0 h-8" aria-hidden />
               )}
               <AdminNavSections
                 expanded={!collapsed}

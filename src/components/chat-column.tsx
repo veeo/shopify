@@ -26,6 +26,7 @@ import {
   voiceOrbLabel,
   voiceOrbTint,
   type Agent,
+  type AdminLayoutMode,
   type Block,
   type Connection,
   type Conversation,
@@ -36,6 +37,8 @@ import {
   type SoftLinkTarget,
   type Source,
 } from "@/lib/prototype";
+import { AdminLayoutGlyph, layoutModeCopy } from "@/components/admin-ui";
+import { ADMIN_LAYOUT_MODES } from "@/lib/shell-layout";
 import type { LiveSegment } from "@/lib/turn";
 import { startRecording, transcribeAudio, type Recording } from "@/lib/voice";
 import { VoiceMode } from "@/components/voice-mode";
@@ -102,7 +105,7 @@ export function ChatColumn({
     orbTo?: string;
     attachOn: boolean;
     attachPage: PreviewId;
-    attachWide: boolean;
+    attachLayout: AdminLayoutMode;
   }) => void;
   onTogglePin: (id: string) => void;
   onToggleHide: (id: string) => void;
@@ -1641,7 +1644,7 @@ function EditSidekick({
     orbTo?: string;
     attachOn: boolean;
     attachPage: PreviewId;
-    attachWide: boolean;
+    attachLayout: AdminLayoutMode;
   }) => void;
   onDisconnect: () => void;
 }) {
@@ -1654,7 +1657,7 @@ function EditSidekick({
   const [colorTo, setColorTo] = useState(agent.orbTo ?? starting.to);
   const [attachOn, setAttachOn] = useState(agent.attachOn);
   const [attachPage, setAttachPage] = useState<PreviewId>(agent.attachPage);
-  const [attachWide, setAttachWide] = useState(agent.attachWide);
+  const [attachLayout, setAttachLayout] = useState<AdminLayoutMode>(agent.attachLayout);
   const voice = isVoiceOrb(orb);
   const combos = voice ? colorCombosFor(orb) : [];
   const field = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white outline-none placeholder:text-[#8e8f8b] focus:border-white/30";
@@ -1674,7 +1677,7 @@ function EditSidekick({
             connections: agent.connections,
             attachOn,
             attachPage,
-            attachWide,
+            attachLayout,
             ...(voice ? { orbFrom: colorFrom, orbTo: colorTo } : {}),
           });
         }}
@@ -1774,7 +1777,8 @@ function EditSidekick({
                     const page = event.target.value as PreviewId;
                     setAttachPage(page);
                     const suggested = attachPageChoices.find((item) => item.page === page)?.wide;
-                    if (suggested !== undefined) setAttachWide(Boolean(suggested));
+                    if (suggested) setAttachLayout("expanded");
+                    else if (suggested === false && attachLayout === "expanded") setAttachLayout("sidebar");
                   }}
                   className={`${field} appearance-none`}
                 >
@@ -1785,20 +1789,40 @@ function EditSidekick({
                   ))}
                 </select>
               </label>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={attachWide}
-                onClick={() => setAttachWide((on) => !on)}
-                className="press flex w-full items-center gap-2.5 text-left text-[13px] text-white"
-              >
-                <PIcon name="LayoutColumns3" size={18} />
-                <span className="flex-1">
-                  <span className="block">Open expanded</span>
-                  <span className="block text-[12px] font-normal text-[#8e8f8b]">Use the wider admin panel when selecting {agent.name}</span>
-                </span>
-                <MenuSwitch on={attachWide} />
-              </button>
+              <fieldset className="flex flex-col gap-1.5">
+                <legend className="text-[12px] text-[#8e8f8b]">Admin size</legend>
+                <div
+                  role="radiogroup"
+                  aria-label="Admin size"
+                  className="grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1"
+                >
+                  {ADMIN_LAYOUT_MODES.map((mode) => {
+                    const on = attachLayout === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => setAttachLayout(mode)}
+                        className={`press flex flex-col items-center gap-1 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-colors ${
+                          on ? "bg-white text-black" : "text-[#c4c4c4] hover:bg-white/[0.08] hover:text-white"
+                        }`}
+                      >
+                        <AdminLayoutGlyph mode={mode} size={16} />
+                        {layoutModeCopy[mode].label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[12px] text-[#8e8f8b]">
+                  {attachLayout === "takeover"
+                    ? `Selecting ${agent.name} opens full admin with the hybrid rail.`
+                    : attachLayout === "expanded"
+                      ? `Selecting ${agent.name} opens the wider admin panel.`
+                      : `Selecting ${agent.name} opens the sidebar admin panel.`}
+                </p>
+              </fieldset>
             </>
           ) : null}
         </div>

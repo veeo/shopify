@@ -180,32 +180,72 @@ export function SidekickLead({
   expanded: boolean;
   onView: () => void;
 }) {
+  // Match admin nav rows: h-8, 20px icon slot, rounded-[10px] px-1.5.
   return (
     <button
       type="button"
       aria-label={`View sidekicks — ${agent.name}`}
       onClick={onView}
-      className={`press press-row mb-3 flex w-full min-w-0 items-center text-left transition-[background-color,box-shadow] duration-300 hover:bg-white/[0.06] active:bg-white/10 ${
-        expanded ? "h-12 gap-2 rounded-full py-2 pl-2 pr-2" : "h-8 justify-center rounded-full px-0"
+      className={`press relative flex h-8 w-full items-center gap-2 overflow-hidden rounded-[10px] px-1.5 text-[13px] font-semibold text-white hover:bg-white/[0.08] ${
+        expanded ? "" : "justify-center px-0"
       }`}
     >
-      <span className="relative grid size-[31px] shrink-0 place-items-center rounded-full">
+      <span className="relative grid size-5 shrink-0 place-items-center rounded-full">
         <Orb
           id={agent.orb}
           agentId={agent.id}
-          size={ORB_SIZE.nav}
+          size={ORB_SIZE.palette}
           colorFrom={agent.orbFrom}
           colorTo={agent.orbTo}
           presence="rest"
         />
       </span>
-      {expanded ? (
-        <span className="min-w-0 flex-1 overflow-hidden">
-          <span className="block truncate text-[13px] font-semibold leading-[1.3] tracking-[-0.13px] text-white">{agent.name}</span>
-          <span className="block truncate text-[12px] leading-4 text-[#8e8f8b]">View sidekicks</span>
-        </span>
-      ) : null}
+      {expanded ? <span className="min-w-0 flex-1 truncate text-left">{agent.name}</span> : null}
     </button>
+  );
+}
+
+/** ~8×8 status glyphs for hybrid recent conversations. */
+export function ConversationStatusIcon({ status }: { status: "idle" | "done" | "working" }) {
+  if (status === "working") {
+    return (
+      <span className="grid size-2 shrink-0 place-items-center" aria-hidden>
+        <span className="hybrid-status-spin size-2 rounded-full border-[1.5px] border-white border-t-transparent" />
+      </span>
+    );
+  }
+  if (status === "done") {
+    return <span className="size-2 shrink-0 rounded-full border-[1.5px] border-white bg-white" aria-hidden />;
+  }
+  return <span className="size-2 shrink-0 rounded-full border-[1.5px] border-[#8e8f8b] bg-transparent" aria-hidden />;
+}
+
+/** Condensed recent chats under the hybrid lead. */
+export function SidekickRecentChats({
+  expanded,
+  items,
+  onOpen,
+}: {
+  expanded: boolean;
+  items: { id: string; title: string; status: "idle" | "done" | "working" }[];
+  onOpen: (id: string) => void;
+}) {
+  if (!expanded || items.length === 0) return null;
+  return (
+    <ul className="mb-2 flex flex-col gap-0.5" aria-label="Recent conversations">
+      {items.map((item) => (
+        <li key={item.id}>
+          <button
+            type="button"
+            onClick={() => onOpen(item.id)}
+            className="press flex h-7 w-full items-center gap-2 overflow-hidden rounded-lg px-1.5 text-left text-[12px] text-[#a6a6a6] hover:bg-white/[0.08] hover:text-white"
+          >
+            <ConversationStatusIcon status={item.status} />
+            <span className="min-w-0 flex-1 truncate">{item.title}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
