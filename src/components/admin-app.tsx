@@ -482,6 +482,12 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     dispatch({ type: "commit", agentId: pending.agentId, text: partial || "Stopped.", segments: liveMessage ? committedSegments(liveMessage) : undefined, streamed: Boolean(partial) });
   }
 
+  // Attach → full also lands in hybrid with labels (not the minimized icon rail).
+  useEffect(() => {
+    if (state.adminLayout === "takeover") setSidebarOpen(true);
+    else setHybridChatOpen(false);
+  }, [state.adminLayout]);
+
   if (booting) {
     return (
       <div className="relative h-dvh bg-[#0c0d0c]">
@@ -522,12 +528,6 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     if (mode !== "takeover") setHybridChatOpen(false);
     dispatch({ type: "admin-layout", mode });
   }
-
-  // Attach → full also lands in hybrid with labels (not the minimized icon rail).
-  useEffect(() => {
-    if (state.adminLayout === "takeover") setSidebarOpen(true);
-    else setHybridChatOpen(false);
-  }, [state.adminLayout]);
 
   function viewSidekicks() {
     setHybridChatOpen(false);

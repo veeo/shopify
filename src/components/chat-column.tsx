@@ -1798,11 +1798,13 @@ function EditSidekick({
                 >
                   {ADMIN_LAYOUT_MODES.map((mode) => {
                     const on = attachLayout === mode;
+                    const label = layoutModeCopy[mode].label;
                     return (
                       <button
                         key={mode}
                         type="button"
                         role="radio"
+                        aria-label={label}
                         aria-checked={on}
                         onClick={() => setAttachLayout(mode)}
                         className={`press flex flex-col items-center gap-1 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-colors ${
@@ -1810,7 +1812,7 @@ function EditSidekick({
                         }`}
                       >
                         <AdminLayoutGlyph mode={mode} size={16} />
-                        {layoutModeCopy[mode].label}
+                        {label}
                       </button>
                     );
                   })}
