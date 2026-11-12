@@ -524,12 +524,12 @@ export function AgentNav({
 
           {showAdmin ? (
             <div
-              className={`z-20 flex min-h-0 flex-col ${narrow ? "items-center px-0" : "px-0.5"} ${
+              className={`z-20 flex min-h-0 w-full flex-col ${narrow ? "items-center" : "px-0.5"} ${
                 mergePhase === "admin" ? "relative flex-1" : "pointer-events-none absolute inset-0"
               }`}
             >
               {mergePhase === "admin" ? (
-                <div className={`mb-6 flex shrink-0 flex-col ${narrow ? "items-center gap-2" : "gap-0.5"}`}>
+                <div className={`mb-6 flex w-full shrink-0 flex-col ${narrow ? "items-center gap-2" : "gap-0.5"}`}>
                   <SidekickLead agent={lead} expanded={!narrow} labels={showLabels} onView={() => onViewSidekicks?.()} />
                   <SidekickRecentChats
                     expanded={!narrow}
@@ -540,10 +540,12 @@ export function AgentNav({
                 </div>
               ) : (
                 // Keep the morphing lead uncovered; only the admin destinations fade in below.
-                <div className="mb-6 h-8 shrink-0" aria-hidden />
+                <div className="mb-6 h-8 w-full shrink-0" aria-hidden />
               )}
               <div
-                className={`flex min-h-0 flex-1 flex-col ${mergePhase === "collapsing" ? "admin-rail-rise" : ""}`}
+                className={`flex min-h-0 w-full flex-1 flex-col ${narrow ? "items-center" : ""} ${
+                  mergePhase === "collapsing" ? "admin-rail-rise" : ""
+                }`}
                 style={mergePhase === "admin" ? { opacity: 1, transform: "none" } : undefined}
               >
                 <AdminNavSections

@@ -13,8 +13,8 @@ const channelIds = new Set(channelNav.map((item) => item.id));
 
 /** Circle hover / selected — matches sidekick collapsed orbs. */
 const circleIdle =
-  "rounded-full text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a]";
-const circleOn = "rounded-full bg-white/[0.1] text-white shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]";
+  "rounded-full text-[#b5b5b5] transition-shadow duration-150 hover:text-white hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a]";
+const circleOn = "rounded-full text-white shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]";
 /** Expanded rows: same rounded-full treatment as sidekick roster rows. */
 const rowIdle = "rounded-full text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white";
 const rowOn = "rounded-full bg-[#2f2f2f] font-semibold text-white";
@@ -41,17 +41,19 @@ export function AdminNavSections({
   const shared = { expanded, labels, active, child, onOpen, onGo };
   return (
     <div
-      className={`flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto ${
-        expanded ? "" : "items-center"
+      className={`flex min-h-0 w-full flex-1 flex-col overflow-x-hidden overflow-y-auto ${
+        expanded
+          ? ""
+          : "items-center [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
       }`}
     >
-      <div className={`flex flex-col ${expanded ? "gap-0.5" : "items-center gap-2"}`}>
+      <div className={`flex w-full flex-col ${expanded ? "gap-0.5" : "items-center gap-2"}`}>
         {mainNav.map((item) => (
           <RailItem key={item.id} item={item} {...shared} />
         ))}
       </div>
       {expanded ? (
-        <div className="mt-1 flex flex-col gap-0.5">
+        <div className="mt-1 flex w-full flex-col gap-0.5">
           <button
             type="button"
             aria-expanded={channelsOpen}
@@ -68,7 +70,7 @@ export function AdminNavSections({
           {channelsOpen ? channelNav.map((item) => <RailItem key={item.id} item={item} {...shared} />) : null}
         </div>
       ) : (
-        <div className="mt-2 flex flex-col items-center gap-2">
+        <div className="mt-2 flex w-full flex-col items-center gap-2">
           <ChannelsItem active={active} onOpen={onOpen} />
         </div>
       )}
@@ -84,7 +86,7 @@ export function AdminNavSections({
           <PIcon name="ChevronRight" size={14} />
         </button>
       ) : (
-        <div className="mt-2 flex flex-col items-center">
+        <div className="mt-2 flex w-full flex-col items-center">
           <RailButton label="Apps" icon="Apps" onClick={() => onSearchApps?.()} />
         </div>
       )}
