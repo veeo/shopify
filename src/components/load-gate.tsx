@@ -132,14 +132,7 @@ function PasswordGate({
             </p>
           </div>
         </div>
-        <label
-          htmlFor="load-password"
-          className={`gate-fade mt-6 block text-[12px] font-medium leading-4 text-[#c9c9c9] ${opening ? "opacity-0" : "opacity-100"}`}
-        >
-          Password
-        </label>
-
-        <div className={`gate-travel relative mt-1.5 h-10 ${opening ? "is-rising" : ""}`}>
+        <div className={`gate-travel relative mt-6 h-10 ${opening ? "is-rising" : ""}`}>
           <div
             data-opening={opening ? "" : undefined}
             className={`gate-field gate-morph absolute inset-x-0 top-1/2 -translate-y-1/2 overflow-hidden ${
@@ -156,18 +149,20 @@ function PasswordGate({
               type="password"
               value={value}
               readOnly={opening}
+              placeholder="password"
               autoComplete="off"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
               enterKeyHint="go"
+              aria-label="password"
               aria-invalid={error}
               aria-describedby={error ? errorId : undefined}
               onChange={(event) => {
                 setValue(event.target.value);
                 if (error) setError(false);
               }}
-              className={`gate-fade h-10 w-full bg-transparent px-3 text-[14px] text-white outline-none ${opening ? "opacity-0" : "opacity-100"}`}
+              className={`gate-fade h-10 w-full bg-transparent px-3 text-[14px] text-white outline-none placeholder:text-[#8e8f8b] ${opening ? "opacity-0" : "opacity-100"}`}
             />
             <span aria-hidden="true" className="gate-field-bar pointer-events-none absolute inset-0 bg-white" />
           </div>
