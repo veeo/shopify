@@ -293,6 +293,15 @@ export function navFor(page: PreviewId): { id: string; child: PreviewId | null }
   return { id: "home", child: null };
 }
 
+/** Short page name for sentences and the attach picker. Home, product, and settings aren't nav row ids. */
+export function adminPageTitle(page: PreviewId): string {
+  if (page === "home-setup" || page === "home-active") return "Home";
+  if (page === "product") return "Product";
+  if (page === "payments-setup") return "Payments";
+  if (page === "settings") return "Settings";
+  return pageMeta(page).title;
+}
+
 /** Title, icon, and parent for the panel's top bar. */
 export function pageMeta(page: PreviewId): { title: string; icon: PolarisIconName; parent: NavItem | null } {
   for (const item of allNav) {

@@ -300,6 +300,11 @@ export const layoutModeCopy: Record<AdminLayoutMode, { label: string }> = {
   takeover: { label: "Full" },
 };
 
+/** Size word inside a sentence: "sidebar", "expanded", "full". */
+export function layoutModePhrase(mode: AdminLayoutMode) {
+  return layoutModeCopy[mode].label.toLowerCase();
+}
+
 const LAYOUT_MODES: AdminLayoutMode[] = ["sidebar", "expanded", "takeover"];
 const LAYOUT_IDLE_MS = 2800;
 const LAYOUT_SLOT = 32;

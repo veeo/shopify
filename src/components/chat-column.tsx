@@ -8,7 +8,8 @@ import { Markdown } from "@/components/markdown";
 import { ArtifactRow, ChoiceCards } from "@/components/choice-cards";
 import { useOrbAudioPublish } from "@/components/orb-audio";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
-import { pageMeta } from "@/lib/admin-nav";
+import { adminPageTitle, pageMeta } from "@/lib/admin-nav";
+import { ColumnToasts, type ColumnToastItem } from "@/components/column-toast";
 import {
   canonicalOrb,
   catalog,
@@ -76,6 +77,9 @@ export function ChatColumn({
   onIntroFinished,
   onChoose,
   onBundle,
+  toasts = [],
+  onDismissToast,
+  composerCovered = false,
 }: {
   state: PrototypeState;
   liveSegments: LiveSegment[] | null;
@@ -121,6 +125,11 @@ export function ChatColumn({
   onIntroFinished?: () => void;
   onChoose: (blockId: string, cardId: string) => void;
   onBundle: (blockId: string) => void;
+  /** Toasts parked above the composer, in this centered column. */
+  toasts?: ColumnToastItem[];
+  onDismissToast?: (id: string) => void;
+  /** Full admin covers this column; the toast still anchors to the composer. */
+  composerCovered?: boolean;
 }) {
   const agent = selectedAgent(state);
   const purpose = state.selectedAgentId === "chief" && state.chiefPhase === "purpose" && state.mode === "thread";
@@ -339,6 +348,7 @@ export function ChatColumn({
           Claude isn’t connected on this deployment, so this reply is scripted.
         </p>
       ) : null}
+      <ColumnToasts toasts={toasts} onDismiss={onDismissToast ?? (() => undefined)} covered={composerCovered} />
       <Composer
         key={state.mode === "add" ? "composer-add" : `composer-${agent.id}`}
         state={state}
@@ -1625,6 +1635,12 @@ const attachPageChoices: { page: PreviewId; label: string; wide?: boolean }[] = 
   { page: "agentic", label: "Agentic" },
 ];
 
+/** The saved page stays visible even when it isn't one of the usual attach choices. */
+function attachPageOptions(page: PreviewId) {
+  if (attachPageChoices.some((item) => item.page === page)) return attachPageChoices;
+  return [...attachPageChoices, { page, label: adminPageTitle(page) }];
+}
+
 function EditSidekick({
   agent,
   canDisconnect,
@@ -1782,7 +1798,7 @@ function EditSidekick({
                   }}
                   className={`${field} appearance-none`}
                 >
-                  {attachPageChoices.map((item) => (
+                  {attachPageOptions(attachPage).map((item) => (
                     <option key={item.page} value={item.page}>
                       {item.label}
                     </option>

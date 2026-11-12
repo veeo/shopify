@@ -2288,6 +2288,7 @@ export type Action =
   | { type: "add-catalog"; id: string }
   | { type: "create-agent"; name: string; purpose: string }
   | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string; attachOn: boolean; attachPage: PreviewId; attachLayout: AdminLayoutMode }
+  | { type: "set-attach"; id: string; page: PreviewId; layout: AdminLayoutMode }
   | { type: "toggle-pin"; id: string }
   | { type: "toggle-hide"; id: string }
   | { type: "disconnect-sidekick"; id: string }
@@ -2635,6 +2636,16 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
           next.adminLayout = "sidebar";
         }
       }
+      return next;
+    }
+    case "set-attach": {
+      const current = next.agents.find((item) => item.id === action.id);
+      if (!current) return state;
+      patchAgent(next, action.id, {
+        attachOn: true,
+        attachPage: action.page,
+        attachLayout: action.layout,
+      });
       return next;
     }
     case "toggle-pin": {
