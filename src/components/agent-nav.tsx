@@ -1,14 +1,23 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AccountMenu, AdminNavSections, Alerts, initials, SidekickLead, StoreMenu } from "@/components/admin-rail";
+import { AccountMenu, AdminNavSections, Alerts, initials, SidekickRecentChats, StoreMenu } from "@/components/admin-rail";
 import { IconButton, Orb, ShopifyMark } from "@/components/marks";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 import { Tip } from "@/components/chat-column";
 import { PIcon } from "@/components/polaris-icon";
 import type { PreviewId } from "@/lib/admin-nav";
 import type { AgentsRailMode } from "@/lib/shell-layout";
-import { hiddenAgents, railGroup, selectedAgent, visibleAgents, type Agent, type AgentGroup, type PrototypeState } from "@/lib/prototype";
+import {
+  hiddenAgents,
+  railGroup,
+  recentAgentConversations,
+  selectedAgent,
+  visibleAgents,
+  type Agent,
+  type AgentGroup,
+  type PrototypeState,
+} from "@/lib/prototype";
 
 const groups: { id: AgentGroup; label: string | null }[] = [
   { id: "favorites", label: null },
@@ -18,8 +27,12 @@ const groups: { id: AgentGroup; label: string | null }[] = [
   { id: "hidden", label: "Hidden" },
 ];
 
-const move = "420ms cubic-bezier(0.22, 1, 0.36, 1)";
-const mergeEase = "480ms cubic-bezier(0.22, 1, 0.36, 1)";
+const ease = "cubic-bezier(0.22, 1, 0.36, 1)";
+const move = `420ms ${ease}`;
+const MERGE_MS = 420;
+const mergeEase = `${MERGE_MS}ms ${ease}`;
+const LABEL_OUT_MS = 140;
+const LABEL_IN_MS = 220;
 
 type MergePhase = "agents" | "collapsing" | "admin";
 
@@ -37,8 +50,6 @@ export function AgentNav({
   onSearch,
   onQuery,
   onScenario,
-  onArrival,
-  onMenuStyle,
   onSettings,
   onLogout,
   onDesignSystem,
@@ -46,6 +57,7 @@ export function AgentNav({
   onAdminOpen,
   onAdminGo,
   onAdminSearch,
+  onOpenConversation,
 }: {
   state: PrototypeState;
   navOpen: boolean;
@@ -69,13 +81,12 @@ export function AgentNav({
   onSearch: () => void;
   onQuery: (query: string) => void;
   onScenario: (scenario: "setup" | "active") => void;
-  onArrival: (arrival: "tasks" | "sidekick") => void;
-  onMenuStyle: (style: "push" | "drop") => void;
   onDesignSystem: () => void;
   onViewSidekicks?: () => void;
   onAdminOpen?: (id: string) => void;
   onAdminGo?: (page: PreviewId) => void;
   onAdminSearch?: (scope?: string) => void;
+  onOpenConversation?: (id: string) => void;
 }) {
   const agents = visibleAgents(state);
   const lead = selectedAgent(state);
@@ -104,8 +115,25 @@ export function AgentNav({
   // Drawers always show the expanded roster. Hybrid/minimized use navOpen for width.
   const collapsed = drawer ? false : !navOpen;
   const merging = mergePhase === "collapsing" || mergePhase === "admin";
-  const showAdmin = mergePhase === "collapsing" || mergePhase === "admin";
   const showAgents = mergePhase !== "admin";
+  // Defer the CSS shrink one frame so a newly-mounted lead slot paints at nav size first,
+  // then eases to the palette size — avoids a popped-small / remount flash.
+  const [leadScaled, setLeadScaled] = useState(adminRail);
+
+  // Collapse: fade labels first, then shrink width. Expand: grow width, then fade labels in.
+  const [widthCollapsed, setWidthCollapsed] = useState(collapsed);
+  const [showLabels, setShowLabels] = useState(!collapsed);
+  useEffect(() => {
+    const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (collapsed) {
+      setShowLabels(false);
+      const timer = window.setTimeout(() => setWidthCollapsed(true), reduce ? 0 : LABEL_OUT_MS);
+      return () => window.clearTimeout(timer);
+    }
+    setWidthCollapsed(false);
+    const timer = window.setTimeout(() => setShowLabels(true), reduce ? 0 : LABEL_IN_MS);
+    return () => window.clearTimeout(timer);
+  }, [collapsed]);
 
   useEffect(() => {
     if (adminRail) {
@@ -113,15 +141,36 @@ export function AgentNav({
       return;
     }
     setMergePhase("agents");
+    setLeadScaled(false);
     setAlerts(false);
   }, [adminRail]); // eslint-disable-line react-hooks/exhaustive-deps -- phase machine driven by rail mode edge
+
+  useLayoutEffect(() => {
+    if (mergePhase !== "collapsing") {
+      if (mergePhase === "admin") setLeadScaled(true);
+      if (mergePhase === "agents") setLeadScaled(false);
+      return;
+    }
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setLeadScaled(true);
+      return;
+    }
+    setLeadScaled(false);
+    const raf = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setLeadScaled(true));
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [mergePhase]);
 
   useEffect(() => {
     if (mergePhase !== "collapsing") return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const timer = window.setTimeout(() => setMergePhase("admin"), reduce ? 0 : 520);
+    const timer = window.setTimeout(() => setMergePhase("admin"), reduce ? 0 : MERGE_MS);
     return () => window.clearTimeout(timer);
   }, [mergePhase]);
+
+  const recentChats = recentAgentConversations(state, lead.id, 3);
 
   function pick(id: string) {
     if (adminRail) return;
@@ -157,9 +206,7 @@ export function AgentNav({
   }, [revealing]);
   const curtain = !present || revealing;
 
-  // Icons share one layout in both widths. When the column rearranges, each icon
-  // slides from where it was instead of popping. The list can paint outside its
-  // scroller for that moment so the moving orbs aren't covered by the header.
+  // FLIP: icons keep their place while width / merge layout rearranges.
   useLayoutEffect(() => {
     const root = navRef.current;
     if (!root) return;
@@ -187,45 +234,54 @@ export function AgentNav({
         if (Math.hypot(dx, dy) > 1) {
           node.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }], {
             duration: 420,
-            easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+            easing: ease,
           });
         }
       }
       placed.current.set(id, { left: box.left, top: box.top });
     }
     return () => window.clearTimeout(timer);
-  }, [collapsed]);
+  }, [widthCollapsed, mergePhase, showLabels]);
 
-  function agentRow(item: Agent, stackIndex: number) {
+  function agentRow(item: Agent, opts?: { leadSlot?: boolean }) {
     const selectedRow = item.id === state.selectedAgentId && state.mode === "thread";
     const isLead = item.id === lead.id;
     const collapsingAway = merging && !isLead;
+    const leadMorph = Boolean(opts?.leadSlot) || (merging && isLead);
+    const narrow = widthCollapsed;
+    // Keep Orb at nav diameter forever; CSS-scale into the lead slot so WebGL never remounts.
+    // leadScaled gates the shrink so the first paint after a slot move stays at nav size.
+    const orbSlot = leadMorph && leadScaled ? ORB_SIZE.palette : ORB_SIZE.nav;
+    const orbScale = orbSlot / ORB_SIZE.nav;
     const button = (
       <button
         type="button"
         data-flip={`agent-${item.id}`}
         aria-current={selectedRow ? "page" : undefined}
-        aria-label={collapsed ? item.name : merging && isLead ? `View sidekicks — ${item.name}` : undefined}
-        onClick={merging && isLead ? () => onViewSidekicks?.() : () => pick(item.id)}
+        aria-label={narrow ? item.name : leadMorph ? `View sidekicks — ${item.name}` : undefined}
+        onClick={leadMorph ? () => onViewSidekicks?.() : () => pick(item.id)}
         onMouseEnter={() => setHotId(item.id)}
         onMouseLeave={() => setHotId((current) => (current === item.id ? null : current))}
         className={
-          collapsed
-            ? `press relative grid size-[31px] place-items-center rounded-full ${
-                selectedRow
-                  ? "shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]"
-                  : "hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a] active:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#bdbdbd]"
-              }`
-            : `press press-row relative flex h-12 w-full min-w-0 items-center gap-2 rounded-full py-2 pl-2 pr-2 text-left transition-[background-color,box-shadow] duration-300 ${
-                selectedRow || (merging && isLead) ? "btn-dark pr-4" : "hover:bg-white/[0.06] active:bg-white/10"
-              }`
+          narrow
+            ? leadMorph
+              ? `press relative mx-auto grid size-8 place-items-center rounded-full text-white hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a]`
+              : `press relative grid size-[31px] place-items-center rounded-full ${
+                  selectedRow
+                    ? "shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]"
+                    : "hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a] active:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#bdbdbd]"
+                }`
+            : leadMorph
+              ? `press press-row relative flex h-8 w-full min-w-0 items-center gap-2 rounded-full px-1.5 text-left transition-[background-color,box-shadow,height,padding] duration-300 hover:bg-white/[0.08]`
+              : `press press-row relative flex h-12 w-full min-w-0 items-center gap-2 rounded-full py-2 pl-2 pr-2 text-left transition-[background-color,box-shadow] duration-300 ${
+                  selectedRow ? "btn-dark pr-4" : "hover:bg-white/[0.06] active:bg-white/10"
+                }`
         }
         style={
           collapsingAway
             ? {
-                // Sweep upward into the lead; farther rows travel farther.
                 opacity: 0,
-                transform: `translateY(${-28 - stackIndex * 36}px) scale(0.82)`,
+                transform: "scale(0.96)",
                 maxHeight: 0,
                 marginTop: 0,
                 marginBottom: 0,
@@ -233,49 +289,78 @@ export function AgentNav({
                 paddingBottom: 0,
                 overflow: "hidden",
                 pointerEvents: "none",
-                transition: `opacity ${mergeEase}, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
+                transition: `opacity 240ms ease, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
               }
             : {
                 opacity: 1,
-                transform: "translateY(0) scale(1)",
-                transition: `opacity ${mergeEase}, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
+                transform: "scale(1)",
+                maxHeight: leadMorph ? 40 : 56,
+                transition: `opacity 240ms ease, transform ${mergeEase}, max-height ${mergeEase}, margin ${mergeEase}, padding ${mergeEase}`,
               }
         }
       >
-        <span className="relative grid size-[31px] shrink-0 place-items-center rounded-full">
-          <Orb
-            id={item.orb}
-            agentId={item.id}
-            size={ORB_SIZE.nav}
-            colorFrom={item.orbFrom}
-            colorTo={item.orbTo}
-            presence={selectedRow || (merging && isLead) ? "selected" : "rest"}
-            hot={hotId === item.id}
-          />
-          {collapsed && item.unread > 0 ? (
+        <span
+          className="relative grid shrink-0 place-items-center overflow-visible rounded-full"
+          data-flip={`agent-orb-${item.id}`}
+          style={{
+            width: orbSlot,
+            height: orbSlot,
+            transition: `width ${mergeEase}, height ${mergeEase}`,
+          }}
+        >
+          <span
+            className="grid place-items-center"
+            style={{
+              width: ORB_SIZE.nav,
+              height: ORB_SIZE.nav,
+              transform: `scale(${orbScale})`,
+              transformOrigin: "center center",
+              transition: `transform ${mergeEase}`,
+            }}
+          >
+            <Orb
+              id={item.orb}
+              agentId={item.id}
+              size={ORB_SIZE.nav}
+              colorFrom={item.orbFrom}
+              colorTo={item.orbTo}
+              presence={selectedRow || leadMorph ? "selected" : "rest"}
+              hot={hotId === item.id}
+            />
+          </span>
+          {narrow && !leadMorph && item.unread > 0 ? (
             <span className="absolute -right-1.5 -top-1.5 z-10 grid size-4 place-items-center rounded-full bg-[#5631f4] text-[10px] font-medium text-white ring-2 ring-[#0c0d0c]">
               {item.unread}
             </span>
           ) : null}
         </span>
-        {collapsed ? null : (
+        {narrow ? null : (
           <span className="min-w-0 flex-1 overflow-hidden">
-            <span className="block truncate whitespace-nowrap text-[13px] font-semibold leading-[1.3] tracking-[-0.13px] text-white">
+            <span className="rail-label block truncate text-[13px] font-semibold leading-[1.3] tracking-[-0.13px] text-white" data-show={showLabels ? "true" : "false"}>
               {item.name}
             </span>
-            <span className="block truncate whitespace-nowrap text-[12px] leading-4 text-[#8e8f8b]">
-              {merging && isLead ? "View sidekicks" : item.preview}
-            </span>
+            {leadMorph ? null : (
+              <span className="rail-label block truncate text-[12px] leading-4 text-[#8e8f8b]" data-show={showLabels ? "true" : "false"}>
+                {item.preview}
+              </span>
+            )}
           </span>
         )}
-        {!collapsed && item.unread > 0 && !(merging && isLead) ? (
+        {!narrow && item.unread > 0 && !leadMorph ? (
           <span className="grid size-[18px] shrink-0 place-items-center rounded-full bg-[#5631f4] text-[11px] font-medium text-white">
             {item.unread}
           </span>
         ) : null}
       </button>
     );
-    return collapsed ? (
+    if (opts?.leadSlot) {
+      return (
+        <div key={`lead-${item.id}`} className={narrow ? "flex w-full justify-center" : "w-full"}>
+          {button}
+        </div>
+      );
+    }
+    return narrow ? (
       <Tip key={item.id} label={item.name} side="right" fixed>
         {button}
       </Tip>
@@ -304,8 +389,8 @@ export function AgentNav({
   const parked = !present;
   if (drawer && !drawerOpen) return null;
 
-  let agentStack = 0;
   const logoLabel = drawer ? "Close sidekicks" : navOpen ? "Collapse navigation" : "Expand navigation";
+  const narrow = widthCollapsed;
 
   const body = (
     <aside
@@ -316,7 +401,9 @@ export function AgentNav({
       className={
         drawer
           ? "shell-agents-drawer relative flex h-full w-[min(100vw-3rem,280px)] max-w-[280px] flex-col bg-[#0c0d0c] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(1.75rem,env(safe-area-inset-top))] text-white shadow-[8px_0_40px_rgba(0,0,0,0.45)]"
-          : `relative flex h-full min-w-0 shrink-0 flex-col pb-3 pt-7 motion-reduce:transition-none ${collapsed ? "w-[64px]" : "w-[248px] px-3"} ${parked || curtain ? "overflow-hidden" : ""}`
+          : `relative flex h-full min-w-0 shrink-0 flex-col pb-3 pt-7 motion-reduce:transition-none ${
+              narrow ? "w-[64px]" : "w-[248px] px-3"
+            } ${parked || curtain ? "overflow-hidden" : ""}`
       }
       style={drawer || curtain ? undefined : { transition: `width ${move}` }}
     >
@@ -327,7 +414,9 @@ export function AgentNav({
         aria-expanded={drawer ? true : navOpen}
         aria-keyshortcuts={drawer ? undefined : "Control+B Meta+B"}
         onClick={drawer ? () => onCloseDrawer?.() : onToggleNav}
-        className={`group/logo press absolute top-7 z-20 grid size-8 place-items-center rounded-full transition-colors hover:bg-white/[0.08] ${collapsed ? "left-4" : "left-5"}`}
+        className={`group/logo press absolute top-7 z-20 grid size-8 place-items-center rounded-full transition-[left,colors] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-white/[0.08] ${
+          narrow ? "left-4" : "left-5"
+        }`}
       >
         <span className="transition-opacity duration-150 group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0">
           <ShopifyMark />
@@ -339,11 +428,11 @@ export function AgentNav({
       <div
         inert={parked ? true : undefined}
         aria-hidden={parked || undefined}
-        className={`flex min-h-0 flex-1 flex-col ${collapsed ? "" : "gap-4"} ${parked ? "pointer-events-none -translate-x-full opacity-0" : ""} ${!parked && curtain ? "nav-reveal" : ""}`}
+        className={`flex min-h-0 flex-1 flex-col ${narrow ? "" : "gap-4"} ${parked ? "pointer-events-none -translate-x-full opacity-0" : ""} ${!parked && curtain ? "nav-reveal" : ""}`}
       >
-        <div className={`relative z-0 flex bg-transparent ${collapsed ? "flex-col items-center gap-4" : "items-center gap-1.5 pb-4 pl-2"}`}>
-          <span className={`size-8 shrink-0 ${collapsed ? "mb-2" : ""}`} aria-hidden />
-          <span data-flip="add" className={collapsed ? "" : "ml-auto"}>
+        <div className={`relative z-0 flex bg-transparent ${narrow ? "flex-col items-center gap-4" : "items-center gap-1.5 pb-4 pl-2"}`}>
+          <span className={`size-8 shrink-0 ${narrow ? "mb-2" : ""}`} aria-hidden />
+          <span data-flip="add" className={narrow ? "" : "ml-auto"}>
             <IconButton
               label="Add a sidekick"
               onClick={() => {
@@ -366,9 +455,9 @@ export function AgentNav({
           </span>
         </div>
 
-        {collapsed ? <div className="mx-auto mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
+        {narrow ? <div className="mx-auto mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
 
-        {state.searchOpen && !collapsed && !adminRail ? (
+        {state.searchOpen && !narrow && !adminRail ? (
           <div className="rise -mt-4 px-1">
             <s-search-field
               label="Search sidekicks"
@@ -381,67 +470,121 @@ export function AgentNav({
         ) : null}
 
         <div className="relative flex min-h-0 flex-1 flex-col">
+          {merging ? (
+            // Lead mounts once for collapsing→admin (no SidekickLead swap). Recent + admin
+            // share the same reveal timing. Orb stays at nav WebGL size and CSS-scales down.
+            <div
+              className={`relative z-20 flex min-h-0 flex-1 flex-col ${narrow ? "items-center" : "px-0.5"}`}
+            >
+              <div className={`mb-6 flex w-full shrink-0 flex-col ${narrow ? "items-center gap-0.5" : "gap-0.5"}`}>
+                {agentRow(lead, { leadSlot: true })}
+                <div
+                  className={mergePhase === "collapsing" ? "admin-rail-rise w-full" : "w-full"}
+                  style={mergePhase === "admin" ? { opacity: 1, transform: "none" } : undefined}
+                >
+                  <SidekickRecentChats
+                    expanded={!narrow}
+                    labels={showLabels}
+                    items={recentChats}
+                    onOpen={(id) => onOpenConversation?.(id)}
+                  />
+                </div>
+              </div>
+              <div
+                className={`flex min-h-0 w-full flex-1 flex-col ${narrow ? "items-center" : ""} ${
+                  mergePhase === "collapsing" ? "admin-rail-rise" : ""
+                }`}
+                style={mergePhase === "admin" ? { opacity: 1, transform: "none" } : undefined}
+              >
+                <AdminNavSections
+                  expanded={!narrow}
+                  labels={showLabels}
+                  preview={state.preview}
+                  onOpen={(id) => onAdminOpen?.(id)}
+                  onGo={(page) => onAdminGo?.(page)}
+                  onSearchApps={() => onAdminSearch?.("Apps")}
+                />
+              </div>
+            </div>
+          ) : null}
+
           {showAgents ? (
             <div
               className={`scroll-thin relative z-10 flex min-h-0 flex-1 flex-col ${
-                collapsed ? "pt-6 [scrollbar-gutter:stable_both-edges]" : "gap-4"
-              } ${sliding ? "overflow-visible" : "overflow-x-hidden overflow-y-auto"}`}
-              style={{ transition: `opacity ${mergeEase}` }}
+                narrow ? "items-center pt-6 [scrollbar-gutter:stable_both-edges]" : "gap-4"
+              } ${sliding ? "overflow-visible" : "overflow-x-hidden overflow-y-auto"} ${
+                merging ? "pointer-events-none absolute inset-0" : ""
+              }`}
+              style={
+                merging
+                  ? {
+                      opacity: 0,
+                      transition: `opacity 220ms ease`,
+                    }
+                  : undefined
+              }
             >
               {visibleGroups.map((group, index) => {
                 const hidden = group.id === "hidden";
                 const open = !hidden || hiddenOpen;
+                // Lead is rendered in the hybrid slot while merging — omit it here.
+                const items = merging ? group.items.filter((item) => item.id !== lead.id) : group.items;
+                if (merging && items.length === 0 && !hidden) return null;
                 return (
                   <div
                     key={group.id}
-                    className={collapsed ? "" : "flex min-w-0 flex-col gap-2"}
+                    className={narrow ? "" : "flex min-w-0 flex-col gap-2"}
                     style={
-                      merging && !group.items.some((item) => item.id === lead.id)
-                        ? { opacity: 0, maxHeight: 0, overflow: "hidden", transition: `opacity ${mergeEase}, max-height ${mergeEase}` }
+                      merging
+                        ? {
+                            opacity: 0,
+                            transform: "translateY(-6px)",
+                            transition: `opacity 220ms ease, transform ${mergeEase}`,
+                          }
                         : undefined
                     }
                   >
-                    {collapsed && index > 0 && !hidden ? <div className="mx-auto mb-6 mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
+                    {narrow && index > 0 && !hidden ? <div className="mx-auto mb-6 mt-6 h-px w-8 bg-white/15" aria-hidden /> : null}
                     {hidden ? (
                       <button
                         type="button"
                         aria-expanded={hiddenOpen}
                         aria-controls="hidden-sidekicks"
-                        aria-label={collapsed ? (hiddenOpen ? "Hide sidekicks" : "Show hidden sidekicks") : undefined}
+                        aria-label={narrow ? (hiddenOpen ? "Hide sidekicks" : "Show hidden sidekicks") : undefined}
                         onClick={() => setHiddenOpen((value) => !value)}
                         className={
-                          collapsed
+                          narrow
                             ? "press mx-auto mb-6 mt-6 grid h-6 w-8 place-items-center"
-                            : "press flex h-8 w-full items-center gap-1.5 rounded-lg px-2.5 text-left hover:bg-white/[0.06]"
+                            : "press flex h-8 w-full items-center gap-1.5 rounded-full px-2.5 text-left hover:bg-white/[0.06]"
                         }
-                        style={merging ? { opacity: 0, pointerEvents: "none" } : undefined}
                       >
-                        {collapsed ? (
+                        {narrow ? (
                           <span className={`h-px w-8 ${hiddenOpen ? "bg-white/40" : "bg-white/15"}`} />
                         ) : (
                           <>
-                            <span className="shrink-0 whitespace-nowrap text-[13px] leading-4 tracking-[-0.13px] text-[#7d7f7c]">{group.label}</span>
+                            <span className="rail-label shrink-0 text-[13px] leading-4 tracking-[-0.13px] text-[#7d7f7c]" data-show={showLabels ? "true" : "false"}>
+                              {group.label}
+                            </span>
                             <span className={`h-px min-w-2 flex-1 ${hiddenOpen ? "bg-white/30" : "bg-white/10"}`} />
                             <PIcon name={hiddenOpen ? "ChevronUp" : "ChevronDown"} size={16} />
                           </>
                         )}
                       </button>
-                    ) : !collapsed && group.label ? (
-                      <div
-                        className="flex h-8 items-center gap-1.5 px-2.5"
-                        style={merging ? { opacity: 0, transition: `opacity ${mergeEase}` } : undefined}
-                      >
-                        <span className="shrink-0 whitespace-nowrap text-[13px] leading-4 tracking-[-0.13px] text-[#7d7f7c]">{group.label}</span>
+                    ) : !narrow && group.label ? (
+                      <div className="flex h-8 items-center gap-1.5 px-2.5">
+                        <span className="rail-label shrink-0 text-[13px] leading-4 tracking-[-0.13px] text-[#7d7f7c]" data-show={showLabels ? "true" : "false"}>
+                          {group.label}
+                        </span>
                         <span className="h-px min-w-2 flex-1 bg-white/10" />
                       </div>
                     ) : null}
-                    {open ? (
+                    {open && items.length ? (
                       <div
                         id={hidden ? "hidden-sidekicks" : undefined}
                         ref={hidden ? hiddenList : undefined}
-                        className={collapsed ? "flex flex-col items-center gap-4" : "flex flex-col gap-2"}
+                        className={narrow ? "flex flex-col items-center gap-4" : "flex flex-col gap-2"}
                       >
-                        {group.items.map((item) => agentRow(item, agentStack++))}
+                        {items.map((item) => agentRow(item))}
                       </div>
                     ) : null}
                   </div>
@@ -449,32 +592,10 @@ export function AgentNav({
               })}
             </div>
           ) : null}
-
-          {showAdmin ? (
-            <div
-              className={`admin-rail-rise z-20 flex min-h-0 flex-col px-0.5 ${
-                mergePhase === "admin" ? "relative flex-1" : "pointer-events-none absolute inset-0"
-              }`}
-            >
-              {mergePhase === "admin" ? (
-                <SidekickLead agent={lead} expanded={!collapsed} onView={() => onViewSidekicks?.()} />
-              ) : (
-                // Spacer matching the lead so rising nav lands under it.
-                <div className={`mb-3 shrink-0 ${collapsed ? "h-8" : "h-12"}`} aria-hidden />
-              )}
-              <AdminNavSections
-                expanded={!collapsed}
-                preview={state.preview}
-                onOpen={(id) => onAdminOpen?.(id)}
-                onGo={(page) => onAdminGo?.(page)}
-                onSearchApps={() => onAdminSearch?.("Apps")}
-              />
-            </div>
-          ) : null}
         </div>
 
-        <div className={`mb-3 flex items-center ${collapsed ? "mt-6 flex-col" : "gap-1.5 pl-2"}`}>
-          <span className={`group/ids relative flex ${collapsed ? "flex-col items-center" : "items-center"}`} data-open={menu ? "" : undefined}>
+        <div className={`mb-3 flex items-center ${narrow ? "mt-6 flex-col" : "gap-1.5 pl-2"}`}>
+          <span className={`group/ids relative flex ${narrow ? "flex-col items-center" : "items-center"}`} data-open={menu ? "" : undefined}>
             <span className="relative z-10" data-flip="account">
               <button
                 type="button"
@@ -492,18 +613,11 @@ export function AgentNav({
                 <AccountMenu
                   storeName={state.storeName}
                   scenario={state.scenario}
-                  arrival={state.arrival}
-                  menuStyle={state.menuStyle}
-                  className={collapsed ? "bottom-0 left-[calc(100%+10px)] origin-bottom-left" : "bottom-[calc(100%+8px)] left-0 origin-bottom-left"}
+                  className={narrow ? "bottom-0 left-[calc(100%+10px)] origin-bottom-left" : "bottom-[calc(100%+8px)] left-0 origin-bottom-left"}
                   onClose={() => setMenu(null)}
                   onSettings={onSettings}
                   onLogout={onLogout}
                   onScenario={onScenario}
-                  onArrival={(arrival) => {
-                    setMenu(null);
-                    onArrival(arrival);
-                  }}
-                  onMenuStyle={onMenuStyle}
                   onDesignSystem={() => {
                     setMenu(null);
                     onDesignSystem();
@@ -514,7 +628,7 @@ export function AgentNav({
             <span
               data-flip="store"
               className={`relative ${
-                collapsed
+                narrow
                   ? "-mt-3 group-hover/ids:mt-1.5 group-focus-within/ids:mt-1.5 group-data-[open]/ids:mt-1.5"
                   : "-ml-3 group-hover/ids:ml-1.5 group-focus-within/ids:ml-1.5 group-data-[open]/ids:ml-1.5"
               }`}
@@ -535,18 +649,14 @@ export function AgentNav({
               {menu === "store" ? (
                 <StoreMenu
                   storeName={state.storeName}
-                  className={collapsed ? "bottom-0 left-[calc(100%+10px)] origin-bottom-left" : "bottom-[calc(100%+8px)] left-0 origin-bottom-left"}
+                  className={narrow ? "bottom-0 left-[calc(100%+10px)] origin-bottom-left" : "bottom-[calc(100%+8px)] left-0 origin-bottom-left"}
                   onClose={() => setMenu(null)}
                   onSettings={onSettings}
                 />
               ) : null}
             </span>
           </span>
-          <span
-            className={`relative flex items-center gap-1.5 ${
-              collapsed ? "mt-2 flex-col" : "ml-auto pr-1"
-            }`}
-          >
+          <span className={`relative flex items-center gap-1.5 ${narrow ? "mt-2 flex-col" : "ml-auto pr-1"}`}>
             <span ref={alertsRef} className="relative">
               <IconButton
                 label="Alerts"

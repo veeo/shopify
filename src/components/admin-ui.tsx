@@ -294,11 +294,16 @@ export function useDismiss(open: boolean, ref: React.RefObject<HTMLElement | nul
   }, [open, ref]);
 }
 
-const layoutModeCopy: Record<AdminLayoutMode, { label: string }> = {
+export const layoutModeCopy: Record<AdminLayoutMode, { label: string }> = {
   sidebar: { label: "Sidebar" },
   expanded: { label: "Expanded" },
   takeover: { label: "Full" },
 };
+
+/** Size word inside a sentence: "sidebar", "expanded", "full". */
+export function layoutModePhrase(mode: AdminLayoutMode) {
+  return layoutModeCopy[mode].label.toLowerCase();
+}
 
 const LAYOUT_MODES: AdminLayoutMode[] = ["sidebar", "expanded", "takeover"];
 const LAYOUT_IDLE_MS = 2800;
@@ -418,9 +423,9 @@ const layoutGlyphPaths: Record<AdminLayoutMode, string> = {
     "M11 1C13.2091 1 15 2.79086 15 5V11C15 13.14 13.3194 14.8879 11.2061 14.9951L11 15H5L4.79395 14.9951C2.7488 14.8913 1.10865 13.2512 1.00488 11.2061L1 11V5C1 2.79086 2.79086 1 5 1H11ZM5 2.5C3.61929 2.5 2.5 3.61929 2.5 5V11C2.5 12.3807 3.61929 13.5 5 13.5H11C12.3807 13.5 13.5 12.3807 13.5 11V5C13.5 3.61929 12.3807 2.5 11 2.5H5ZM11 4C11.5523 4 12 4.44772 12 5V11C12 11.5523 11.5523 12 11 12H6.5C5.94772 12 5.5 11.5523 5.5 11V5C5.5 4.44772 5.94772 4 6.5 4H11Z",
 };
 
-function AdminLayoutGlyph({ mode }: { mode: AdminLayoutMode }) {
+export function AdminLayoutGlyph({ mode, size = 16 }: { mode: AdminLayoutMode; size?: number }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden className="shrink-0" fill="currentColor">
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden className="shrink-0" fill="currentColor">
       <path d={layoutGlyphPaths[mode]} />
     </svg>
   );

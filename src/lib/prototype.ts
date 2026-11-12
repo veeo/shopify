@@ -1,7 +1,7 @@
 import { channelNav, findNav, mainNav, navFor, pageMeta, previewPages, settingsNav, type PreviewId } from "@/lib/admin-nav";
 import type { ChoiceCard, ChoiceMode } from "@/lib/choices";
 import { applyWorkspace, captureWorkspace, emptyView, homeFor, readLiveScroll, sameDesk, sidekickHomes, type SavedWork, type ViewState, type Workspace } from "@/lib/workspace";
-import { ADMIN_LAYOUT_MODES, adminLayoutFromWide, isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
+import { adminLayoutFromWide, isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
 
 export type { AdminLayoutMode };
 
@@ -200,7 +200,8 @@ export type Agent = {
   /** When on, selecting this sidekick always opens `attachPage` in admin. */
   attachOn: boolean;
   attachPage: PreviewId;
-  attachWide: boolean;
+  /** Admin panel size applied when this sidekick is selected with attach on. */
+  attachLayout: AdminLayoutMode;
   preview: string;
   topic: string;
   placeholder: string;
@@ -348,7 +349,47 @@ export type PrototypeState = {
   workingAgentId: string | null;
 };
 
-export type Conversation = { id: string; title: string; at: number; blocks: Block[] };
+export type ConversationStatus = "idle" | "done" | "working";
+
+export type Conversation = {
+  id: string;
+  title: string;
+  at: number;
+  blocks: Block[];
+  /** Hybrid-rail status glyph; archived chats default to done. */
+  status?: ConversationStatus;
+};
+
+/** Recent chats for the hybrid sidekick section (current + archived). */
+export function recentAgentConversations(
+  state: PrototypeState,
+  agentId: string,
+  limit = 3,
+): { id: string; title: string; status: ConversationStatus; current: boolean }[] {
+  const agent = state.agents.find((item) => item.id === agentId);
+  const thread = state.threads[agentId] ?? [];
+  const hasCurrent = thread.some((block) => block.type === "text" && block.role === "user");
+  const rows: { id: string; title: string; status: ConversationStatus; current: boolean; at: number }[] = [];
+  if (hasCurrent) {
+    rows.push({
+      id: "current",
+      title: (agent?.topic || "Current conversation").replace(/\s+/g, " ").trim(),
+      status: state.workingAgentId === agentId ? "working" : "idle",
+      current: true,
+      at: Date.now(),
+    });
+  }
+  for (const item of state.conversations[agentId] ?? []) {
+    rows.push({
+      id: item.id,
+      title: item.title.replace(/\s+/g, " ").trim(),
+      status: item.status ?? "done",
+      current: false,
+      at: item.at,
+    });
+  }
+  return rows.sort((a, b) => b.at - a.at).slice(0, limit).map(({ at: _at, ...row }) => row);
+}
 
 export const homeCards = [
   { id: "theme", title: "Choose your store design", chip: "Choose theme →" },
@@ -406,16 +447,54 @@ function seedConversations(now: number): Conversation[] {
 
 /** Example threads on the connected platforms. Grok is agents running on X. Slack is the team. */
 function teamConversations(now: number): Record<string, Conversation[]> {
-  const convo = (agent: string, n: string, title: string, ago: number, ask: string, reply: string): Conversation => ({
+  const convo = (
+    agent: string,
+    n: string,
+    title: string,
+    ago: number,
+    ask: string,
+    reply: string,
+    status: ConversationStatus = "done",
+  ): Conversation => ({
     id: `seed-${agent}-${n}`,
     title,
     at: now - ago,
+    status,
     blocks: [
       { id: `seed-${agent}-${n}-u`, type: "text", role: "user", text: ask },
       { id: `seed-${agent}-${n}-a`, type: "text", role: "assistant", text: reply },
     ],
   });
   return {
+    chief: [
+      convo(
+        "chief",
+        "unpaid",
+        "Review unpaid order #1075",
+        2 * 3_600_000,
+        "Help me clear unpaid order #1075.",
+        "Priya Patel’s $58 order still isn’t paid. I can open it in Orders and draft a payment reminder.",
+        "working",
+      ),
+      convo(
+        "chief",
+        "fulfill",
+        "Clear the fulfillment queue",
+        day + 3_600_000,
+        "What’s left to fulfill today?",
+        "Two paid orders are still open — #1078 and #1077. Headphones and the desk lamp. Everything older than yesterday has shipped.",
+        "done",
+      ),
+      convo(
+        "chief",
+        "bundle",
+        "Bundle the best sellers",
+        2 * day,
+        "Should we bundle the best sellers?",
+        "Studio ANC, the USB-C power bank, and the portable charger are the top three. A starter kit would push the quieter SKUs with them.",
+        "idle",
+      ),
+    ],
     grok: [
       convo(
         "grok",
@@ -726,10 +805,10 @@ function connectionsFor(id: string): Connection[] {
 }
 
 const attachDefaults = new Set(["customers", "orders", "finance", "analytics", "store", "shop", "pos", "agentic"]);
-const attachWideDefaults = new Set(["customers", "orders", "finance", "analytics"]);
+const attachExpandedDefaults = new Set(["customers", "orders", "finance", "analytics"]);
 
 function agent(
-  partial: Omit<Agent, "persona" | "installed" | "unread" | "purpose" | "connections" | "baseGroup" | "pinned" | "hidden" | "attachOn" | "attachPage" | "attachWide"> & {
+  partial: Omit<Agent, "persona" | "installed" | "unread" | "purpose" | "connections" | "baseGroup" | "pinned" | "hidden" | "attachOn" | "attachPage" | "attachLayout"> & {
     unread?: number;
     installed?: boolean;
     purpose?: string;
@@ -739,12 +818,17 @@ function agent(
     hidden?: boolean;
     attachOn?: boolean;
     attachPage?: PreviewId;
+    attachLayout?: AdminLayoutMode;
+    /** @deprecated prefer attachLayout */
     attachWide?: boolean;
   },
 ): Agent {
-  const { purpose, connections, ...rest } = partial;
+  const { purpose, connections, attachWide, ...rest } = partial;
   const baseGroup = partial.baseGroup ?? (partial.group === "hidden" ? "teams" : partial.group);
   const home = sidekickHomes[partial.id] ?? sidekickHomes.custom;
+  const attachLayout =
+    partial.attachLayout ??
+    (attachWide === true ? "expanded" : attachWide === false ? "sidebar" : attachExpandedDefaults.has(partial.id) ? "expanded" : "sidebar");
   return {
     ...rest,
     unread: partial.unread ?? 0,
@@ -757,7 +841,7 @@ function agent(
     hidden: partial.hidden ?? hiddenSidekicks.has(partial.id),
     attachOn: partial.attachOn ?? attachDefaults.has(partial.id),
     attachPage: partial.attachPage ?? home.page,
-    attachWide: partial.attachWide ?? attachWideDefaults.has(partial.id),
+    attachLayout,
     orb: canonicalOrb(partial.orb),
     orbFrom: partial.orbFrom ?? defaultOrbTint(partial.id, partial.orb)?.from,
     orbTo: partial.orbTo ?? defaultOrbTint(partial.id, partial.orb)?.to,
@@ -1163,7 +1247,7 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
     storeName,
     scenario: "setup",
     arrival,
-    menuStyle: "push",
+    menuStyle: "drop",
     agents: [kick],
     selectedAgentId: "sidekick",
     threads: {
@@ -1181,8 +1265,8 @@ export function setupState(storeName = "My Store", arrival: Arrival = "sidekick"
             ],
     },
     preview: "home-setup",
-    // Roomy desktops floor to expanded; tight viewports clamp down in the shell.
-    adminLayout: "expanded",
+    // Fresh loads prefer sidebar; attachLayout on the selected sidekick can expand.
+    adminLayout: "sidebar",
     view: emptyView(),
     workspaces: { sidekick: homeFor("sidekick", "setup") },
     mode: "thread",
@@ -1351,8 +1435,8 @@ export function activeState(storeName = "My Store"): PrototypeState {
     conversations: { ...base.conversations, ...teamConversations(Date.now()) },
     preview: "home-active",
     chiefPhase: "working",
-    // Roomy desktops floor to expanded; tight viewports clamp down in the shell.
-    adminLayout: "expanded",
+    // Fresh loads prefer sidebar; attachLayout on the selected sidekick can expand/take over.
+    adminLayout: "sidebar",
     view: emptyView(),
     workspaces: { chief: homeFor("chief", "active") },
   };
@@ -2203,7 +2287,8 @@ export type Action =
   | { type: "toggle-purpose"; id: string }
   | { type: "add-catalog"; id: string }
   | { type: "create-agent"; name: string; purpose: string }
-  | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string; attachOn: boolean; attachPage: PreviewId; attachWide: boolean }
+  | { type: "edit-agent"; id: string; name: string; purpose: string; orb: OrbId; connections: Connection[]; orbFrom?: string; orbTo?: string; attachOn: boolean; attachPage: PreviewId; attachLayout: AdminLayoutMode }
+  | { type: "set-attach"; id: string; page: PreviewId; layout: AdminLayoutMode }
   | { type: "toggle-pin"; id: string }
   | { type: "toggle-hide"; id: string }
   | { type: "disconnect-sidekick"; id: string }
@@ -2531,21 +2616,36 @@ function reduceInner(state: PrototypeState, action: Action): PrototypeState {
         orbTo: action.orbTo,
         attachOn: action.attachOn,
         attachPage: action.attachPage,
-        attachWide: action.attachWide,
+        attachLayout: action.attachLayout,
       });
-      if (action.attachOn && next.selectedAgentId === action.id) {
-        const prior = next.workspaces[action.id];
-        next.workspaces = {
-          ...next.workspaces,
-          [action.id]: {
-            ...(prior ?? { ...emptyView(), page: action.attachPage, wide: action.attachWide }),
-            page: action.attachPage,
-            wide: action.attachWide,
-            draft: { ...(prior?.draft ?? {}) },
-          },
-        };
-        openPage(next, action.attachPage, action.attachWide);
+      if (next.selectedAgentId === action.id) {
+        if (action.attachOn) {
+          const wide = isAdminWideLayout(action.attachLayout);
+          const prior = next.workspaces[action.id];
+          next.workspaces = {
+            ...next.workspaces,
+            [action.id]: {
+              ...(prior ?? { ...emptyView(), page: action.attachPage, wide }),
+              page: action.attachPage,
+              wide,
+              draft: { ...(prior?.draft ?? {}) },
+            },
+          };
+          openPage(next, action.attachPage, wide, action.attachLayout);
+        } else if (next.adminLayout !== "takeover") {
+          next.adminLayout = "sidebar";
+        }
       }
+      return next;
+    }
+    case "set-attach": {
+      const current = next.agents.find((item) => item.id === action.id);
+      if (!current) return state;
+      patchAgent(next, action.id, {
+        attachOn: true,
+        attachPage: action.page,
+        attachLayout: action.layout,
+      });
       return next;
     }
     case "toggle-pin": {
@@ -2855,9 +2955,7 @@ export function restoreWork(state: PrototypeState, saved: SavedWork): PrototypeS
   }
   // Refresh behaves like a fresh login: open on Chief with its opening animation.
   const selected = state.selectedAgentId;
-  // Prefer the global shell layout; fall back to the selected desk’s legacy snapshot.
-  const rawLayout = saved.adminLayout ?? workspaces[selected]?.layout;
-  const savedLayout = rawLayout && (ADMIN_LAYOUT_MODES as readonly string[]).includes(rawLayout) ? rawLayout : undefined;
+  // Ignore sticky layout from disk — reload starts sidebar unless attachLayout expands it.
   const next: PrototypeState = {
     ...state,
     agents,
@@ -2867,7 +2965,7 @@ export function restoreWork(state: PrototypeState, saved: SavedWork): PrototypeS
     selectedAgentId: selected,
     seq: Math.max(state.seq, saved.seq || 0),
     view: emptyView(),
-    ...(savedLayout ? { adminLayout: savedLayout } : {}),
+    adminLayout: "sidebar",
   };
   const agent = next.agents.find((item) => item.id === selected);
   applyWorkspace(next, selected, next.scenario, agent);

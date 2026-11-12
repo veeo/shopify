@@ -8,7 +8,8 @@ import { Markdown } from "@/components/markdown";
 import { ArtifactRow, ChoiceCards } from "@/components/choice-cards";
 import { useOrbAudioPublish } from "@/components/orb-audio";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
-import { pageMeta } from "@/lib/admin-nav";
+import { adminPageTitle, pageMeta } from "@/lib/admin-nav";
+import { ColumnToasts, type ColumnToastItem } from "@/components/column-toast";
 import {
   canonicalOrb,
   catalog,
@@ -26,6 +27,7 @@ import {
   voiceOrbLabel,
   voiceOrbTint,
   type Agent,
+  type AdminLayoutMode,
   type Block,
   type Connection,
   type Conversation,
@@ -36,6 +38,8 @@ import {
   type SoftLinkTarget,
   type Source,
 } from "@/lib/prototype";
+import { AdminLayoutGlyph, layoutModeCopy } from "@/components/admin-ui";
+import { ADMIN_LAYOUT_MODES } from "@/lib/shell-layout";
 import type { LiveSegment } from "@/lib/turn";
 import { startRecording, transcribeAudio, type Recording } from "@/lib/voice";
 import { VoiceMode } from "@/components/voice-mode";
@@ -73,6 +77,9 @@ export function ChatColumn({
   onIntroFinished,
   onChoose,
   onBundle,
+  toasts = [],
+  onDismissToast,
+  composerCovered = false,
 }: {
   state: PrototypeState;
   liveSegments: LiveSegment[] | null;
@@ -102,7 +109,7 @@ export function ChatColumn({
     orbTo?: string;
     attachOn: boolean;
     attachPage: PreviewId;
-    attachWide: boolean;
+    attachLayout: AdminLayoutMode;
   }) => void;
   onTogglePin: (id: string) => void;
   onToggleHide: (id: string) => void;
@@ -118,6 +125,11 @@ export function ChatColumn({
   onIntroFinished?: () => void;
   onChoose: (blockId: string, cardId: string) => void;
   onBundle: (blockId: string) => void;
+  /** Toasts parked above the composer, in this centered column. */
+  toasts?: ColumnToastItem[];
+  onDismissToast?: (id: string) => void;
+  /** Full admin covers this column; the toast still anchors to the composer. */
+  composerCovered?: boolean;
 }) {
   const agent = selectedAgent(state);
   const purpose = state.selectedAgentId === "chief" && state.chiefPhase === "purpose" && state.mode === "thread";
@@ -173,7 +185,8 @@ export function ChatColumn({
         mobileChrome ? "px-4 pt-[max(1rem,env(safe-area-inset-top))]" : tightChrome ? "px-5 pt-6" : "px-8 pt-7"
       }`}
     >
-      <div className="flex min-h-0 flex-1 flex-col">
+      {/* Title, thread, and composer share one centered column; the chat pane itself stays fluid. */}
+      <div className="mx-auto flex min-h-0 w-full min-w-[min(100%,280px)] max-w-[780px] flex-1 flex-col">
           <header className={`relative mb-5 flex items-start gap-3 ${tightChrome ? "justify-between" : "justify-between gap-4"}`}>
             {mobileChrome && onOpenAgents ? (
               <button
@@ -335,6 +348,7 @@ export function ChatColumn({
           Claude isn’t connected on this deployment, so this reply is scripted.
         </p>
       ) : null}
+      <ColumnToasts toasts={toasts} onDismiss={onDismissToast ?? (() => undefined)} covered={composerCovered} />
       <Composer
         key={state.mode === "add" ? "composer-add" : `composer-${agent.id}`}
         state={state}
@@ -1621,6 +1635,12 @@ const attachPageChoices: { page: PreviewId; label: string; wide?: boolean }[] = 
   { page: "agentic", label: "Agentic" },
 ];
 
+/** The saved page stays visible even when it isn't one of the usual attach choices. */
+function attachPageOptions(page: PreviewId) {
+  if (attachPageChoices.some((item) => item.page === page)) return attachPageChoices;
+  return [...attachPageChoices, { page, label: adminPageTitle(page) }];
+}
+
 function EditSidekick({
   agent,
   canDisconnect,
@@ -1640,7 +1660,7 @@ function EditSidekick({
     orbTo?: string;
     attachOn: boolean;
     attachPage: PreviewId;
-    attachWide: boolean;
+    attachLayout: AdminLayoutMode;
   }) => void;
   onDisconnect: () => void;
 }) {
@@ -1653,10 +1673,10 @@ function EditSidekick({
   const [colorTo, setColorTo] = useState(agent.orbTo ?? starting.to);
   const [attachOn, setAttachOn] = useState(agent.attachOn);
   const [attachPage, setAttachPage] = useState<PreviewId>(agent.attachPage);
+  const [attachLayout, setAttachLayout] = useState<AdminLayoutMode>(agent.attachLayout);
   const voice = isVoiceOrb(orb);
   const combos = voice ? colorCombosFor(orb) : [];
   const field = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-white outline-none placeholder:text-[#8e8f8b] focus:border-white/30";
-  const attachWide = attachPageChoices.find((item) => item.page === attachPage)?.wide ?? agent.attachWide;
   return createPortal(
     <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" role="presentation" onMouseDown={onClose}>
       <form
@@ -1673,7 +1693,7 @@ function EditSidekick({
             connections: agent.connections,
             attachOn,
             attachPage,
-            attachWide,
+            attachLayout,
             ...(voice ? { orbFrom: colorFrom, orbTo: colorTo } : {}),
           });
         }}
@@ -1764,20 +1784,64 @@ function EditSidekick({
             <MenuSwitch on={attachOn} />
           </button>
           {attachOn ? (
-            <label className="flex flex-col gap-1.5 text-[12px] text-[#8e8f8b]">
-              Admin page
-              <select
-                value={attachPage}
-                onChange={(event) => setAttachPage(event.target.value as PreviewId)}
-                className={`${field} appearance-none`}
-              >
-                {attachPageChoices.map((item) => (
-                  <option key={item.page} value={item.page}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <>
+              <label className="flex flex-col gap-1.5 text-[12px] text-[#8e8f8b]">
+                Admin page
+                <select
+                  value={attachPage}
+                  onChange={(event) => {
+                    const page = event.target.value as PreviewId;
+                    setAttachPage(page);
+                    const suggested = attachPageChoices.find((item) => item.page === page)?.wide;
+                    if (suggested) setAttachLayout("expanded");
+                    else if (suggested === false && attachLayout === "expanded") setAttachLayout("sidebar");
+                  }}
+                  className={`${field} appearance-none`}
+                >
+                  {attachPageOptions(attachPage).map((item) => (
+                    <option key={item.page} value={item.page}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <fieldset className="flex flex-col gap-1.5">
+                <legend className="text-[12px] text-[#8e8f8b]">Admin size</legend>
+                <div
+                  role="radiogroup"
+                  aria-label="Admin size"
+                  className="grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1"
+                >
+                  {ADMIN_LAYOUT_MODES.map((mode) => {
+                    const on = attachLayout === mode;
+                    const label = layoutModeCopy[mode].label;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        role="radio"
+                        aria-label={label}
+                        aria-checked={on}
+                        onClick={() => setAttachLayout(mode)}
+                        className={`press flex flex-col items-center gap-1 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-colors ${
+                          on ? "bg-white text-black" : "text-[#c4c4c4] hover:bg-white/[0.08] hover:text-white"
+                        }`}
+                      >
+                        <AdminLayoutGlyph mode={mode} size={16} />
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[12px] text-[#8e8f8b]">
+                  {attachLayout === "takeover"
+                    ? `Selecting ${agent.name} opens full admin with the hybrid rail.`
+                    : attachLayout === "expanded"
+                      ? `Selecting ${agent.name} opens the wider admin panel.`
+                      : `Selecting ${agent.name} opens the sidebar admin panel.`}
+                </p>
+              </fieldset>
+            </>
           ) : null}
         </div>
         <div className="flex items-center justify-between gap-2">

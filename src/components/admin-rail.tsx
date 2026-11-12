@@ -5,21 +5,32 @@ import { createPortal } from "react-dom";
 import { useDismiss } from "@/components/admin-ui";
 import { Orb } from "@/components/marks";
 import { PIcon, type PolarisIconName } from "@/components/polaris-icon";
-import { channelNav, mainNav, navFor, type NavItem, type PreviewId } from "@/lib/admin-nav";
+import { channelNav, mainNav, navFor, navIconSize, type NavItem, type PreviewId } from "@/lib/admin-nav";
 import type { Agent } from "@/lib/prototype";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
 
 const channelIds = new Set(channelNav.map((item) => item.id));
 
+/** Circle hover / selected — matches sidekick collapsed orbs. */
+const circleIdle =
+  "rounded-full text-[#b5b5b5] transition-shadow duration-150 hover:text-white hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a]";
+const circleOn = "rounded-full text-white shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#fff]";
+/** Expanded rows: same rounded-full treatment as sidekick roster rows. */
+const rowIdle = "rounded-full text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white";
+const rowOn = "rounded-full bg-[#2f2f2f] font-semibold text-white";
+
 /** Main admin destinations (Home → Apps) without search or footer chrome. */
 export function AdminNavSections({
   expanded,
+  labels = expanded,
   preview,
   onOpen,
   onGo,
   onSearchApps,
 }: {
   expanded: boolean;
+  /** When false, hide/clip labels while width may still be animating. */
+  labels?: boolean;
   preview: PreviewId;
   onOpen: (id: string) => void;
   onGo: (page: PreviewId) => void;
@@ -27,24 +38,31 @@ export function AdminNavSections({
 }) {
   const { id: active, child } = navFor(preview);
   const [channelsOpen, setChannelsOpen] = useState(true);
-  const shared = { expanded, active, child, onOpen, onGo };
+  const shared = { expanded, labels, active, child, onOpen, onGo };
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
-      <div className="flex flex-col gap-0.5">
+    <div
+      className={`flex min-h-0 w-full flex-1 flex-col overflow-x-hidden overflow-y-auto ${
+        expanded
+          ? ""
+          : "items-center [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      }`}
+    >
+      <div className={`flex w-full flex-col ${expanded ? "gap-0.5" : "items-center gap-2"}`}>
         {mainNav.map((item) => (
           <RailItem key={item.id} item={item} {...shared} />
         ))}
       </div>
-      <span className={`my-2 h-px shrink-0 bg-white/15 ${expanded ? "mx-2" : "mx-1.5"}`} />
       {expanded ? (
-        <div className="flex flex-col gap-0.5">
+        <div className="mt-1 flex w-full flex-col gap-0.5">
           <button
             type="button"
             aria-expanded={channelsOpen}
             onClick={() => setChannelsOpen((open) => !open)}
-            className="flex h-7 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-[12px] font-medium text-[#a6a6a6] hover:text-white"
+            className="flex h-7 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[12px] font-medium text-[#a6a6a6] hover:text-white"
           >
-            Sales channels
+            <span className="rail-label" data-show={labels ? "true" : "false"}>
+              Sales channels
+            </span>
             <span className={`transition-transform duration-150 ${channelsOpen ? "rotate-90" : ""}`}>
               <PIcon name="ChevronRight" size={14} />
             </span>
@@ -52,20 +70,25 @@ export function AdminNavSections({
           {channelsOpen ? channelNav.map((item) => <RailItem key={item.id} item={item} {...shared} />) : null}
         </div>
       ) : (
-        <ChannelsItem active={active} onOpen={onOpen} />
+        <div className="mt-2 flex w-full flex-col items-center gap-2">
+          <ChannelsItem active={active} onOpen={onOpen} />
+        </div>
       )}
-      <span className={`my-2 h-px shrink-0 bg-white/15 ${expanded ? "mx-2" : "mx-1.5"}`} />
       {expanded ? (
         <button
           type="button"
           onClick={() => onSearchApps?.()}
-          className="flex h-7 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-[12px] font-medium text-[#a6a6a6] hover:text-white"
+          className="mt-1 flex h-7 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[12px] font-medium text-[#a6a6a6] hover:text-white"
         >
-          Apps
+          <span className="rail-label" data-show={labels ? "true" : "false"}>
+            Apps
+          </span>
           <PIcon name="ChevronRight" size={14} />
         </button>
       ) : (
-        <RailButton label="Apps" icon="Apps" onClick={() => onSearchApps?.()} />
+        <div className="mt-2 flex w-full flex-col items-center">
+          <RailButton label="Apps" icon="Apps" onClick={() => onSearchApps?.()} />
+        </div>
       )}
     </div>
   );
@@ -103,7 +126,7 @@ export function AdminRail({
   const { id: active, child } = navFor(preview);
   const [alerts, setAlerts] = useState(false);
   const [read, setRead] = useState(false);
-  const shared = { expanded, active, child, onOpen, onGo };
+  const shared = { expanded, labels: expanded, active, child, onOpen, onGo };
   return (
     <nav
       className={`relative flex h-full shrink-0 flex-col pb-3 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
@@ -116,7 +139,7 @@ export function AdminRail({
         <button
           type="button"
           onClick={() => onSearch()}
-          className="fade-in mb-1 flex h-8 w-full items-center gap-2 rounded-[10px] bg-white/[0.08] px-2 text-[13px] text-[#b5b5b5] transition-colors hover:bg-white/[0.12] hover:text-white"
+          className="fade-in mb-1 flex h-8 w-full items-center gap-2 rounded-full bg-white/[0.08] px-2 text-[13px] text-[#b5b5b5] transition-colors hover:bg-white/[0.12] hover:text-white"
         >
           <PIcon name="Search" size={18} />
           <span className="flex-1 text-left">Search</span>
@@ -174,49 +197,117 @@ export function initials(name: string) {
 export function SidekickLead({
   agent,
   expanded,
+  labels = expanded,
   onView,
+  /** Keep Orb at nav diameter and CSS-scale into the lead slot — avoids remount flicker. */
+  orbFromNav = false,
 }: {
   agent: Agent;
   expanded: boolean;
+  labels?: boolean;
   onView: () => void;
+  orbFromNav?: boolean;
 }) {
+  const slot = ORB_SIZE.palette;
+  const render = orbFromNav ? ORB_SIZE.nav : slot;
+  const scale = slot / render;
   return (
     <button
       type="button"
+      data-flip={`agent-${agent.id}`}
       aria-label={`View sidekicks — ${agent.name}`}
       onClick={onView}
-      className={`press press-row mb-3 flex w-full min-w-0 items-center text-left transition-[background-color,box-shadow] duration-300 hover:bg-white/[0.06] active:bg-white/10 ${
-        expanded ? "h-12 gap-2 rounded-full py-2 pl-2 pr-2" : "h-8 justify-center rounded-full px-0"
-      }`}
+      className={
+        expanded
+          ? `press press-row flex h-8 w-full items-center gap-2 overflow-hidden px-1.5 text-[13px] font-semibold text-white ${rowIdle}`
+          : `press mx-auto grid size-8 place-items-center ${circleIdle} hover:text-white`
+      }
     >
-      <span className="relative grid size-[31px] shrink-0 place-items-center rounded-full">
-        <Orb
-          id={agent.orb}
-          agentId={agent.id}
-          size={ORB_SIZE.nav}
-          colorFrom={agent.orbFrom}
-          colorTo={agent.orbTo}
-          presence="rest"
-        />
+      <span
+        className="relative grid size-5 shrink-0 place-items-center overflow-visible rounded-full"
+        data-flip={`agent-orb-${agent.id}`}
+      >
+        <span
+          className="grid place-items-center"
+          style={{
+            width: render,
+            height: render,
+            transform: `scale(${scale})`,
+            transformOrigin: "center center",
+            transition: orbFromNav ? "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)" : undefined,
+          }}
+        >
+          <Orb
+            id={agent.orb}
+            agentId={agent.id}
+            size={render}
+            colorFrom={agent.orbFrom}
+            colorTo={agent.orbTo}
+            presence="rest"
+          />
+        </span>
       </span>
       {expanded ? (
-        <span className="min-w-0 flex-1 overflow-hidden">
-          <span className="block truncate text-[13px] font-semibold leading-[1.3] tracking-[-0.13px] text-white">{agent.name}</span>
-          <span className="block truncate text-[12px] leading-4 text-[#8e8f8b]">View sidekicks</span>
+        <span className="rail-label min-w-0 flex-1 text-left" data-show={labels ? "true" : "false"}>
+          {agent.name}
         </span>
       ) : null}
     </button>
   );
 }
 
-function ItemIcon({ item, on }: { item: NavItem; on: boolean }) {
-  return item.channel ? (
-    <span className={`grid size-[18px] shrink-0 place-items-center rounded-[5px] ${on ? "bg-white text-[#303030]" : "bg-white/15 text-white"}`}>
-      <PIcon name={item.icon} size={16} />
-    </span>
-  ) : (
-    <span className="shrink-0">
-      <PIcon name={item.icon} size={20} />
+/** ~8×8 status glyphs for hybrid recent conversations. */
+export function ConversationStatusIcon({ status }: { status: "idle" | "done" | "working" }) {
+  if (status === "working") {
+    return <span className="hybrid-status-spin size-2 rounded-full border-[1.5px] border-white border-t-transparent" aria-hidden />;
+  }
+  if (status === "done") {
+    return <span className="size-2 rounded-full border-[1.5px] border-white bg-white" aria-hidden />;
+  }
+  return <span className="size-2 rounded-full border-[1.5px] border-[#8e8f8b] bg-transparent" aria-hidden />;
+}
+
+/** Condensed recent chats under the hybrid lead — 32px rows aligned with admin nav. */
+export function SidekickRecentChats({
+  expanded,
+  labels = expanded,
+  items,
+  onOpen,
+}: {
+  expanded: boolean;
+  labels?: boolean;
+  items: { id: string; title: string; status: "idle" | "done" | "working" }[];
+  onOpen: (id: string) => void;
+}) {
+  if (!expanded || items.length === 0) return null;
+  return (
+    <ul className="flex flex-col gap-0.5" aria-label="Recent conversations">
+      {items.map((item) => (
+        <li key={item.id}>
+          <button
+            type="button"
+            onClick={() => onOpen(item.id)}
+            className={`press flex h-8 w-full items-center gap-2 overflow-hidden px-1.5 text-left text-[13px] ${rowIdle}`}
+          >
+            {/* size-5 matches Home/Orders icon box; 8×8 circle stays centered inside */}
+            <span className="grid size-5 shrink-0 place-items-center">
+              <ConversationStatusIcon status={item.status} />
+            </span>
+            <span className="rail-label min-w-0 flex-1 truncate" data-show={labels ? "true" : "false"}>
+              {item.title}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ItemIcon({ item }: { item: NavItem; on: boolean }) {
+  // Same 20px slot for channels and main nav — no gray chip. Full-bleed channel marks scale down so the ink matches Home/Orders.
+  return (
+    <span className="grid size-5 shrink-0 place-items-center">
+      <PIcon name={item.icon} size={navIconSize(item.icon)} />
     </span>
   );
 }
@@ -227,6 +318,7 @@ const flyoutRow = "flex items-center gap-2 whitespace-nowrap rounded-lg px-2 py-
 function RailItem({
   item,
   expanded,
+  labels = expanded,
   active,
   child,
   onOpen,
@@ -234,6 +326,7 @@ function RailItem({
 }: {
   item: NavItem;
   expanded: boolean;
+  labels?: boolean;
   active: string;
   child: PreviewId | null;
   onOpen: (id: string) => void;
@@ -241,21 +334,31 @@ function RailItem({
 }) {
   const on = active === item.id;
   const kids = item.children?.filter((entry) => entry.page !== item.page) ?? [];
+  const selected = on && (!child || !expanded);
   return (
-    <div className="group relative flex flex-col">
+    <div className={`group relative flex flex-col ${expanded ? "" : "items-center"}`}>
       <button
         type="button"
+        data-flip={`nav-${item.id}`}
         aria-label={expanded ? undefined : item.label}
-        aria-current={on && !child ? "page" : undefined}
+        aria-current={selected ? "page" : undefined}
         onClick={() => onOpen(item.id)}
-        className={`press relative flex h-8 w-full items-center gap-2 overflow-hidden rounded-[10px] px-1.5 text-[13px] ${
-          on && (!child || !expanded) ? "bg-[#303030] text-white" : "text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white"
-        } ${on && expanded ? "font-semibold text-white" : ""}`}
+        className={
+          expanded
+            ? `press relative flex h-8 w-full items-center gap-2 overflow-hidden px-1.5 text-[13px] ${
+                selected || (on && expanded) ? rowOn : rowIdle
+              }`
+            : `press relative grid size-8 place-items-center ${selected ? circleOn : circleIdle}`
+        }
       >
         <ItemIcon item={item} on={on} />
-        <span className={`truncate whitespace-nowrap transition-opacity duration-200 ${expanded ? "opacity-100" : "opacity-0"}`}>{item.label}</span>
-        {item.dot ? (
-          <span className={`absolute size-1.5 rounded-full bg-[#b5b5b5] ${expanded ? "right-3 top-1/2 -translate-y-1/2" : "right-1 top-1"}`} title="Pin to your navigation" />
+        {expanded ? (
+          <span className="rail-label" data-show={labels ? "true" : "false"}>
+            {item.label}
+          </span>
+        ) : null}
+        {item.dot && expanded ? (
+          <span className="absolute right-3 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-[#b5b5b5]" title="Pin to your navigation" />
         ) : null}
         {expanded && on && item.channel ? (
           <span className="ml-auto text-[#b5b5b5]">
@@ -271,11 +374,13 @@ function RailItem({
               type="button"
               aria-current={child === entry.page ? "page" : undefined}
               onClick={() => onGo(entry.page)}
-              className={`h-7 truncate whitespace-nowrap rounded-lg pl-8 pr-2 text-left text-[13px] ${
-                child === entry.page ? "bg-[#303030] font-medium text-white" : "text-[#a6a6a6] hover:bg-white/[0.08] hover:text-white"
+              className={`h-7 truncate whitespace-nowrap rounded-full pl-8 pr-2 text-left text-[13px] ${
+                child === entry.page ? "bg-[#2f2f2f] font-medium text-white" : "text-[#a6a6a6] hover:bg-white/[0.08] hover:text-white"
               }`}
             >
-              {entry.label}
+              <span className="rail-label" data-show={labels ? "true" : "false"}>
+                {entry.label}
+              </span>
             </button>
           ))}
         </div>
@@ -314,13 +419,13 @@ function ChannelsItem({ active, onOpen }: { active: string; onOpen: (id: string)
   const on = channelIds.has(active);
   const shown = more ? channelNav : channelNav.filter((item) => item.id !== "shop");
   return (
-    <div className="group relative flex flex-col" onMouseLeave={() => setMore(false)}>
+    <div className="group relative flex flex-col items-center" onMouseLeave={() => setMore(false)}>
       <button
         type="button"
         aria-label="Sales channels"
         aria-current={on ? "page" : undefined}
         onClick={() => onOpen(on ? active : "online-store")}
-        className={`press flex h-8 w-full items-center rounded-[10px] px-1.5 ${on ? "bg-[#303030] text-white" : "text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white"}`}
+        className={`press grid size-8 place-items-center ${on ? circleOn : circleIdle}`}
       >
         <PIcon name="Channels" size={20} />
       </button>
@@ -361,7 +466,7 @@ function RailButton({
   controls?: string;
 }) {
   return (
-    <span className="group relative flex">
+    <span className="group relative flex justify-center">
       <button
         type="button"
         aria-label={label}
@@ -369,8 +474,8 @@ function RailButton({
         aria-current={on && !controls ? "page" : undefined}
         aria-expanded={controls ? on : undefined}
         onClick={onClick}
-        className={`press flex h-8 items-center gap-2 rounded-[10px] px-1.5 text-[13px] ${text ? "w-full" : "w-8"} ${
-          on ? "bg-[#303030] text-white" : "text-[#b5b5b5] hover:bg-white/[0.08] hover:text-white"
+        className={`press flex items-center gap-2 px-1.5 text-[13px] ${text ? "h-8 w-full" : "size-8 justify-center"} ${
+          on ? (text ? rowOn : circleOn) : text ? rowIdle : circleIdle
         }`}
       >
         <PIcon name={icon} size={20} />
@@ -543,36 +648,29 @@ export function StoreMenu({
   );
 }
 
-/** The merchant's account: the store, help, the design system, prototype controls, and log out. */
+/** The merchant's account: the store, help, the design system, and log out. */
 export function AccountMenu({
   storeName,
   scenario,
-  arrival,
-  menuStyle,
   className,
   onClose,
   onSettings,
   onLogout,
   onScenario,
-  onArrival,
-  onMenuStyle,
   onDesignSystem,
 }: {
   storeName: string;
   scenario: "setup" | "active";
-  arrival: "tasks" | "sidekick";
-  menuStyle: "push" | "drop";
   className: string;
   onClose: () => void;
   onSettings: () => void;
   onLogout: () => void;
   onScenario: (scenario: "setup" | "active") => void;
-  onArrival: (arrival: "tasks" | "sidekick") => void;
-  onMenuStyle: (style: "push" | "drop") => void;
   onDesignSystem: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(true, ref, onClose);
+  const activeStore = scenario === "active";
   return (
     <div ref={ref} id="account-menu" className={`${menuShell} ${className}`}>
       <button
@@ -617,37 +715,25 @@ export function AccountMenu({
         <span className="min-w-0 flex-1">Design system</span>
         <PIcon name="ChevronRight" size={16} />
       </button>
-      <span className={menuDivider} />
-      <p className="px-2 pb-1 pt-1.5 text-[12px] font-medium text-[#616161]">Prototype</p>
-      <MenuChoice
-        label="Store"
-        value={scenario}
-        options={[
-          ["setup", "New store"],
-          ["active", "Active store"],
-        ]}
-        onChange={onScenario}
-      />
-      {scenario === "setup" ? (
-        <MenuChoice
-          label="Opening"
-          value={arrival}
-          options={[
-            ["tasks", "Tasks"],
-            ["sidekick", "Sidekick"],
-          ]}
-          onChange={onArrival}
-        />
-      ) : null}
-      <MenuChoice
-        label="Navigation"
-        value={menuStyle}
-        options={[
-          ["push", "Push down"],
-          ["drop", "Dropdown"],
-        ]}
-        onChange={onMenuStyle}
-      />
+      <button
+        type="button"
+        role="switch"
+        aria-checked={activeStore}
+        onClick={() => onScenario(activeStore ? "setup" : "active")}
+        className={menuItem}
+      >
+        <span className="grid size-5 place-items-center">
+          <PIcon name="Store" size={16} />
+        </span>
+        <span className="min-w-0 flex-1">Active store</span>
+        <span className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${activeStore ? "bg-[#303030]" : "bg-[#d4d4d4]"}`}>
+          <span
+            className={`absolute top-0.5 size-3 rounded-full bg-white shadow transition-[left] duration-150 ${
+              activeStore ? "left-[14px]" : "left-0.5"
+            }`}
+          />
+        </span>
+      </button>
       <span className={menuDivider} />
       <button
         type="button"
@@ -662,40 +748,6 @@ export function AccountMenu({
         </span>
         Log out
       </button>
-    </div>
-  );
-}
-
-function MenuChoice<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: readonly (readonly [T, string])[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="px-1.5 py-1">
-      <p className="px-1.5 pb-1 text-[12px] text-[#616161]">{label}</p>
-      <div role="group" aria-label={label} className="grid grid-cols-2 gap-0.5 rounded-[10px] bg-[#f1f1f1] p-0.5">
-        {options.map(([option, text]) => {
-          const on = value === option;
-          return (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={on}
-              onClick={() => onChange(option)}
-              className={`h-8 rounded-lg px-2 text-[13px] ${on ? "bg-white font-medium text-[#171817] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.08)]" : "text-[#303030] hover:bg-white/70"}`}
-            >
-              {text}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }

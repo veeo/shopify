@@ -180,6 +180,21 @@ export const mainNav: NavItem[] = [
   },
 ];
 
+/**
+ * Sales-channel marks that fill their artboard (or skip the usual 20px icon padding)
+ * read larger than Home/Orders at the same box. These widths keep the ink near that
+ * ~12px line-icon extent, still centered in the shared 20px slot. Online Store already matches.
+ */
+const channelIconSize: Partial<Record<PolarisIconName, number>> = {
+  AgenticStorefront: 13,
+  PointOfSale: 12.5,
+  LogoShop: 15.5,
+};
+
+export function navIconSize(icon: PolarisIconName) {
+  return channelIconSize[icon] ?? 20;
+}
+
 export const channelNav: NavItem[] = [
   {
     id: "online-store",
@@ -276,6 +291,15 @@ export function navFor(page: PreviewId): { id: string; child: PreviewId | null }
     if (item.children?.some((child) => child.page === page)) return { id: item.id, child: page };
   }
   return { id: "home", child: null };
+}
+
+/** Short page name for sentences and the attach picker. Home, product, and settings aren't nav row ids. */
+export function adminPageTitle(page: PreviewId): string {
+  if (page === "home-setup" || page === "home-active") return "Home";
+  if (page === "product") return "Product";
+  if (page === "payments-setup") return "Payments";
+  if (page === "settings") return "Settings";
+  return pageMeta(page).title;
 }
 
 /** Title, icon, and parent for the panel's top bar. */

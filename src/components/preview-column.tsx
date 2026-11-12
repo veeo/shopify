@@ -283,11 +283,7 @@ export function PreviewColumn({
   const settingsLevel = underlayPage === "settings" || isSettingsPage(underlayPage);
   const headerRef = useRef<HTMLElement>(null);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
-  const [menuTop, setMenuTop] = useState(84);
-  useLayoutEffect(() => {
-    if (!headerRef.current) return;
-    setMenuTop(headerRef.current.offsetHeight + 24);
-  }, [underlayPage, menu]);
+  const dropMenu = state.menuStyle === "drop" && !takeover;
   useEffect(() => {
     const prev = seenPreview.current;
     const previewChanged = prev !== state.preview;
@@ -427,23 +423,35 @@ export function PreviewColumn({
               <PIcon name="ChevronLeft" size={20} />
             </button>
           ) : showChromeMenu ? (
-            <button
-              type="button"
-              aria-label={menu ? "Close admin menu" : "Open admin menu"}
-              aria-expanded={menu}
-              aria-controls="admin-menu"
-              onClick={() => setMenuOpen(!menu, true)}
-              className={circleButton}
-            >
-              <span className="relative grid size-5 place-items-center">
-                <span className={`absolute transition-all duration-200 ${menu ? "scale-75 rotate-90 opacity-0" : "opacity-100"}`}>
-                  <PIcon name="Menu" size={20} />
+            <span className="relative z-40 shrink-0">
+              <button
+                type="button"
+                aria-label={menu ? "Close admin menu" : "Open admin menu"}
+                aria-expanded={menu}
+                aria-controls="admin-menu"
+                onClick={() => setMenuOpen(!menu, true)}
+                className={circleButton}
+              >
+                <span className="relative grid size-5 place-items-center">
+                  <span className={`absolute transition-all duration-200 ${menu ? "scale-75 rotate-90 opacity-0" : "opacity-100"}`}>
+                    <PIcon name="Menu" size={20} />
+                  </span>
+                  <span className={`absolute transition-all duration-200 ${menu ? "opacity-100" : "-rotate-90 scale-75 opacity-0"}`}>
+                    <PIcon name="X" size={20} />
+                  </span>
                 </span>
-                <span className={`absolute transition-all duration-200 ${menu ? "opacity-100" : "-rotate-90 scale-75 opacity-0"}`}>
-                  <PIcon name="X" size={20} />
-                </span>
-              </span>
-            </button>
+              </button>
+              {menu && dropMenu ? (
+                <div
+                  id="admin-menu"
+                  role="menu"
+                  aria-label="Admin menu"
+                  className="pop-in absolute left-0 top-full z-30 mt-1 flex max-h-[min(720px,calc(100dvh-64px))] w-56 origin-top-left flex-col overflow-y-auto rounded-xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_12px_32px_rgba(0,0,0,0.14)] [scrollbar-width:none]"
+                >
+                  <AdminMenu {...menuProps} />
+                </div>
+              ) : null}
+            </span>
           ) : null}
           {sheet ? (
             <button
@@ -518,19 +526,8 @@ export function PreviewColumn({
             />
           </div>
         </div>
-        {state.menuStyle === "drop" && menu && !takeover ? (
-          <>
-            <button type="button" aria-label="Close admin menu" onClick={() => setMenu(false)} className="absolute inset-0 z-20" />
-            <div
-              id="admin-menu"
-              role="menu"
-              aria-label="Admin menu"
-              className="pop-in absolute inset-x-6 z-30 max-h-[calc(100%-108px)] overflow-y-auto rounded-2xl bg-white p-2 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_16px_40px_rgba(0,0,0,0.16)]"
-              style={{ top: menuTop }}
-            >
-              <AdminMenu {...menuProps} />
-            </div>
-          </>
+        {dropMenu && menu ? (
+          <button type="button" aria-label="Close admin menu" onClick={() => setMenuOpen(false, true)} className="absolute inset-0 z-20" />
         ) : null}
         </div>
         {kind ? (

@@ -1,5 +1,5 @@
 import type { PreviewId } from "@/lib/admin-nav";
-import { isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
+import { adminLayoutFromWide, isAdminWideLayout, type AdminLayoutMode } from "@/lib/shell-layout";
 
 /** Filters, the open record, and the draft sitting on top of the admin page. */
 export type ViewState = {
@@ -102,7 +102,20 @@ export function captureWorkspace(state: Capturable, scroll = state.view.scroll):
 
 type EditableProduct = { id: string; title: string; description: string; price: string; status: "Draft" | "Active" };
 
-type Attachable = { attachOn?: boolean; attachPage?: PreviewId; attachWide?: boolean };
+type Attachable = {
+  attachOn?: boolean;
+  attachPage?: PreviewId;
+  attachLayout?: AdminLayoutMode;
+  /** @deprecated prefer attachLayout */
+  attachWide?: boolean;
+};
+
+function resolveAttachLayout(attach?: Attachable | null): AdminLayoutMode | null {
+  if (!attach?.attachOn) return null;
+  if (attach.attachLayout) return attach.attachLayout;
+  if (attach.attachWide != null) return adminLayoutFromWide(attach.attachWide);
+  return "sidebar";
+}
 
 /** Copies a sidekick's saved place onto the live admin. First visits use `homeFor`. */
 export function applyWorkspace<P extends EditableProduct>(
@@ -113,17 +126,24 @@ export function applyWorkspace<P extends EditableProduct>(
 ) {
   const saved = state.workspaces[agentId];
   let workspace = saved ? { ...saved, draft: { ...saved.draft } } : homeFor(agentId, scenario);
+  const attachLayout = resolveAttachLayout(attach);
   if (attach?.attachOn && attach.attachPage) {
+    const wide = attachLayout ? isAdminWideLayout(attachLayout) : false;
     workspace =
       workspace.page === attach.attachPage
-        ? { ...workspace, wide: attach.attachWide ?? workspace.wide }
-        : { ...emptyView(), page: attach.attachPage, wide: attach.attachWide ?? false, draft: {} };
+        ? { ...workspace, wide }
+        : { ...emptyView(), page: attach.attachPage, wide, draft: {} };
   }
   state.workspaces = { ...state.workspaces, [agentId]: workspace };
   const productMissing = workspace.page === "product" && !state.products.some((item) => item.id === workspace.recordId);
   state.preview = productMissing ? "products" : workspace.page;
-  // Keep the merchant’s chosen admin size (sidebar / expanded / takeover) across
-  // sidekick switches — panel layout is a shell preference, not per-agent.
+  // Attach applies the sidekick's saved admin size (including full/takeover → hybrid rail).
+  // Without attach, keep an active takeover until the merchant leaves it; otherwise prefer sidebar.
+  if (attachLayout) {
+    state.adminLayout = attachLayout;
+  } else if (state.adminLayout !== "takeover") {
+    state.adminLayout = "sidebar";
+  }
   state.view = {
     query: workspace.query,
     tab: workspace.tab || "All",
@@ -177,7 +197,7 @@ export type SavedWork = {
   scenario: WorkspaceScenario;
   selectedAgentId: string;
   seq: number;
-  /** Global admin panel size; sticky across sidekick switches. */
+  /** Last admin panel size; reload ignores this in favor of sidebar / attachLayout. */
   adminLayout?: AdminLayoutMode;
   workspaces: Record<string, Workspace>;
   products: SavedProduct[];

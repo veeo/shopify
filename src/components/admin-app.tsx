@@ -3,8 +3,12 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { adminPageTitle } from "@/lib/admin-nav";
+import { attachAlreadySaved, type ColumnToastItem } from "@/components/column-toast";
+import { layoutModePhrase } from "@/components/admin-ui";
 import { AgentNav } from "@/components/agent-nav";
 import { ChatColumn, clearTypedOnce } from "@/components/chat-column";
+import { HybridChatModal } from "@/components/hybrid-chat-modal";
 import { Orb } from "@/components/marks";
 import { OrbAudioProvider } from "@/components/orb-audio";
 import { DesignSystem } from "@/components/design-system";
@@ -30,7 +34,7 @@ import {
 } from "@/lib/prototype";
 import { bundleOf, draftOf, interpret, type ChoiceCard, type DraftSpec } from "@/lib/choices";
 import { segmentsOf, sourcesOf } from "@/lib/turn";
-import type { Chip, Product } from "@/lib/prototype";
+import type { Chip, PreviewId, Product } from "@/lib/prototype";
 import { emptyWork, readWorkSnapshot, saveWork, subscribeWork } from "@/lib/workspace";
 import { useShellLayout } from "@/hooks/use-shell-layout";
 import { agentsRailModeFor, SHELL, type AdminLayoutMode } from "@/lib/shell-layout";
@@ -50,6 +54,14 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
   const [adminSheetOpen, setAdminSheetOpen] = useState(false);
   const [palette, setPalette] = useState<{ open: boolean; scope?: string }>({ open: false });
   const [design, setDesign] = useState(false);
+  const [hybridChatOpen, setHybridChatOpen] = useState(false);
+  const [attachOffer, setAttachOffer] = useState<{
+    token: number;
+    agentId: string;
+    page: PreviewId;
+    layout: AdminLayoutMode;
+    message: string;
+  } | null>(null);
   const layout = useShellLayout();
   // The turn being streamed. Cleared in the same update that commits its reply, so the live view and
   // the committed message swap in one render instead of leaving a blank frame between them.
@@ -480,6 +492,12 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     dispatch({ type: "commit", agentId: pending.agentId, text: partial || "Stopped.", segments: liveMessage ? committedSegments(liveMessage) : undefined, streamed: Boolean(partial) });
   }
 
+  // Attach → full also lands in hybrid with labels (not the minimized icon rail).
+  useEffect(() => {
+    if (state.adminLayout === "takeover") setSidebarOpen(true);
+    else setHybridChatOpen(false);
+  }, [state.adminLayout]);
+
   if (booting) {
     return (
       <div className="relative h-dvh bg-[#0c0d0c]">
@@ -514,16 +532,66 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         ? SHELL.adminWide
         : Math.min(layout.adminWidth, SHELL.adminNarrow);
 
-  function setAdminLayout(mode: AdminLayoutMode) {
+  function applyAdminLayout(mode: AdminLayoutMode) {
     // Entering full expands the hybrid rail; leaving full restores sidekick focus.
     if (mode === "takeover") setSidebarOpen(true);
+    if (mode !== "takeover") setHybridChatOpen(false);
+    if (mode !== state.adminLayout) setAttachOffer(null);
     dispatch({ type: "admin-layout", mode });
   }
 
-  function viewSidekicks() {
-    setSidebarOpen(true);
-    setAdminLayout("sidebar");
+  function onLayoutControl(mode: AdminLayoutMode) {
+    const changed = mode !== state.adminLayout;
+    applyAdminLayout(mode);
+    if (!changed || state.mode !== "thread") return;
+    const agent = selectedAgent(state);
+    if (attachAlreadySaved(agent, state.preview, mode)) return;
+    const page = state.preview;
+    setAttachOffer({
+      token: Date.now(),
+      agentId: agent.id,
+      page,
+      layout: mode,
+      message: `Set ${adminPageTitle(page)} to ${layoutModePhrase(mode)} for ${agent.name}?`,
+    });
   }
+
+  function viewSidekicks() {
+    setHybridChatOpen(false);
+    setSidebarOpen(true);
+    applyAdminLayout("sidebar");
+  }
+
+  function openHybridConversation(id: string) {
+    if (id !== "current") dispatch({ type: "open-conversation", id });
+    setHybridChatOpen(true);
+  }
+
+  const attachLive =
+    attachOffer && attachOffer.agentId === state.selectedAgentId && attachOffer.page === state.preview ? attachOffer : null;
+  if (attachOffer && !attachLive) setAttachOffer(null);
+
+  const attachToasts: ColumnToastItem[] = attachLive
+    ? [
+        {
+          id: "attach-layout",
+          token: attachLive.token,
+          message: attachLive.message,
+          action: {
+            label: "Set default",
+            onClick: () => {
+              dispatch({
+                type: "set-attach",
+                id: attachLive.agentId,
+                page: attachLive.page,
+                layout: attachLive.layout,
+              });
+              setAttachOffer(null);
+            },
+          },
+        },
+      ]
+    : [];
 
   return (
     <OrbAudioProvider>
@@ -553,13 +621,24 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onSearch={() => dispatch({ type: "toggle-search" })}
             onQuery={(query) => dispatch({ type: "search", query })}
             onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
-            onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
-            onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
             onDesignSystem={() => setDesign(true)}
             onViewSidekicks={viewSidekicks}
             onAdminOpen={(id) => dispatch({ type: "rail", id })}
             onAdminGo={(page) => dispatch({ type: "preview", page, layout: "takeover" })}
             onAdminSearch={(scope) => setPalette({ open: true, scope })}
+            onOpenConversation={openHybridConversation}
+          />
+        ) : null}
+        {hybridChatOpen && takeover ? (
+          <HybridChatModal
+            state={state}
+            liveSegments={liveAgentId === agent.id ? liveSegments : null}
+            busy={busy && liveAgentId === agent.id}
+            locked={busy}
+            offline={offline}
+            onClose={() => setHybridChatOpen(false)}
+            onSend={send}
+            onStop={stop}
           />
         ) : null}
         {agentsDrawer ? (
@@ -584,8 +663,6 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onSearch={() => dispatch({ type: "toggle-search" })}
             onQuery={(query) => dispatch({ type: "search", query })}
             onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
-            onArrival={(arrival) => dispatch({ type: "arrival", arrival })}
-            onMenuStyle={(style) => dispatch({ type: "menu-style", style })}
             onDesignSystem={() => {
               setAgentsDrawerOpen(false);
               setDesign(true);
@@ -644,6 +721,9 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onIntroFinished={() => dispatch({ type: "intro-seen" })}
             onChoose={choose}
             onBundle={bundleChoices}
+            toasts={attachToasts}
+            onDismissToast={() => setAttachOffer(null)}
+            composerCovered={takeover}
           />
         </div>
       <PreviewColumn
@@ -654,7 +734,7 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
         dockWidth={dockedAdminWidth}
         takeover={takeover}
         showLayoutControl={!adminSheet && panels.preview}
-        onLayout={setAdminLayout}
+        onLayout={onLayoutControl}
         onCloseSheet={() => setAdminSheetOpen(false)}
         state={state}
         onPreview={(page, wide) =>
