@@ -2,16 +2,14 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AccountMenu, AdminNavSections, Alerts, initials, SidekickRecentChats, StoreMenu } from "@/components/admin-rail";
-import { useDismiss } from "@/components/admin-ui";
 import { IconButton, Orb, ShopifyMark } from "@/components/marks";
 import { ORB_SIZE } from "@/voiceorbs/lib/orb-model";
-import { Tip } from "@/components/chat-column";
+import { SidekickSwitcher, Tip } from "@/components/chat-column";
 import { PIcon } from "@/components/polaris-icon";
 import type { PreviewId } from "@/lib/admin-nav";
 import type { AgentsRailMode } from "@/lib/shell-layout";
 import {
   hiddenAgents,
-  isNavSidekick,
   railGroup,
   recentAgentConversations,
   selectedAgent,
@@ -98,8 +96,6 @@ export function AgentNav({
   const alertsRef = useRef<HTMLSpanElement>(null);
   const [hiddenOpen, setHiddenOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
-  const leadSwitchRef = useRef<HTMLDivElement>(null);
-  useDismiss(switchOpen, leadSwitchRef, () => setSwitchOpen(false));
   const adminRail = railMode === "hybrid" || railMode === "minimized";
   const [mergePhase, setMergePhase] = useState<MergePhase>(adminRail ? "admin" : "agents");
   const query = state.search.trim().toLowerCase();
@@ -430,7 +426,6 @@ export function AgentNav({
       return (
         <div
           key={`lead-${item.id}`}
-          ref={leadSwitchRef}
           className={narrow ? "flex w-full justify-center" : "relative w-full"}
         >
           {button}
@@ -441,29 +436,36 @@ export function AgentNav({
                 aria-label="Switch sidekick"
                 aria-haspopup="menu"
                 aria-expanded={switchOpen}
-                aria-controls="hybrid-sidekick-switcher"
+                aria-controls="sidekick-switcher"
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
                   setSwitchOpen((open) => !open);
                 }}
-                className={`press absolute right-0.5 top-1/2 z-10 grid size-7 -translate-y-1/2 place-items-center rounded-full text-[#8e8f8b] transition-colors hover:bg-white/[0.1] hover:text-white ${
+                className={`press absolute right-0.5 top-1/2 z-10 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-[#8e8f8b] transition-colors hover:bg-white/[0.1] hover:text-white ${
                   switchOpen ? "bg-white/[0.08] text-white" : ""
                 }`}
               >
-                <span className={`grid place-items-center transition-transform duration-200 ${switchOpen ? "rotate-180" : ""}`}>
-                  <PIcon name="ChevronDown" size={16} />
+                <span aria-hidden className="flex h-4 w-3 flex-col items-center justify-center">
+                  <span className="flex h-2.5 w-3 items-end justify-center overflow-hidden">
+                    <PIcon name="ChevronUp" size={12} />
+                  </span>
+                  <span className="flex h-2.5 w-3 items-start justify-center overflow-hidden">
+                    <PIcon name="ChevronDown" size={12} />
+                  </span>
                 </span>
               </button>
               {switchOpen ? (
-                <HybridLeadSwitcher
+                <SidekickSwitcher
                   state={state}
                   current={lead.id}
+                  onDismiss={() => setSwitchOpen(false)}
                   onPick={switchLead}
                   onAdd={() => {
                     setSwitchOpen(false);
                     onAdd();
                   }}
+                  className="left-0 top-[calc(100%+6px)] z-40 w-64 origin-top-left p-1.5"
                 />
               ) : null}
             </>
@@ -824,61 +826,3 @@ export function AgentNav({
   );
 }
 
-/** Compact switcher under the hybrid lead — mirrors the composer SidekickSwitcher. */
-function HybridLeadSwitcher({
-  state,
-  current,
-  onPick,
-  onAdd,
-}: {
-  state: PrototypeState;
-  current: string;
-  onPick: (id: string) => void;
-  onAdd: () => void;
-}) {
-  const agents = state.agents.filter((item) => item.installed && isNavSidekick(item.id, item));
-  return (
-    <div
-      id="hybrid-sidekick-switcher"
-      role="menu"
-      aria-label="Switch sidekick"
-      className="pop-in absolute left-0 top-[calc(100%+6px)] z-40 flex w-64 origin-top-left flex-col rounded-xl border border-white/10 bg-[#1a1a1a] p-1.5 text-white shadow-[0_16px_40px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)]"
-    >
-      <p className="px-2 pb-1 pt-1.5 text-[12px] text-[#8e8f8b]">Switch sidekick</p>
-      <div className="scroll-thin flex max-h-72 flex-col overflow-y-auto">
-        {agents.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="menuitem"
-            aria-current={item.id === current ? "true" : undefined}
-            onClick={(event) => {
-              event.stopPropagation();
-              onPick(item.id);
-            }}
-            className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] hover:bg-white/[0.07]"
-          >
-            <Orb id={item.orb} agentId={item.id} size={ORB_SIZE.menu} colorFrom={item.orbFrom} colorTo={item.orbTo} />
-            <span className="min-w-0 flex-1 truncate">{item.name}</span>
-            {item.id === current ? <PIcon name="Check" size={16} /> : null}
-          </button>
-        ))}
-      </div>
-      <div className="my-1 h-px bg-white/10" />
-      <button
-        type="button"
-        role="menuitem"
-        onClick={(event) => {
-          event.stopPropagation();
-          onAdd();
-        }}
-        className="press press-row flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] text-[#c4c4c4] hover:bg-white/[0.07] hover:text-white"
-      >
-        <span className="grid size-6 place-items-center rounded-full border border-dashed border-white/20">
-          <PIcon name="Plus" size={16} />
-        </span>
-        Add a sidekick
-      </button>
-    </div>
-  );
-}
