@@ -128,13 +128,17 @@ const STATE_RATE: Record<OrbState, number> = {
   idle: 1,
   hover: 1.2,
   selected: 1.08,
-  connecting: 1.15,
-  listening: 1.45,
-  thinking: 1.15,
-  speaking: 1.7,
+  connecting: 1.12,
+  listening: 1.12,
+  thinking: 1.08,
+  speaking: 1.22,
   error: 1.75,
   disabled: 0,
 };
+
+/** Idle fill. Voice states shrink so warp stays inside the canvas. */
+const MESH_IDLE = 1.66;
+const MESH_VOICE = 1.18;
 
 function TwistMesh({
   frameRef,
@@ -175,26 +179,41 @@ function TwistMesh({
     invalidate();
   }, [colorFrom, colorTo, custom, invalidate]);
 
+  const meshRef = useRef<THREE.Mesh>(null);
+
   useFrame((_, delta) => {
     const material = matRef.current;
+    const mesh = meshRef.current;
     if (!material) return;
     const frame = frameRef.current;
     const kick = frame.reduced ? 0 : frame.level;
+    const voiced =
+      frame.state === 'listening' ||
+      frame.state === 'speaking' ||
+      frame.state === 'thinking' ||
+      frame.state === 'connecting';
     const rate = frame.reduced ? 0 : STATE_RATE[frame.state];
     const tint = tintRef.current;
     elapsed.current += Math.min(delta, 0.1);
     material.uniforms.uTime.value = elapsed.current;
-    material.uniforms.uSpeed.value = 0.2 * rate * (1 + 1.1 * kick);
-    material.uniforms.uNoiseDensity.value = 1.5 + 0.8 * kick;
-    material.uniforms.uNoiseStrength.value = 0.16 + 0.55 * kick;
-    material.uniforms.uAmplitude.value = 4.5 + 7 * kick;
+    // Calmer voice reaction — keep the twist, lose the hard crop.
+    material.uniforms.uSpeed.value = 0.2 * rate * (1 + 0.28 * kick);
+    material.uniforms.uNoiseDensity.value = 1.4 + 0.18 * kick;
+    material.uniforms.uNoiseStrength.value = 0.12 + 0.1 * kick;
+    material.uniforms.uAmplitude.value = 3.2 + 1.0 * kick;
     material.uniforms.uFrom.value.copy(tint.from);
     material.uniforms.uTo.value.copy(tint.to);
     material.uniforms.uCustom.value = tint.custom;
+    if (mesh) {
+      const target = voiced ? MESH_VOICE * (1 - 0.1 * kick) : MESH_IDLE;
+      const current = mesh.scale.x;
+      const next = current + (target - current) * Math.min(1, delta * 10);
+      mesh.scale.setScalar(next);
+    }
   });
 
   return (
-    <mesh scale={1.66}>
+    <mesh ref={meshRef} scale={MESH_IDLE}>
       <icosahedronGeometry args={[1, 64]} />
       <shaderMaterial
         ref={matRef}

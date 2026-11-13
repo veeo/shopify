@@ -26,12 +26,12 @@ Values are the shared baseline. Audio adds on top of listening and speaking: a f
 | Rest | 0.16 | 0.35 | 0.10 | 1.00 | 5 /s |
 | Hover | 0.16 | 0.35 | 0.10 | 1.00 | 5 /s |
 | Selected | 0.16 | 0.35 | 0.10 | 1.00 | 5 /s |
-| Listening | 0.70 | 1.00 | 0.18 | 1.00 | 14 /s |
-| Thinking | 0.40 | 0.60 | 0.12 | 1.00 | 8 /s |
-| Speaking | 0.78 | 1.10 | 0.20 | 1.00 | 14 /s |
+| Listening | 0.50 | 0.80 | 0.14 | 0.84 | 12 /s |
+| Thinking | 0.32 | 0.50 | 0.12 | 0.90 | 8 /s |
+| Speaking | 0.55 | 0.90 | 0.15 | 0.82 | 12 /s |
 | Reduced motion | 0.04 | 0 | 0.06 | 1.00 | 8 /s |
 
-States blend. They do not snap. Hover and selected keep the same motion as rest: the circle does not grow, speed up, or tilt. Listening, thinking, and speaking are the reaction, and the silhouette stays inside the circle. Only the selected agent receives the microphone or the reply audio. The microphone opens when dictation or voice mode starts.
+States blend. They do not snap. Hover and selected keep the same motion as rest: the circle does not grow, speed up, or tilt. Listening, thinking, and speaking are the reaction: the orb draws slightly smaller (CSS scale inside the fixed slot) so warp and glow stay inside the circle. Only the selected agent receives the microphone or the reply audio. The microphone opens when dictation or voice mode starts.
 
 Visible orbs keep their idle motion, all at the same pace. Offscreen orbs and hidden tabs pause. Reduced motion holds a frame.
 
@@ -39,7 +39,7 @@ Visible orbs keep their idle motion, all at the same pace. Offscreen orbs and hi
 
 - **Plasma** is the Product ideas orb. The colors stay separated, a glass highlight sits on the sphere, and the idle flow is a step more lively. Talking still speeds it further.
 - **Mercury** is the Trends orb. The ripples and contour deepen with the level, and the idle flow is a step faster.
-- **Twisted sphere** keeps the original twist. Chief of staff uses this style. Talking speeds it.
+- **Twisted sphere** keeps the original twist. Chief of staff uses this style. Talking speeds it gently and draws the mesh a touch smaller so the warp is not cropped.
 - **Marble** is the Campaigns orb. A milky glass marble with a soft blue-to-purple ribbon inside. It stays inside the same circle as the others.
 - **Orbit** is the tool ring (React Bits): a centered violet-to-cyan swirl with an orbiting highlight. The thick speaking look is the base for idle too; listening, thinking, and speaking keep that body and only add voice reaction. Drawn a touch smaller than the filled orbs so the glow isn’t cropped. Adapted from [reactbits.dev/backgrounds/orb](https://reactbits.dev/backgrounds/orb).
 - **Grok Bot, Slackbot, and Muse** keep their artwork. The mark squashes and stretches with the level. Grok and Slackbot answer with their eyes. Neither grows a mouth.

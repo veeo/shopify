@@ -898,9 +898,9 @@ function Sidekick() {
 
 /** Demo levels so listening/speaking in the gallery match a live mic without opening one. */
 const DEMO_LEVEL: Partial<Record<OrbState, number>> = {
-  listening: 0.55,
-  speaking: 0.72,
-  thinking: 0.28,
+  listening: 0.42,
+  speaking: 0.55,
+  thinking: 0.22,
 };
 
 /**
