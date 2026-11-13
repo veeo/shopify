@@ -289,9 +289,10 @@ export function AgentNav({
     const collapsingAway = merging && !isLead;
     const leadMorph = Boolean(opts?.leadSlot) || (merging && isLead);
     const narrow = widthCollapsed;
-    // Lead keeps a fixed size-5 icon box (same as Home/Orders). Orb stays at nav
-    // WebGL size and CSS-scales inside — never resize the box, so it can't sit low.
-    const orbScale = leadMorph && leadScaled ? ORB_SIZE.palette / ORB_SIZE.nav : 1;
+    // Lead icon slot matches Home/Orders ItemIcon: size-5 grid, orb at palette (20).
+    // Morph scales the 20px orb up to nav visually, then back — no absolute/translate
+    // host that can leave a residual offset or sit the canvas low in the row.
+    const leadOrbScale = leadMorph && !leadScaled ? ORB_SIZE.nav / ORB_SIZE.palette : 1;
     const button = (
       <button
         type="button"
@@ -327,8 +328,8 @@ export function AgentNav({
                     : "hover:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#9a9a9a] active:shadow-[0_0_0_2px_#0c0d0c,0_0_0_3px_#bdbdbd]"
                 }`
             : leadMorph
-              ? `press press-row relative flex h-8 w-full min-w-0 items-center gap-2 rounded-full py-0 pl-1.5 ${
-                  opts?.leadSlot ? "pr-8" : "pr-1.5"
+              ? `press press-row relative flex h-8 w-full min-w-0 items-center gap-2 rounded-full py-0 px-1.5 ${
+                  opts?.leadSlot ? "pr-8" : ""
                 } text-left transition-[background-color,box-shadow] duration-300 hover:bg-white/[0.08] ${
                   switchOpen ? "bg-white/[0.08]" : ""
                 }`
@@ -368,7 +369,7 @@ export function AgentNav({
         <span
           className={
             leadMorph
-              ? "relative grid size-5 shrink-0 place-items-center overflow-visible rounded-full"
+              ? "grid size-5 shrink-0 place-items-center overflow-visible"
               : "relative grid shrink-0 place-items-center overflow-visible rounded-full"
           }
           data-flip={leadMorph ? undefined : `agent-orb-${item.id}`}
@@ -382,26 +383,36 @@ export function AgentNav({
           }
         >
           {leadMorph ? (
-            <span
-              className="pointer-events-none absolute left-1/2 top-1/2 grid place-items-center"
-              style={{
-                width: ORB_SIZE.nav,
-                height: ORB_SIZE.nav,
-                transform: `translate(-50%, -50%) scale(${orbScale})`,
-                transformOrigin: "center center",
-                transition: `transform ${mergeEase}`,
-              }}
-            >
+            leadOrbScale === 1 ? (
               <Orb
                 id={item.orb}
                 agentId={item.id}
-                size={ORB_SIZE.nav}
+                size={ORB_SIZE.palette}
                 colorFrom={item.orbFrom}
                 colorTo={item.orbTo}
                 presence="selected"
                 hot={hotId === item.id}
               />
-            </span>
+            ) : (
+              <span
+                className="grid size-5 place-items-center"
+                style={{
+                  transform: `scale(${leadOrbScale})`,
+                  transformOrigin: "center center",
+                  transition: `transform ${mergeEase}`,
+                }}
+              >
+                <Orb
+                  id={item.orb}
+                  agentId={item.id}
+                  size={ORB_SIZE.palette}
+                  colorFrom={item.orbFrom}
+                  colorTo={item.orbTo}
+                  presence="selected"
+                  hot={hotId === item.id}
+                />
+              </span>
+            )
           ) : (
             <Orb
               id={item.orb}
