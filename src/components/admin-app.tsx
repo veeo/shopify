@@ -556,12 +556,6 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
     });
   }
 
-  function viewSidekicks() {
-    setHybridChatOpen(false);
-    setSidebarOpen(true);
-    applyAdminLayout("sidebar");
-  }
-
   function openHybridConversation(id: string) {
     if (id !== "current") dispatch({ type: "open-conversation", id });
     setHybridChatOpen(true);
@@ -622,7 +616,6 @@ export function AdminApp({ initialScenario = "active" }: { initialScenario?: "se
             onQuery={(query) => dispatch({ type: "search", query })}
             onScenario={(scenario) => dispatch({ type: "scenario", scenario })}
             onDesignSystem={() => setDesign(true)}
-            onViewSidekicks={viewSidekicks}
             onAdminOpen={(id) => dispatch({ type: "rail", id })}
             onAdminGo={(page) => dispatch({ type: "preview", page, layout: "takeover" })}
             onAdminSearch={(scope) => setPalette({ open: true, scope })}

@@ -1217,22 +1217,27 @@ function Attachment({ icon, label, className, onRemove }: { icon: PolarisIconNam
   );
 }
 
-function SidekickSwitcher({
+/** Shared sidekick menu — composer orb control and hybrid lead switcher. */
+export function SidekickSwitcher({
   state,
   current,
   onDismiss,
   onPick,
   onAdd,
+  id = "sidekick-switcher",
+  className = "bottom-[calc(100%+8px)] left-0 w-64 origin-bottom-left p-1.5",
 }: {
   state: PrototypeState;
   current: string | null;
   onDismiss: () => void;
   onPick: (id: string) => void;
   onAdd?: () => void;
+  id?: string;
+  className?: string;
 }) {
   const agents = state.agents.filter((item) => item.installed && isNavSidekick(item.id, item));
   return (
-    <Popover id="sidekick-switcher" onDismiss={onDismiss} className="bottom-[calc(100%+8px)] left-0 w-64 origin-bottom-left p-1.5">
+    <Popover id={id} onDismiss={onDismiss} className={className}>
       <p className="px-2 pb-1 pt-1.5 text-[12px] text-[#8e8f8b]">Switch sidekick</p>
       <div className="scroll-thin flex max-h-72 flex-col overflow-y-auto">
         {agents.map((item) => (
