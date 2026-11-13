@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "X-Content-Type-Options", value: "nosniff" },
+          // Keep the floating Vercel Toolbar / Feedback widget off preview + production.
+          { key: "x-vercel-skip-toolbar", value: "1" },
         ],
       },
     ];
