@@ -712,6 +712,151 @@ html.vt-titles::view-transition-old(*):only-child {
   animation: sk-bar 1400ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards;
 }
 
+/* Password gate: logo and orb share one slot and crossfade together. The orb itself never moves. */
+.gate-shell {
+  transition: opacity 320ms ease;
+}
+
+.gate-shell.is-exit {
+  opacity: 0;
+}
+
+.gate-crossfade {
+  grid-area: 1 / 1;
+  transition: opacity 680ms ease-in-out;
+  will-change: opacity;
+}
+
+/* Orb canvas sets pointer-events:auto and would steal bag clicks through the inert layer. */
+.gate-crossfade.pointer-events-none,
+.gate-crossfade.pointer-events-none * {
+  pointer-events: none !important;
+}
+
+/* Load-gate bag only: press + neon/lime fill tween (front brighter, side darker). */
+.gate-bag {
+  --gate-bag-front: #ffffff;
+  --gate-bag-side: #c3c3c3;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0.75rem;
+  background: transparent;
+  cursor: pointer;
+  transform-origin: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gate-bag:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.72);
+  outline-offset: 3px;
+}
+
+.gate-bag:disabled {
+  cursor: default;
+}
+
+.gate-bag svg path:first-of-type {
+  fill: var(--gate-bag-front);
+  transition: fill 340ms cubic-bezier(0.2, 0.8, 0, 1);
+}
+
+.gate-bag svg path:last-of-type {
+  fill: var(--gate-bag-side);
+  transition: fill 340ms cubic-bezier(0.2, 0.8, 0, 1);
+}
+
+.gate-bag.is-pressing {
+  animation: gate-bag-press 280ms cubic-bezier(0.2, 0.8, 0, 1);
+}
+
+@keyframes gate-bag-press {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(0.82);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* The field compresses in place. The bar stays on that line while it fills. */
+.gate-morph {
+  transition:
+    height 520ms cubic-bezier(0.2, 0.8, 0, 1),
+    border-radius 520ms cubic-bezier(0.2, 0.8, 0, 1),
+    background-color 520ms cubic-bezier(0.2, 0.8, 0, 1),
+    box-shadow 520ms cubic-bezier(0.2, 0.8, 0, 1);
+}
+
+.gate-fade {
+  transition: opacity 380ms ease-in-out;
+}
+
+.gate-field-bar {
+  transform: scaleX(0.08);
+  transform-origin: left center;
+  opacity: 0;
+  transition: opacity 600ms ease-in-out;
+}
+
+.gate-field[data-opening] .gate-field-bar {
+  opacity: 1;
+  animation: gate-fill 2800ms linear forwards;
+}
+
+/* Uneven on purpose: a quick first step, a linger, then a clean ease to full. */
+@keyframes gate-fill {
+  0% {
+    transform: scaleX(0.08);
+    animation-timing-function: cubic-bezier(0.15, 0.85, 0.3, 1);
+  }
+  18% {
+    transform: scaleX(0.36);
+    animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  }
+  52% {
+    transform: scaleX(0.51);
+    animation-timing-function: cubic-bezier(0.3, 0.15, 0.25, 1);
+  }
+  78% {
+    transform: scaleX(0.8);
+    animation-timing-function: cubic-bezier(0.2, 0.6, 0.15, 1);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+/* Polaris primary stays the component; its own height token is raised to the large button size. */
+.gate-continue {
+  --p-height-700-6e076: 2.75rem;
+  --p-font-size-button-label-6e076: 0.875rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gate-crossfade,
+  .gate-morph,
+  .gate-fade,
+  .gate-field-bar,
+  .gate-shell,
+  .gate-bag svg path:first-of-type,
+  .gate-bag svg path:last-of-type {
+    transition: none;
+  }
+
+  .gate-field[data-opening] .gate-field-bar,
+  .gate-bag.is-pressing {
+    animation: none;
+  }
+}
+
 @keyframes sk-dot {
   0%,
   80%,

@@ -43,11 +43,18 @@ const bootMs = 1500;
 
 type Turn = { agentId: string; text: string; done: boolean; first: boolean };
 
-export function AdminApp({ initialScenario = "active" }: { initialScenario?: "setup" | "active" }) {
+export function AdminApp({
+  initialScenario = "active",
+  skipBoot = false,
+}: {
+  initialScenario?: "setup" | "active";
+  /** The password gate already played the loader, so the shell opens without a second boot bar. */
+  skipBoot?: boolean;
+}) {
   const [state, setState] = useState<PrototypeState>(() =>
     initialScenario === "active" ? activeState() : { ...setupState("My Store", "sidekick"), signedIn: true },
   );
-  const [booting, setBooting] = useState(true);
+  const [booting, setBooting] = useState(!skipBoot);
   const [offline, setOffline] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [agentsDrawerOpen, setAgentsDrawerOpen] = useState(false);
